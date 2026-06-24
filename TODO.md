@@ -129,6 +129,9 @@ Dashboard panels:
 3. Pilot scope — internal household vs external UHNW families?
 4. Build vs buy — native ledger vs Addepar / Orion / Tamarac?
 5. Compliance — RIA/fiduciary obligations, trade surveillance, regulatory reporting, and audit retention requirements?
+6. Income optimization without principle drawdown — many family offices have recurring income obligations for family members; how should the optimizer target yield/dividends vs selling lots?
+7. Synthetic portfolio data for stress testing — generate realistic household portfolios and price paths for backtest and scenario panels without client data?
+8. Security layer and logging — authentication, authorization, audit-grade request logging, and secrets handling for pilot deployment?
 
 ---
 
