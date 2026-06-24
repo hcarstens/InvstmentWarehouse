@@ -4,6 +4,18 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Phase 0 complete
+
+**Delivered:**
+
+- Infra health panel — SQLite, local data, research sandbox, job queue, object store
+- `/api/health` endpoint (503 when checks fail)
+- GitHub Actions CI — ruff + pytest, no Docker
+
+**Next:** Phase 1 schema design and entity graph views.
+
+---
+
 ## 2026-06-24 — Config moved to configs/
 
 **Context:** Application settings are not secrets; belong in version-controlled TOML.

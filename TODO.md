@@ -14,19 +14,19 @@ use `configs/local.toml` (gitignored) for machine-specific overrides only.
 
 ---
 
-## Phase 0 — Shell + dashboard foundation (current)
+## Phase 0 — Shell + dashboard foundation ✓
 
-**Dashboard at run:** Platform overview, phase roadmap, plane readiness, workflow catalog.
+**Dashboard at run:** Platform overview, phase roadmap, plane readiness, workflow catalog, infra health.
 
 - [x] Repository architecture and package layout
 - [x] `configs/`, `requirements.txt`, `tests/`, `CLAUDE.md`, `.claude/`
 - [x] **Dashboard shell** — `warehouse serve` → status report (phases, planes, workflows)
-- [ ] CI: pytest + ruff on push (no Docker services in CI)
-- [ ] **Dashboard:** infra health panel (SQLite, local paths; optional external services shown as skipped)
+- [x] CI: pytest + ruff on push (no Docker services in CI)
+- [x] **Dashboard:** infra health panel (SQLite, local paths; optional external services shown as skipped)
 
 ---
 
-## Phase 1 — Weeks 1–4: Discovery, schema & data model views
+## Phase 1 — Weeks 1–4: Discovery, schema & data model views (current)
 
 **Dashboard at run:** Entity graph explorer, security master table, schema/migration status.
 

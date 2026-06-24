@@ -21,14 +21,16 @@ PHASES: list[Phase] = [
     Phase(
         number=0,
         name="Shell + dashboard foundation",
-        dashboard_summary="Platform overview, phase roadmap, plane readiness, workflow catalog",
-        status="in_progress",
+        dashboard_summary=(
+            "Platform overview, phase roadmap, plane readiness, workflow catalog, infra health"
+        ),
+        status="complete",
         panels=[
             DashboardPanel(name="Platform overview", phase=0, status="live"),
             DashboardPanel(name="Phase roadmap", phase=0, status="live"),
             DashboardPanel(name="Plane readiness", phase=0, status="live"),
             DashboardPanel(name="Workflow catalog", phase=0, status="live"),
-            DashboardPanel(name="Infra health", phase=0, status="planned"),  # SQLite + local paths
+            DashboardPanel(name="Infra health", phase=0, status="live"),
         ],
     ),
     Phase(

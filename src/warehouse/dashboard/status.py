@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from warehouse import __version__
 from warehouse.config import get_settings
 from warehouse.dashboard.phases import PHASES, Phase
+from warehouse.infra.health import InfraCheck, run_infra_checks
 from warehouse.workflows.catalog import WORKFLOW_CATALOG, WorkflowDefinition
 
 
@@ -26,8 +27,10 @@ class StatusReport(BaseModel):
     phases: list[Phase]
     planes: list[PlaneStatus]
     workflows: list[WorkflowDefinition]
+    infra_checks: list[InfraCheck]
     live_panel_count: int
     planned_panel_count: int
+    infra_error_count: int
 
 
 PLANES: list[PlaneStatus] = [
@@ -42,6 +45,7 @@ PLANES: list[PlaneStatus] = [
 def build_status_report() -> StatusReport:
     settings = get_settings()
     all_panels = [panel for phase in PHASES for panel in phase.panels]
+    infra_checks = run_infra_checks(settings)
     return StatusReport(
         app_env=settings.app_env,
         build_order="ledger + security master → entity graph → optimizer → OMS",
@@ -49,6 +53,8 @@ def build_status_report() -> StatusReport:
         phases=PHASES,
         planes=PLANES,
         workflows=WORKFLOW_CATALOG,
+        infra_checks=infra_checks,
         live_panel_count=sum(1 for p in all_panels if p.status == "live"),
         planned_panel_count=sum(1 for p in all_panels if p.status != "live"),
+        infra_error_count=sum(1 for c in infra_checks if c.status == "error"),
     )

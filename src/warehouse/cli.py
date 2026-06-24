@@ -18,7 +18,10 @@ def info() -> None:
     click.echo("")
     click.echo(f"North star: {report.north_star}")
     click.echo(f"Build order: {report.build_order}")
-    click.echo(f"Dashboard panels: {report.live_panel_count} live, {report.planned_panel_count} planned")
+    click.echo(
+        f"Dashboard panels: {report.live_panel_count} live, "
+        f"{report.planned_panel_count} planned"
+    )
     click.echo("")
     click.echo("Run `warehouse serve` for the living status report.")
 

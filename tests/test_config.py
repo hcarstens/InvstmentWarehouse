@@ -1,8 +1,6 @@
 """Configuration loading tests."""
 
-from pathlib import Path
-
-from warehouse.config import Settings, default_config_path, get_settings, repo_root
+from warehouse.config import default_config_path, get_settings, repo_root
 
 
 def test_default_config_path_exists() -> None:

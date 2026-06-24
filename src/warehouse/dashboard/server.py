@@ -5,12 +5,8 @@ from __future__ import annotations
 import html
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import TYPE_CHECKING
 
 from warehouse.dashboard.status import build_status_report
-
-if TYPE_CHECKING:
-    from socketserver import ThreadingMixIn
 
 
 def _badge(text: str, kind: str) -> str:
@@ -27,6 +23,10 @@ def _phase_kind(status: str) -> str:
 
 def _panel_kind(status: str) -> str:
     return {"live": "ok", "stub": "warn", "planned": "muted"}.get(status, "muted")
+
+
+def _infra_kind(status: str) -> str:
+    return {"ok": "ok", "skipped": "muted", "error": "err"}.get(status, "muted")
 
 
 def render_html() -> str:
@@ -56,6 +56,13 @@ def render_html() -> str:
         f"<td>{w.sla_hours or '—'}</td></tr>"
         for w in report.workflows
     )
+    infra_rows = "".join(
+        f"<tr><td>{html.escape(c.component)}</td>"
+        f"<td>{_badge(c.status, _infra_kind(c.status))}</td>"
+        f"<td>{html.escape(c.detail)}</td>"
+        f"<td>{html.escape(c.error) if c.error else '—'}</td></tr>"
+        for c in report.infra_checks
+    )
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -79,6 +86,7 @@ def render_html() -> str:
     .badge-ok {{ background: #d1fae5; color: #065f46; }}
     .badge-warn {{ background: #fef3c7; color: #92400e; }}
     .badge-muted {{ background: #e5e7eb; color: #374151; }}
+    .badge-err {{ background: #fee2e2; color: #991b1b; }}
     footer {{ color: #666; font-size: 0.85rem; margin-top: 1.5rem; }}
   </style>
 </head>
@@ -92,7 +100,16 @@ def render_html() -> str:
     <div class="metric"><strong>{report.planned_panel_count}</strong> planned panels</div>
     <div class="metric"><strong>{len(report.workflows)}</strong> workflows</div>
     <div class="metric"><strong>{len(report.planes)}</strong> planes</div>
+    <div class="metric"><strong>{report.infra_error_count}</strong> infra errors</div>
   </div>
+
+  <section>
+    <h2>Infrastructure health</h2>
+    <table>
+      <thead><tr><th>Component</th><th>Status</th><th>Detail</th><th>Error</th></tr></thead>
+      <tbody>{infra_rows}</tbody>
+    </table>
+  </section>
 
   <section>
     <h2>Phase roadmap</h2>
@@ -126,7 +143,7 @@ def render_html() -> str:
     </table>
   </section>
 
-  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">JSON</a></footer>
+  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">JSON</a> · <a href="/api/health">health</a></footer>
 </body>
 </html>"""
 
@@ -137,6 +154,17 @@ class DashboardHandler(BaseHTTPRequestHandler):
             body = render_html().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path == "/api/health":
+            from warehouse.infra.health import run_infra_checks
+
+            checks = run_infra_checks()
+            body = json.dumps([c.model_dump() for c in checks], indent=2).encode()
+            has_error = any(c.status == "error" for c in checks)
+            self.send_response(503 if has_error else 200)
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

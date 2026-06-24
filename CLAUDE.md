@@ -26,8 +26,8 @@ Rules:
   with `TODO.md`
 - Prefer adding a panel over adding hidden backend-only code
 
-Current live panels (Phase 0): platform overview, phase roadmap, plane readiness, workflow
-catalog. See `TODO.md` for per-phase panel deliverables.
+Current live panels (Phase 0, complete): platform overview, phase roadmap, plane readiness,
+workflow catalog, infra health. See `TODO.md` for per-phase panel deliverables.
 
 ## Public repository & early dev
 

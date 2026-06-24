@@ -3,7 +3,13 @@
 from decimal import Decimal
 
 from warehouse.data.security_master import AssetClass, TaxCharacter
-from warehouse.models.entities import Entity, EntityGraph, EntityType, Relationship, RelationshipType
+from warehouse.models.entities import (
+    Entity,
+    EntityGraph,
+    EntityType,
+    Relationship,
+    RelationshipType,
+)
 from warehouse.workflows.catalog import WORKFLOW_CATALOG
 
 
