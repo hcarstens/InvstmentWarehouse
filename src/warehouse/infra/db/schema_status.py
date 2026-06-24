@@ -14,13 +14,16 @@ from warehouse.infra.db.migrate import current_revision
 from warehouse.infra.db.models import (
     EntityRelationshipRow,
     EntityRow,
+    IngestRunRow,
     LotRow,
+    MarketPriceRow,
+    ReconciliationBreakRow,
     SchemaMigrationMetaRow,
     SecurityRow,
     WorkflowDefinitionRow,
 )
 
-HEAD_REVISION = "001_initial"
+HEAD_REVISION = "002_phase2"
 
 TRACKED_TABLES: tuple[type, ...] = (
     EntityRow,
@@ -28,6 +31,9 @@ TRACKED_TABLES: tuple[type, ...] = (
     SecurityRow,
     LotRow,
     WorkflowDefinitionRow,
+    IngestRunRow,
+    ReconciliationBreakRow,
+    MarketPriceRow,
 )
 
 

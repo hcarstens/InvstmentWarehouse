@@ -1,8 +1,11 @@
 """CLI entry point."""
 
+from pathlib import Path
+
 import click
 
 from warehouse.dashboard.status import build_status_report
+from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
 
 
 @click.group()
@@ -42,6 +45,44 @@ def db_bootstrap() -> None:
 
     revision = bootstrap_database(seed=True)
     click.echo(f"Database bootstrapped at revision {revision}")
+
+
+@main.command()
+@click.argument("file", type=click.Path(exists=True, path_type=Path))
+@click.option("--custodian", default="custodian_schwab", show_default=True)
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def ingest(file: Path, custodian: str, household: str) -> None:
+    """Ingest a custodian CSV file (account_id,ticker,quantity,as_of_date)."""
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        summary = run_custodian_ingest(
+            session,
+            file,
+            custodian_id=custodian,
+            household_id=household,
+        )
+    click.echo(f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)")
+
+
+@main.command()
+@click.argument("file", type=click.Path(exists=True, path_type=Path))
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def refresh(file: Path, household: str) -> None:
+    """Run daily refresh workflow: ingest → reconcile → lots → corp actions."""
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.workflows.daily_refresh import run_daily_refresh
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        result = run_daily_refresh(session, file, household_id=household)
+    click.echo(f"Refresh {result.run_id}: {result.status}")
+    for step in result.steps:
+        click.echo(f"  {step.step_name}: {step.status} — {step.detail or ''}")
 
 
 @main.command()

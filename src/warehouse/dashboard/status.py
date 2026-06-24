@@ -42,8 +42,18 @@ PLANES: list[PlaneStatus] = [
     ),
     PlaneStatus(name="Research", package="warehouse.research", readiness="stub", note="Backtest harness scaffolded"),
     PlaneStatus(name="Decision", package="warehouse.decision", readiness="partial", note="IPS/optimizer models only"),
-    PlaneStatus(name="Execution", package="warehouse.execution", readiness="stub", note="Deferred until reconciliation v0"),
-    PlaneStatus(name="Reporting", package="warehouse.reporting", readiness="stub", note="Performance model only"),
+    PlaneStatus(
+        name="Execution",
+        package="warehouse.execution",
+        readiness="partial",
+        note="Reconciliation v0 live; OMS deferred",
+    ),
+    PlaneStatus(
+        name="Reporting",
+        package="warehouse.reporting",
+        readiness="partial",
+        note="Household P&L and lot positions live",
+    ),
 ]
 
 

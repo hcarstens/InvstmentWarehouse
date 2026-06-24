@@ -54,6 +54,7 @@ select = ["E", "F", "I", "UP"]
 "src/warehouse/dashboard/server.py" = ["E501"]
 "src/warehouse/dashboard/status.py" = ["E501"]
 "tests/test_architecture.py" = ["E501"]
+"src/warehouse/dashboard/render_phase2.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.11"

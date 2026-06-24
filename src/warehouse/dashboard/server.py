@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
+from warehouse.dashboard.phase2_data import load_phase2_dashboard
+from warehouse.dashboard.render_phase2 import render_phase2_sections
 from warehouse.dashboard.status import build_status_report
 
 
@@ -39,6 +41,7 @@ def _security_query_from_path(path: str) -> str | None:
 def render_html(security_query: str | None = None) -> str:
     report = build_status_report()
     phase1 = load_phase1_dashboard(security_query=security_query)
+    phase2 = load_phase2_dashboard()
     phase_rows = "".join(
         f"<tr><td>Phase {p.number}</td><td>{html.escape(p.name)}</td>"
         f"<td>{_badge(p.status, _phase_kind(p.status))}</td>"
@@ -109,6 +112,7 @@ def render_html(security_query: str | None = None) -> str:
         for t in schema.tables
     )
     q_value = html.escape(phase1.security_query or "")
+    phase2_html = render_phase2_sections(phase2)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -197,6 +201,8 @@ def render_html(security_query: str | None = None) -> str:
     </table>
   </section>
 
+{phase2_html}
+
   <section>
     <h2>Phase roadmap</h2>
     <table>
@@ -229,7 +235,7 @@ def render_html(security_query: str | None = None) -> str:
     </table>
   </section>
 
-  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/phase1">phase1</a></footer>
+  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/phase1">phase1</a> · <a href="/api/phase2">phase2</a></footer>
 </body>
 </html>"""
 
@@ -240,6 +246,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             body = render_html(security_query=_security_query_from_path(self.path)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path.startswith("/api/phase2"):
+            data = load_phase2_dashboard()
+            body = data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not data.error else 503)
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

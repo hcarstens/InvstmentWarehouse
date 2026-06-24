@@ -4,6 +4,36 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Phase 2 complete
+
+**Delivered:**
+
+- Migration `002_phase2` — ingest, custodian positions, reconciliation breaks, audit log, daily refresh, market prices
+- Schwab CSV ingest + `warehouse ingest` / `warehouse refresh` CLI
+- Daily refresh workflow (5 steps) with research sandbox file copy
+- Reconciliation v0 — custodian vs lot ledger quantity compare
+- Dashboard panels: ingest, positions/P&L, recon queue, refresh timeline, audit stream
+- `/api/phase2` endpoint
+
+**Next:** Phase 3 tax-aware optimizer and decision plane dashboard.
+
+---
+
+## 2026-06-24 — README CLI reference
+
+**Context:** Documented the `warehouse` CLI for contributors and public-repo clones.
+
+**Added to `README.md`:**
+
+- Setup (`pip install -e ".[dev]"`)
+- Dashboard commands (`serve`, `info`) and API URLs
+- Database commands (`db bootstrap`, `db upgrade`, `db seed`)
+- Dev commands (`pytest`, `ruff`)
+
+**Next:** Phase 2 custodian ingest and positions dashboard.
+
+---
+
 ## 2026-06-24 — Phase 1 complete
 
 **Delivered:**

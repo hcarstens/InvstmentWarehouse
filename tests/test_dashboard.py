@@ -8,7 +8,7 @@ from warehouse.dashboard.status import build_status_report
 def test_status_report_includes_all_phases() -> None:
     report = build_status_report()
     assert len(report.phases) == len(PHASES)
-    assert report.live_panel_count >= 8
+    assert report.live_panel_count >= 13
     assert report.infra_error_count == 0
     assert len(report.infra_checks) == 5
     assert len(report.workflows) == 6
@@ -20,6 +20,9 @@ def test_render_html_contains_key_sections() -> None:
     assert "Entity graph" in html
     assert "Security master" in html
     assert "Schema status" in html
+    assert "Ingest status" in html
+    assert "Positions" in html and "lots" in html
+    assert "Audit log stream" in html
     assert "Phase roadmap" in html
     assert "Dashboard panels" in html
     assert "Workflow catalog" in html

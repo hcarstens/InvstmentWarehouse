@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from sqlalchemy import inspect, select, text
 from sqlalchemy.engine import Engine
 
@@ -45,6 +46,14 @@ def record_migration_meta(revision: str) -> None:
         )
 
 
+def head_revision() -> str:
+    script = ScriptDirectory.from_config(alembic_config())
+    head = script.get_current_head()
+    if head is None:
+        raise RuntimeError("No alembic head revision configured")
+    return head
+
+
 def upgrade_head() -> str:
     """Apply all pending migrations. Returns current revision id."""
     cfg = alembic_config()
@@ -58,7 +67,8 @@ def upgrade_head() -> str:
 
 def ensure_migrated() -> str:
     """Upgrade to head if needed."""
+    head = head_revision()
     revision = current_revision()
-    if revision != "001_initial":
+    if revision != head:
         return upgrade_head()
-    return revision
+    return revision or head

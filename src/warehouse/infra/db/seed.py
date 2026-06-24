@@ -14,6 +14,7 @@ from warehouse.infra.db.models import (
     EntityRelationshipRow,
     EntityRow,
     LotRow,
+    MarketPriceRow,
     SecurityRow,
     WorkflowDefinitionRow,
 )
@@ -23,12 +24,28 @@ from warehouse.workflows.catalog import WORKFLOW_CATALOG
 DEMO_HOUSEHOLD_ID = "hh_smith"
 
 
+def seed_market_prices(session: Session) -> None:
+    existing = session.scalar(select(MarketPriceRow.security_id).limit(1))
+    if existing:
+        return
+    prices = [
+        ("sec_vti", Decimal("245.50")),
+        ("sec_bnd", Decimal("73.10")),
+        ("sec_aapl", Decimal("195.20")),
+    ]
+    as_of = date(2026, 6, 24)
+    session.add_all(
+        [MarketPriceRow(security_id=s, price=p, as_of_date=as_of) for s, p in prices]
+    )
+
+
 def seed_demo_data(session: Session) -> bool:
     """Insert demo graph, securities, lots, workflows. Returns True if newly seeded."""
     existing = session.scalar(
         select(EntityRow).where(EntityRow.entity_id == DEMO_HOUSEHOLD_ID)
     )
     if existing:
+        seed_market_prices(session)
         return False
 
     entities = [
@@ -191,4 +208,5 @@ def seed_demo_data(session: Session) -> bool:
     session.add_all(securities)
     session.add_all(lots)
     session.add_all(workflows)
+    seed_market_prices(session)
     return True

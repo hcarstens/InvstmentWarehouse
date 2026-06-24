@@ -82,3 +82,92 @@ class SchemaMigrationMetaRow(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     revision: Mapped[str] = mapped_column(String(64), nullable=False)
     applied_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class IngestRunRow(Base):
+    __tablename__ = "ingest_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    custodian_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    rows_processed: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+
+class CustodianPositionRow(Base):
+    __tablename__ = "custodian_positions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ingest_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("ingest_runs.run_id"), nullable=False, index=True
+    )
+    account_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    security_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class ReconciliationBreakRow(Base):
+    __tablename__ = "reconciliation_breaks"
+
+    break_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    ingest_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("ingest_runs.run_id"), nullable=False, index=True
+    )
+    account_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    security_id: Mapped[str | None] = mapped_column(String(64))
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    opened_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime)
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class AuditLogRow(Base):
+    __tablename__ = "audit_log"
+
+    entry_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    resource_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    household_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+
+
+class DailyRefreshRunRow(Base):
+    __tablename__ = "daily_refresh_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+
+class DailyRefreshStepRow(Base):
+    __tablename__ = "daily_refresh_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    refresh_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("daily_refresh_runs.run_id"), nullable=False, index=True
+    )
+    step_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    detail: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+
+
+class MarketPriceRow(Base):
+    __tablename__ = "market_prices"
+
+    security_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("securities.security_id"), primary_key=True
+    )
+    price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
