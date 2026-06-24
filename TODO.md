@@ -133,6 +133,7 @@ Dashboard panels:
 7. Synthetic portfolio data for stress testing — generate realistic household portfolios and price paths for backtest and scenario panels without client data?
 8. Security layer and logging — authentication, authorization, audit-grade request logging, and secrets handling for pilot deployment?
 9. Heuristic agents & report writer — how should agent-driven workflows (IPS drift triage, recon exceptions, optimizer narrative) and the heuristic report writer integrate with `warehouse serve`, the audit trail, and advisor approval gates without bypassing frozen, replayable outputs?
+10. **Agent for IPS compliance monitoring** — Explore an agent that watches household state against digitized IPS constraints and narrative governance (`docs/research/ips.md`): strategic allocation bands, concentration limits, restricted lists, liquidity floors, ESG exclusions. How does it complement (not replace) rule-based Phase 3 drift monitoring? Scope: interpret prose IPS sections vs enforce machine-readable rules, triage alerts, explain breaches, escalate to advisor approval — never autonomous trades. When scoped, ship a dashboard panel alongside the existing IPS drift monitor.
 
 ---
 
