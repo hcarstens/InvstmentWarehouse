@@ -5,7 +5,9 @@ from __future__ import annotations
 import html
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, urlparse
 
+from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.status import build_status_report
 
 
@@ -29,8 +31,14 @@ def _infra_kind(status: str) -> str:
     return {"ok": "ok", "skipped": "muted", "error": "err"}.get(status, "muted")
 
 
-def render_html() -> str:
+def _security_query_from_path(path: str) -> str | None:
+    query = parse_qs(urlparse(path).query).get("q", [])
+    return query[0] if query else None
+
+
+def render_html(security_query: str | None = None) -> str:
     report = build_status_report()
+    phase1 = load_phase1_dashboard(security_query=security_query)
     phase_rows = "".join(
         f"<tr><td>Phase {p.number}</td><td>{html.escape(p.name)}</td>"
         f"<td>{_badge(p.status, _phase_kind(p.status))}</td>"
@@ -63,6 +71,44 @@ def render_html() -> str:
         f"<td>{html.escape(c.error) if c.error else '—'}</td></tr>"
         for c in report.infra_checks
     )
+    error_banner = ""
+    if phase1.error:
+        error_banner = (
+            f'<section class="error-banner"><strong>Data load error:</strong> '
+            f"{html.escape(phase1.error)}</section>"
+        )
+    entity_rows = "".join(
+        f"<tr><td>{html.escape(e.entity_id)}</td>"
+        f"<td>{html.escape(e.entity_type.value)}</td>"
+        f"<td>{html.escape(e.name)}</td>"
+        f"<td>{html.escape(e.household_id or '—')}</td></tr>"
+        for e in phase1.entity_graph.entities
+    )
+    relationship_rows = "".join(
+        f"<tr><td>{html.escape(r.source_id)}</td>"
+        f"<td>{html.escape(r.relationship_type.value)}</td>"
+        f"<td>{html.escape(r.target_id)}</td></tr>"
+        for r in phase1.entity_graph.relationships
+    )
+    security_rows = "".join(
+        f"<tr><td>{html.escape(s.ticker or '—')}</td>"
+        f"<td>{html.escape(s.name)}</td>"
+        f"<td>{html.escape(s.asset_class.value)}</td>"
+        f"<td>{html.escape(s.tax_character.value)}</td>"
+        f"<td>{html.escape(s.wash_sale_substitute_group or '—')}</td></tr>"
+        for s in phase1.securities
+    )
+    schema = phase1.schema_status
+    schema_revision = (
+        _badge("current", "ok")
+        if schema.is_current
+        else _badge("pending", "warn")
+    )
+    schema_rows = "".join(
+        f"<tr><td>{html.escape(t.name)}</td><td>{t.row_count}</td></tr>"
+        for t in schema.tables
+    )
+    q_value = html.escape(phase1.security_query or "")
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -87,6 +133,8 @@ def render_html() -> str:
     .badge-warn {{ background: #fef3c7; color: #92400e; }}
     .badge-muted {{ background: #e5e7eb; color: #374151; }}
     .badge-err {{ background: #fee2e2; color: #991b1b; }}
+    .error-banner {{ background: #fee2e2; border: 1px solid #fca5a5; color: #991b1b; padding: 0.75rem 1rem; border-radius: 8px; margin: 1rem 0; }}
+    .search {{ margin-bottom: 0.75rem; }}
     footer {{ color: #666; font-size: 0.85rem; margin-top: 1.5rem; }}
   </style>
 </head>
@@ -94,6 +142,7 @@ def render_html() -> str:
   <h1>Investment Warehouse</h1>
   <p class="subtitle">Living status report · v{html.escape(report.version)} · {html.escape(report.app_env)}</p>
   <p><strong>North star:</strong> {html.escape(report.north_star)} · <strong>Build order:</strong> {html.escape(report.build_order)}</p>
+  {error_banner}
 
   <div class="metrics">
     <div class="metric"><strong>{report.live_panel_count}</strong> live panels</div>
@@ -108,6 +157,43 @@ def render_html() -> str:
     <table>
       <thead><tr><th>Component</th><th>Status</th><th>Detail</th><th>Error</th></tr></thead>
       <tbody>{infra_rows}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Entity graph — {html.escape(phase1.household_id)}</h2>
+    <h3>Entities</h3>
+    <table>
+      <thead><tr><th>ID</th><th>Type</th><th>Name</th><th>Household</th></tr></thead>
+      <tbody>{entity_rows or '<tr><td colspan="4">No entities</td></tr>'}</tbody>
+    </table>
+    <h3>Relationships</h3>
+    <table>
+      <thead><tr><th>Source</th><th>Edge</th><th>Target</th></tr></thead>
+      <tbody>{relationship_rows or '<tr><td colspan="3">No relationships</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Security master</h2>
+    <form class="search" method="get" action="/">
+      <label>Search <input type="search" name="q" value="{q_value}" placeholder="ticker, name, CUSIP"></label>
+      <button type="submit">Filter</button>
+    </form>
+    <table>
+      <thead><tr><th>Ticker</th><th>Name</th><th>Asset class</th><th>Tax character</th><th>Wash-sale group</th></tr></thead>
+      <tbody>{security_rows or '<tr><td colspan="5">No securities</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Schema status</h2>
+    <p>Revision: <code>{html.escape(schema.current_revision or 'none')}</code> / {html.escape(schema.head_revision)} {schema_revision}</p>
+    <p>Last applied: {schema.last_applied_at.isoformat() if schema.last_applied_at else '—'}</p>
+    {f'<p class="error-banner">{html.escape(schema.error)}</p>' if schema.error else ''}
+    <table>
+      <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+      <tbody>{schema_rows or '<tr><td colspan="2">No tables — run warehouse db bootstrap</td></tr>'}</tbody>
     </table>
   </section>
 
@@ -143,17 +229,25 @@ def render_html() -> str:
     </table>
   </section>
 
-  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">JSON</a> · <a href="/api/health">health</a></footer>
+  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/phase1">phase1</a></footer>
 </body>
 </html>"""
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
-        if self.path in ("/", "/dashboard"):
-            body = render_html().encode()
+        if self.path.startswith("/") and self.path.split("?")[0] in ("/", "/dashboard"):
+            body = render_html(security_query=_security_query_from_path(self.path)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif self.path.startswith("/api/phase1"):
+            data = load_phase1_dashboard(security_query=_security_query_from_path(self.path))
+            body = data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not data.error else 503)
+            self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)

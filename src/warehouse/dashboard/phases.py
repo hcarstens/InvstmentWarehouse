@@ -37,11 +37,11 @@ PHASES: list[Phase] = [
         number=1,
         name="Discovery, schema & data model views",
         dashboard_summary="Entity graph explorer, security master table, schema/migration status",
-        status="planned",
+        status="complete",
         panels=[
-            DashboardPanel(name="Entity graph view", phase=1, status="planned"),
-            DashboardPanel(name="Security master browser", phase=1, status="planned"),
-            DashboardPanel(name="Schema status", phase=1, status="planned"),
+            DashboardPanel(name="Entity graph view", phase=1, status="live"),
+            DashboardPanel(name="Security master browser", phase=1, status="live"),
+            DashboardPanel(name="Schema status", phase=1, status="live"),
         ],
     ),
     Phase(

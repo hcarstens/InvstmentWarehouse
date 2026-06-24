@@ -4,6 +4,20 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Phase 1 complete
+
+**Delivered:**
+
+- Alembic `001_initial` — entities, relationships, securities, lots, workflow_definitions
+- Demo seed — Smith household graph, 3 securities, 3 lots, 6 workflows
+- CLI: `warehouse db upgrade`, `warehouse db seed`, `warehouse db bootstrap`
+- Dashboard panels: entity graph, security master search, schema status
+- `/api/phase1` JSON endpoint
+
+**Next:** Phase 2 custodian ingest and positions dashboard.
+
+---
+
 ## 2026-06-24 — Phase 0 complete
 
 **Delivered:**

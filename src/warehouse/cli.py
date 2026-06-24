@@ -10,6 +10,40 @@ def main() -> None:
     """Investment Warehouse — positions-first wealth platform."""
 
 
+@main.group()
+def db() -> None:
+    """Database migrations and seed data."""
+
+
+@db.command("upgrade")
+def db_upgrade() -> None:
+    """Apply Alembic migrations to head."""
+    from warehouse.infra.db.migrate import upgrade_head
+
+    revision = upgrade_head()
+    click.echo(f"Database at revision {revision}")
+
+
+@db.command("seed")
+def db_seed() -> None:
+    """Seed demo household data (idempotent)."""
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.seed import seed_demo_data
+
+    with session_scope() as session:
+        created = seed_demo_data(session)
+    click.echo("Demo data seeded." if created else "Demo data already present.")
+
+
+@db.command("bootstrap")
+def db_bootstrap() -> None:
+    """Migrate to head and seed demo data."""
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    revision = bootstrap_database(seed=True)
+    click.echo(f"Database bootstrapped at revision {revision}")
+
+
 @main.command()
 def info() -> None:
     """Print platform planes and build order."""

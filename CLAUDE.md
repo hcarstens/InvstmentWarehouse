@@ -112,6 +112,8 @@ pip install -e ".[dev]"
 pytest                        # no Docker required
 pytest tests/test_frozen.py   # immutability registry
 warehouse serve               # living status dashboard (primary entry point)
+warehouse db bootstrap        # migrate + seed demo household
+warehouse db upgrade          # Alembic migrations only
 warehouse info                # CLI summary
 warehouse --help
 ```

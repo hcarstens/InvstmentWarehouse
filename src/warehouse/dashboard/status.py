@@ -34,7 +34,12 @@ class StatusReport(BaseModel):
 
 
 PLANES: list[PlaneStatus] = [
-    PlaneStatus(name="Data", package="warehouse.data", readiness="partial", note="Models defined; ingest pending"),
+    PlaneStatus(
+        name="Data",
+        package="warehouse.data",
+        readiness="live",
+        note="Entity graph, security master, lot schema in SQLite",
+    ),
     PlaneStatus(name="Research", package="warehouse.research", readiness="stub", note="Backtest harness scaffolded"),
     PlaneStatus(name="Decision", package="warehouse.decision", readiness="partial", note="IPS/optimizer models only"),
     PlaneStatus(name="Execution", package="warehouse.execution", readiness="stub", note="Deferred until reconciliation v0"),

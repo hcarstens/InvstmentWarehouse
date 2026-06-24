@@ -1,11 +1,26 @@
 """Shared pytest fixtures."""
 
+import os
 from decimal import Decimal
 
 import pytest
 
+from warehouse.config import get_settings
 from warehouse.data.ledger import Lot
 from warehouse.data.security_master import AssetClass, Security, TaxCharacter
+from warehouse.infra.db.bootstrap import bootstrap_database
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolated_database(tmp_path_factory: pytest.TempPathFactory) -> None:
+    db_dir = tmp_path_factory.mktemp("warehouse_db")
+    db_file = db_dir / "test.db"
+    os.environ["DATABASE_URL"] = f"sqlite:///{db_file}"
+    get_settings.cache_clear()
+    bootstrap_database(seed=True)
+    yield
+    get_settings.cache_clear()
+    os.environ.pop("DATABASE_URL", None)
 
 
 @pytest.fixture
