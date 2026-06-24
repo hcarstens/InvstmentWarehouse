@@ -1,0 +1,34 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Local overrides (optional; defaults in configs/development.toml)
+configs/local.toml
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Runtime / local data
+runs/
+data/*
+!data/.gitkeep
+*.db
+*.sqlite3
+
+# Secrets
+*.pem
+credentials.json

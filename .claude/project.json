@@ -1,0 +1,4 @@
+{
+  "project": "invstment-warehouse",
+  "instructions": "Read CLAUDE.md before making changes. Errors bubble to surface — no silent failures. Register immutable types in warehouse.integrity.frozen_registry and run tests/test_frozen.py. Public GitHub repo. Settings in configs/development.toml. Dashboard-first."
+}

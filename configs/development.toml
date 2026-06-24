@@ -1,0 +1,30 @@
+# Default development config — committed to the public repo (not secrets).
+# Override path: WAREHOUSE_CONFIG=configs/staging.toml
+
+app_env = "development"
+log_level = "debug"
+
+# Early dev: SQLite (no Docker). Phase 4: Postgres URL.
+database_url = "sqlite:///./data/warehouse_dev.db"
+local_data_path = "./data"
+
+# Object store — local filesystem until Phase 4
+object_store_bucket = "warehouse-dev"
+object_store_endpoint = ""
+object_store_access_key = ""
+object_store_secret_key = ""
+
+# Empty = in-process jobs (no Redis). Phase 4: redis://localhost:6379/0
+job_queue_url = ""
+
+# Tax / optimizer — version-pinned for audit replay
+tax_config_version = "2026.01"
+fed_stcg_rate = 0.37
+fed_ltcg_rate = 0.20
+niit_rate = 0.038
+
+# Research sandbox — isolated from production client data
+research_sandbox_path = "./runs/research"
+walk_forward_purge_days = 5
+
+household_rls_enabled = false
