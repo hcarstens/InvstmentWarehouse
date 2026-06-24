@@ -22,6 +22,10 @@ tax_config_version = "2026.01"
 fed_stcg_rate = 0.37
 fed_ltcg_rate = 0.20
 niit_rate = 0.038
+amt_rate = 0.28
+
+mip_optimizer_enabled = true
+mip_max_trades = 3
 
 # Research sandbox — isolated from production client data
 research_sandbox_path = "./runs/research"

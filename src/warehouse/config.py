@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     fed_stcg_rate: float = 0.37
     fed_ltcg_rate: float = 0.20
     niit_rate: float = 0.038
+    amt_rate: float = 0.28
+
+    mip_optimizer_enabled: bool = True
+    mip_max_trades: int = 3
 
     research_sandbox_path: str = "./runs/research"
     walk_forward_purge_days: int = 5
@@ -65,11 +69,11 @@ class Settings(BaseSettings):
         local_path = repo_root() / "configs" / "local.toml"
         sources: list[PydanticBaseSettingsSource] = [
             init_settings,
-            TomlConfigSettingsSource(settings_cls, config_path),
+            env_settings,
         ]
         if local_path.is_file():
             sources.append(TomlConfigSettingsSource(settings_cls, local_path))
-        sources.append(env_settings)
+        sources.append(TomlConfigSettingsSource(settings_cls, config_path))
         return tuple(sources)
 
 

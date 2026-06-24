@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from warehouse.data.ingest.schwab_csv import CustodianPositionRecord, parse_custodian_csv
+from warehouse.data.ingest.registry import get_parser
+from warehouse.data.ingest.schwab_csv import CustodianPositionRecord
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import CustodianPositionRow, IngestRunRow, SecurityRow
 
@@ -55,7 +56,7 @@ def run_custodian_ingest(
     session.flush()
 
     try:
-        records = parse_custodian_csv(path)
+        records = get_parser(custodian_id)(path)
         for record in records:
             security_id = _ticker_to_security_id(session, record.ticker)
             session.add(

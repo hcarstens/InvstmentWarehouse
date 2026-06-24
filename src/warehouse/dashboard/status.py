@@ -40,13 +40,23 @@ PLANES: list[PlaneStatus] = [
         readiness="live",
         note="Entity graph, security master, lot schema in SQLite",
     ),
-    PlaneStatus(name="Research", package="warehouse.research", readiness="stub", note="Backtest harness scaffolded"),
-    PlaneStatus(name="Decision", package="warehouse.decision", readiness="partial", note="IPS/optimizer models only"),
+    PlaneStatus(
+        name="Research",
+        package="warehouse.research",
+        readiness="live",
+        note="Walk-forward backtest harness with config hash replay",
+    ),
+    PlaneStatus(
+        name="Decision",
+        package="warehouse.decision",
+        readiness="live",
+        note="IPS drift, TLH optimizer v0, advisor approval gates",
+    ),
     PlaneStatus(
         name="Execution",
         package="warehouse.execution",
-        readiness="partial",
-        note="Reconciliation v0 live; OMS deferred",
+        readiness="live",
+        note="Reconciliation v0, OMS staging and order state machine",
     ),
     PlaneStatus(
         name="Reporting",

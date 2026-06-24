@@ -7,10 +7,11 @@ See `docs/research/sharpe_founding_engineer_brief.md` for full context.
 without something new visible at `warehouse serve`. The dashboard is the living status
 report — it reflects real system state (data, jobs, breaks, proposals), not static docs.
 
-**Early dev (public repo):** No Docker. Use SQLite + local filesystem + in-process jobs
-so `warehouse serve` and `pytest` run with zero external services. Postgres, Redis, and
-docker-compose move to Phase 4. Non-secret settings live in **`configs/`** (committed);
-use `configs/local.toml` (gitignored) for machine-specific overrides only.
+**Early dev (public repo):** No Docker through Phase 4. Use SQLite + local filesystem +
+in-process jobs so `warehouse serve` and `pytest` run with zero external services.
+Postgres, Redis, and docker-compose move to **Phase 5** (prod parity, not a gate on
+product work). Non-secret settings live in **`configs/`** (committed); use
+`configs/local.toml` (gitignored) for machine-specific overrides only.
 
 ---
 
@@ -64,60 +65,84 @@ Dashboard panels:
 
 ---
 
-## Phase 3 — Weeks 13–26: Decision plane & optimizer dashboard (current)
+## Phase 3 — Weeks 13–26: Decision plane & optimizer dashboard ✓
 
 **Dashboard at run:** IPS drift, optimizer proposals, approval queue, backtest outcomes.
 
 Backend:
-- [ ] **Tax-aware optimizer v0** — TLH heuristics + greedy rebalance on sample portfolios
-- [ ] **Constraint library** — IPS min/max, wash-sale, restricted lists, do-not-sell lots
-- [ ] **Explainable trade list** — lots, binding constraints, tax delta vs baseline
-- [ ] **Sim / backtest harness** — historical prices + lot state → trades → after-tax outcome
-- [ ] **IPS monitoring** — drift vs strategic allocation, concentration
-- [ ] **Advisor approval workflow** — staged orders, sign-off gates
-- [ ] Pilot reconciliation flows and exception handling
+- [x] **Tax-aware optimizer v0** — TLH heuristics + greedy rebalance on sample portfolios
+- [x] **Constraint library** — IPS min/max, wash-sale, restricted lists, do-not-sell lots
+- [x] **Explainable trade list** — lots, binding constraints, tax delta vs baseline
+- [x] **Sim / backtest harness** — historical prices + lot state → trades → after-tax outcome
+- [x] **IPS monitoring** — drift vs strategic allocation, concentration
+- [x] **Advisor approval workflow** — staged orders, sign-off gates
+- [x] Pilot reconciliation flows and exception handling
 
 Dashboard panels:
-- [ ] **IPS drift monitor** — current vs target weights, concentration alerts
-- [ ] **Optimizer proposals** — trade list, rationale, estimated tax delta vs baseline
-- [ ] **Approval queue** — pending / approved / rejected with reviewer and timestamps
-- [ ] **Backtest results** — after-tax return, tax delta, config hash, snapshot ID
-- [ ] **Constraint binding report** — which IPS / tax rules are active per household
+- [x] **IPS drift monitor** — current vs target weights, concentration alerts
+- [x] **Optimizer proposals** — trade list, rationale, estimated tax delta vs baseline
+- [x] **Approval queue** — pending / approved / rejected with reviewer and timestamps
+- [x] **Backtest results** — after-tax return, tax delta, config hash, snapshot ID
+- [x] **Constraint binding report** — which IPS / tax rules are active per household
 
 ---
 
-## Phase 4 — Later (explicitly deferred)
+## Phase 4 — Execution, alternatives & tax depth ✓
 
-**Dashboard at run:** Execution and alternatives panels (stub until backend ships).
+**Dashboard at run:** Staged orders, solver comparison, multi-custodian ingest, alternatives
+sub-ledger, tax scenario panel.
 
-Infrastructure (deferred from early dev):
-- [ ] docker-compose — Postgres, Redis, object store for local parity with prod
-- [ ] Postgres migration path from SQLite dev ledger
-- [ ] Redis job queue (replace in-process jobs)
+**Architecture note:** Phase 4 product work ships on the same stack as Phases 0–3 — SQLite,
+local filesystem, in-process jobs. Docker-compose and Postgres are **not** prerequisites;
+they are deferred to Phase 5 for prod parity (concurrency, RLS, async jobs, object store).
 
-Product:
-- [ ] OMS / trade staging and routing → **staged orders panel**
-- [ ] Full MIP optimizer (Gurobi / CPLEX) → **solver comparison panel**
-- [ ] Multi-custodian support → **custodian selector on ingest/positions**
-- [ ] Alternatives sub-ledger → **alt marks, capital calls, distributions panel**
-- [ ] AMT, NIIT, QSBS, trust DNI depth → **tax scenario panel**
+Backend:
+- [x] **OMS / trade staging and routing** — approval → staged order → execution state machine
+- [x] **Full MIP optimizer** (Gurobi / CPLEX) — lot-discrete solves behind feature flag
+- [x] **Multi-custodian ingest** — parser registry, per-custodian normalization
+- [x] **Alternatives sub-ledger** — manual marks, capital calls, distributions
+- [x] **Tax scenario depth** — AMT, NIIT, QSBS, trust DNI overlays on optimizer/backtest
+
+Dashboard panels:
+- [x] **Staged orders** — pending / routed / filled with approval linkage
+- [x] **Solver comparison** — heuristic vs MIP: trades, tax delta, runtime
+- [x] **Custodian selector** — ingest and positions filtered by custodian
+- [x] **Alternatives panel** — alt marks, capital calls, distributions by entity
+- [x] **Tax scenario panel** — what-if overlays on household after-tax outcome
 
 ---
 
 ## Scope cuts (v0)
 
-- Single custodian, public markets (equities / ETFs)
-- Manual entry for alternatives
-- Heuristics before mixed-integer optimization
-- Dashboard uses demo/sample data until Phase 2 ingest is live
-- **No Docker in Phases 0–3** — SQLite + local files; public GitHub repo
+- Single custodian, public markets (equities / ETFs) until Phase 4 multi-custodian
+- Manual entry for alternatives (Phase 4 sub-ledger)
+- Heuristics before mixed-integer optimization (Phase 4 MIP upgrade)
+- **No Docker in Phases 0–4** — SQLite + local files; public GitHub repo
 - App settings in **`configs/development.toml`** (not secrets); optional `configs/local.toml`
 
 ---
 
-## Open questions (clarify before Phase 3)
+## Open questions (clarify before Phase 4)
 
 1. Execution model — in-house trading, custodian API, or advisor-only recommendations?
 2. System of record — wealth graph authoritative vs custodian overlay?
 3. Pilot scope — internal household vs external UHNW families?
 4. Build vs buy — native ledger vs Addepar / Orion / Tamarac?
+5. Compliance — RIA/fiduciary obligations, trade surveillance, regulatory reporting, and audit retention requirements?
+
+---
+
+## Phase 5 — Prod infra: docker-compose & Postgres upgrade
+
+**Dashboard at run:** Infra health shows Postgres, Redis, and object store live (replacing
+skipped stubs); schema status reflects Postgres migration path.
+
+**When to pull this forward:** multi-advisor concurrency, household RLS, background jobs
+for long MIP/backtest runs, or pilot deployment — not before product panels in Phase 4 ship.
+
+Infrastructure:
+- [ ] **docker-compose** — Postgres, Redis, object store for local prod parity
+- [ ] **Postgres migration path** — SQLite dev ledger → managed Postgres (Alembic dialect path)
+- [ ] **Redis job queue** — replace in-process jobs for optimizer, backtest, ingest batches
+- [ ] **Object store** — custodian files, research artifacts, audit exports
+- [ ] **Postgres RLS** — row-level security on `household_id` for multi-tenant pilot

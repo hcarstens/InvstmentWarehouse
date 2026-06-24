@@ -41,4 +41,4 @@ def test_object_store_skipped_in_early_dev() -> None:
     settings = get_settings()
     result = check_object_store(settings)
     assert result.status == "skipped"
-    assert "Phase 4" in result.detail
+    assert "Phase 5" in result.detail

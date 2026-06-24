@@ -105,3 +105,63 @@ Build log for Investment Warehouse. Newest entries at top.
 - Research sandbox at `runs/research/` with walk-forward purge config
 
 **Next:** Phase 1 schema design and workflow catalog.
+
+---
+
+## 2026-06-24 — Phase 3: decision plane & optimizer dashboard
+
+**Context:** Phase 3 deliverables from `TODO.md` — IPS drift, tax-aware optimizer v0, advisor approval, backtest harness.
+
+**Shipped:**
+
+- Alembic `003_phase3` — `ips_policies`, `optimization_runs`, `optimization_trades`, `approval_requests`, `backtest_runs`
+- TLH heuristics optimizer with explainable trade list and binding constraints
+- IPS drift monitor, constraint library (do-not-sell, restricted, IPS min/max)
+- Advisor approval workflow with audit trail
+- Walk-forward backtest harness with config hash replay
+- Dashboard panels + `/api/phase3`; CLI: `warehouse optimize`, `warehouse backtest`, `warehouse approve`
+- Demo IPS for Smith household; loss lot for TLH demo
+
+**Next:** Phase 4 — OMS, MIP optimizer, multi-custodian, alternatives, tax depth (SQLite OK).
+
+---
+
+## 2026-06-24 — Phase 4/5 split: product before docker-compose
+
+**Context:** Reviewed whether Phase 4 product work requires docker-compose / Postgres.
+
+**Decision:** Product and infra are decoupled. Phases 0–3 already prove the architecture
+on SQLite + local filesystem + in-process jobs (ingest → ledger → reconciliation →
+optimizer → approval → backtest, all visible at `warehouse serve`). Phase 4 product
+pieces — OMS staging, MIP solver, multi-custodian ingest, alternatives sub-ledger, tax
+scenario depth — can ship on the same stack without Docker.
+
+**Postponed to Phase 5:**
+
+- docker-compose (Postgres, Redis, object store)
+- SQLite → Postgres migration path
+- Redis job queue (replace in-process jobs)
+- Postgres RLS on `household_id`
+
+**Pull Phase 5 forward when:** multi-advisor concurrency, tenant isolation, or background
+jobs for long MIP/backtest runs — not before Phase 4 dashboard panels ship.
+
+**Next:** Phase 4 product track on SQLite.
+
+---
+
+## 2026-06-24 — Phase 4: execution, alternatives & tax depth
+
+**Context:** Phase 4 product deliverables on SQLite — no docker-compose required.
+
+**Shipped:**
+
+- Alembic `004_phase4` — `staged_orders`, `solver_comparisons`, `alternative_holdings`, `alternative_events`, `tax_scenario_runs`; `optimization_runs.solver_type`
+- OMS staging from approved optimizations; order state machine (staged → submitted → filled)
+- MIP optimizer stub (lot-discrete) + heuristic comparison panel
+- Multi-custodian ingest registry (Schwab + Fidelity parsers)
+- Alternatives sub-ledger with marks, capital calls, distributions
+- Tax scenario overlays (NIIT, AMT, QSBS exclusion, trust DNI)
+- Dashboard panels + `/api/phase4`; CLI: `warehouse order`, `compare-solvers`, `tax-scenario`
+
+**Next:** Phase 5 — docker-compose, Postgres migration, Redis queue.

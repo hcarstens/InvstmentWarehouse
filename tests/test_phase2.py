@@ -53,7 +53,7 @@ def test_phase2_dashboard_loads() -> None:
     data = load_phase2_dashboard()
     assert data.error is None
     assert len(data.ingest_runs) >= 1
-    assert len(data.positions) == 3
+    assert len(data.positions) >= 4
     assert data.household_pnl is not None
     assert data.household_pnl.unrealized_gain > Decimal("0")
     assert len(data.refresh_steps) == 5

@@ -86,6 +86,158 @@ def refresh(file: Path, household: str) -> None:
 
 
 @main.command()
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def optimize(household: str) -> None:
+    """Run tax-aware optimizer and queue advisor approval."""
+    from warehouse.decision.optimizer.runner import run_and_persist_optimizer
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        result = run_and_persist_optimizer(session, household)
+    click.echo(f"Optimization {result.run_id}: {len(result.trades)} trades")
+    click.echo(f"  Tax delta: {result.estimated_tax_delta}")
+    for trade in result.trades:
+        click.echo(f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}")
+
+
+@main.command()
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+@click.option("--start", "start_date", default="2024-01-01", show_default=True)
+@click.option("--end", "end_date", default="2026-06-24", show_default=True)
+def backtest(household: str, start_date: str, end_date: str) -> None:
+    """Run walk-forward backtest and persist after-tax outcome."""
+    from datetime import date
+
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.research.backtest.harness import run_backtest
+
+    bootstrap_database(seed=True)
+    start = date.fromisoformat(start_date)
+    end = date.fromisoformat(end_date)
+    with session_scope() as session:
+        result = run_backtest(session, household, start_date=start, end_date=end)
+    click.echo(f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}")
+    click.echo(f"  Tax delta vs baseline: {result.tax_delta:.4f}")
+    click.echo(f"  Config hash: {result.config_hash}")
+
+
+@main.group()
+def approve() -> None:
+    """Advisor approval workflow."""
+
+
+@approve.command("list")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def approve_list(household: str) -> None:
+    """List pending and recent approval requests."""
+    from warehouse.decision.approval.service import list_approval_requests
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        requests = list_approval_requests(session, household_id=household)
+    for req in requests:
+        click.echo(f"{req.request_id} {req.status} run={req.optimization_run_id}")
+
+
+@approve.command("decide")
+@click.argument("request_id")
+@click.option("--reviewer", default="advisor:demo", show_default=True)
+@click.option("--reject", is_flag=True, help="Reject instead of approve.")
+def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
+    """Approve or reject an optimization proposal (approval stages OMS orders)."""
+    from warehouse.decision.approval import ApprovalStatus
+    from warehouse.decision.approval.service import update_approval_status
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    status = ApprovalStatus.REJECTED if reject else ApprovalStatus.APPROVED
+    with session_scope() as session:
+        result = update_approval_status(session, request_id, status=status, reviewer_id=reviewer)
+    click.echo(f"{result.request_id} → {result.status} by {result.reviewer_id}")
+
+
+@main.group()
+def order() -> None:
+    """Staged order management."""
+
+
+@order.command("list")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def order_list(household: str) -> None:
+    """List staged orders for a household."""
+    from warehouse.execution.oms.service import list_staged_orders
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        orders = list_staged_orders(session, household_id=household)
+    for o in orders:
+        click.echo(f"{o.order_id} {o.status} {o.side} {o.quantity} {o.security_id}")
+
+
+@order.command()
+@click.argument("order_id")
+@click.option("--submit", is_flag=True, help="Mark submitted (default: filled).")
+def order_advance(order_id: str, submit: bool) -> None:
+    """Advance a staged order to submitted or filled."""
+    from warehouse.execution.oms import OrderStatus
+    from warehouse.execution.oms.service import update_order_status
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    status = OrderStatus.SUBMITTED if submit else OrderStatus.FILLED
+    with session_scope() as session:
+        result = update_order_status(session, order_id, status=status)
+    click.echo(f"{result.order_id} → {result.status}")
+
+
+@main.command("compare-solvers")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+def compare_solvers(household: str) -> None:
+    """Run heuristic vs MIP optimizer comparison."""
+    from warehouse.decision.optimizer.compare import run_solver_comparison
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        result = run_solver_comparison(session, household)
+    click.echo(f"Comparison {result.comparison_id}")
+    click.echo(
+        f"  Heuristic: {result.heuristic_trade_count} trades, tax {result.heuristic_tax_delta}"
+    )
+    click.echo(f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}")
+
+
+@main.command("tax-scenario")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+@click.option("--name", "scenario_name", default="niit_overlay", show_default=True)
+@click.option("--niit/--no-niit", default=True, show_default=True)
+@click.option("--amt", is_flag=True, help="Apply AMT overlay.")
+def tax_scenario(household: str, scenario_name: str, niit: bool, amt: bool) -> None:
+    """Run a tax scenario overlay on household unrealized gains."""
+    from warehouse.decision.tax.scenarios import TaxScenarioOverlays, run_tax_scenario
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+
+    bootstrap_database(seed=True)
+    overlays = TaxScenarioOverlays(apply_niit=niit, apply_amt=amt)
+    with session_scope() as session:
+        result = run_tax_scenario(
+            session, household, scenario_name=scenario_name, overlays=overlays
+        )
+    click.echo(f"Scenario {result.run_id}: delta {result.tax_delta:.2f}")
+
+
+@main.command()
 def info() -> None:
     """Print platform planes and build order."""
     report = build_status_report()

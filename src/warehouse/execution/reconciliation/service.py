@@ -13,10 +13,12 @@ from sqlalchemy.orm import Session
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import (
     CustodianPositionRow,
+    EntityRelationshipRow,
     LotRow,
     ReconciliationBreakRow,
     SecurityRow,
 )
+from warehouse.models.entities import RelationshipType
 
 
 class ReconciliationBreak(BaseModel):
@@ -39,6 +41,16 @@ def _ledger_quantities(session: Session) -> dict[tuple[str, str], Decimal]:
     return {(account_id, security_id): quantity for account_id, security_id, quantity in rows}
 
 
+def _accounts_for_custodian(session: Session, custodian_id: str) -> set[str]:
+    rows = session.scalars(
+        select(EntityRelationshipRow.source_id).where(
+            EntityRelationshipRow.target_id == custodian_id,
+            EntityRelationshipRow.relationship_type == RelationshipType.CUSTODIED_AT.value,
+        )
+    ).all()
+    return set(rows)
+
+
 def reconcile_ingest(
     session: Session,
     ingest_run_id: str,
@@ -46,6 +58,13 @@ def reconcile_ingest(
     actor_id: str = "system:reconcile",
     household_id: str | None = None,
 ) -> list[ReconciliationBreak]:
+    from warehouse.infra.db.models import IngestRunRow
+
+    ingest_run = session.get(IngestRunRow, ingest_run_id)
+    if ingest_run is None:
+        raise ValueError(f"Ingest run not found: {ingest_run_id}")
+    custodian_accounts = _accounts_for_custodian(session, ingest_run.custodian_id)
+
     custodian_rows = session.scalars(
         select(CustodianPositionRow).where(CustodianPositionRow.ingest_run_id == ingest_run_id)
     ).all()
@@ -100,6 +119,8 @@ def reconcile_ingest(
             )
 
     for (account_id, security_id), ledger_qty in ledger.items():
+        if account_id not in custodian_accounts:
+            continue
         if (account_id, security_id) in seen:
             continue
         if ledger_qty == 0:

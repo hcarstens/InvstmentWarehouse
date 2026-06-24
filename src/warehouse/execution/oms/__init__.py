@@ -1,4 +1,4 @@
-"""OMS / trade staging — deferred until reconciliation and security master v0 are trustworthy."""
+"""OMS / trade staging — approval → staged orders → execution routing."""
 
 from enum import StrEnum
 

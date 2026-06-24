@@ -171,3 +171,152 @@ class MarketPriceRow(Base):
     )
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
     as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class IpsPolicyRow(Base):
+    __tablename__ = "ips_policies"
+
+    ips_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    effective_date: Mapped[str] = mapped_column(String(16), nullable=False)
+    allocation_json: Mapped[str] = mapped_column(Text, nullable=False)
+    restricted_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+
+
+class OptimizationRunRow(Base):
+    __tablename__ = "optimization_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    config_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    estimated_tax_delta: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    binding_constraints_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    input_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="complete")
+    solver_type: Mapped[str] = mapped_column(String(16), nullable=False, default="heuristic")
+    runtime_ms: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class OptimizationTradeRow(Base):
+    __tablename__ = "optimization_trades"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("optimization_runs.run_id"), nullable=False, index=True
+    )
+    lot_id: Mapped[str | None] = mapped_column(String(64))
+    security_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    account_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    side: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    rationale: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class ApprovalRequestRow(Base):
+    __tablename__ = "approval_requests"
+
+    request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    optimization_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("optimization_runs.run_id"), nullable=False, index=True
+    )
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    reviewer_id: Mapped[str | None] = mapped_column(String(64))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class StagedOrderRow(Base):
+    __tablename__ = "staged_orders"
+
+    order_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    approval_request_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("approval_requests.request_id"), nullable=False, index=True
+    )
+    optimization_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("optimization_runs.run_id"), nullable=False, index=True
+    )
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    lot_id: Mapped[str | None] = mapped_column(String(64))
+    security_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    account_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    side: Mapped[str] = mapped_column(String(8), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class SolverComparisonRow(Base):
+    __tablename__ = "solver_comparisons"
+
+    comparison_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    heuristic_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("optimization_runs.run_id"), nullable=False
+    )
+    mip_run_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("optimization_runs.run_id"), nullable=False
+    )
+    heuristic_tax_delta: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    mip_tax_delta: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
+    heuristic_runtime_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    mip_runtime_ms: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class AlternativeHoldingRow(Base):
+    __tablename__ = "alternative_holdings"
+
+    holding_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(256), nullable=False)
+    asset_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    committed_capital: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    called_capital: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    current_nav: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    last_mark_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
+class AlternativeEventRow(Base):
+    __tablename__ = "alternative_events"
+
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    holding_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("alternative_holdings.holding_id"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
+
+
+class TaxScenarioRunRow(Base):
+    __tablename__ = "tax_scenario_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    scenario_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    overlays_json: Mapped[str] = mapped_column(Text, nullable=False)
+    baseline_tax: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    scenario_tax: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    tax_delta: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class BacktestRunRow(Base):
+    __tablename__ = "backtest_runs"
+
+    run_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    after_tax_return: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    baseline_after_tax_return: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    tax_delta: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    input_snapshot_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

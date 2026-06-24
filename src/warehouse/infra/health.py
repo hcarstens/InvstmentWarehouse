@@ -45,7 +45,7 @@ def check_database(settings: Settings) -> InfraCheck:
         return InfraCheck(
             component="Database",
             status="skipped",
-            detail=f"External DB ({url.drivername}) — Phase 4 docker-compose",
+            detail=f"External DB ({url.drivername}) — Phase 5 docker-compose",
         )
 
     if url.database and url.database != ":memory:":
@@ -93,7 +93,7 @@ def check_job_queue(settings: Settings) -> InfraCheck:
         return InfraCheck(
             component="Job queue",
             status="skipped",
-            detail="In-process jobs (no Redis) — Phase 4",
+            detail="In-process jobs (no Redis) — Redis queue deferred to Phase 5",
         )
 
     try:
@@ -129,13 +129,16 @@ def check_object_store(settings: Settings) -> InfraCheck:
         return InfraCheck(
             component="Object store",
             status="skipped",
-            detail=f"Local filesystem ({settings.local_data_path}) — Phase 4",
+            detail=(
+                f"Local filesystem ({settings.local_data_path}) — "
+                "object store deferred to Phase 5"
+            ),
         )
 
     return InfraCheck(
         component="Object store",
         status="skipped",
-        detail="S3 endpoint configured; connectivity check deferred to Phase 4",
+        detail="S3 endpoint configured; connectivity check deferred to Phase 5",
     )
 
 

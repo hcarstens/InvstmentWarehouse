@@ -10,6 +10,9 @@ def test_default_config_path_exists() -> None:
 
 
 def test_settings_from_config_file() -> None:
+    import os
+
+    os.environ.pop("DATABASE_URL", None)
     get_settings.cache_clear()
     settings = get_settings()
     assert settings.app_env == "development"

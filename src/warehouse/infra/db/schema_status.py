@@ -23,7 +23,7 @@ from warehouse.infra.db.models import (
     WorkflowDefinitionRow,
 )
 
-HEAD_REVISION = "002_phase2"
+HEAD_REVISION = "004_phase4"
 
 TRACKED_TABLES: tuple[type, ...] = (
     EntityRow,

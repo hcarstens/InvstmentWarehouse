@@ -37,9 +37,9 @@ This is a **public GitHub repo**. Treat it accordingly:
 - **Optional local overrides:** copy to `configs/local.toml` (gitignored) for machine-specific paths
 - **Never commit** credentials, client data, or real custodian files
 - **`runs/`**, **`data/`**, and **`*.db`** are gitignored — local state stays local
-- **No Docker in Phases 0–3** — zero external services required to develop or run tests
+- **No Docker in Phases 0–4** — zero external services required to develop or run tests
 - Override config file path: `WAREHOUSE_CONFIG=configs/staging.toml`
-- Postgres, Redis, and docker-compose are **Phase 4** (prod parity, not day-one setup)
+- Postgres, Redis, and docker-compose are **Phase 5** (prod parity, not a gate on product work)
 
 ## Build order (do not skip)
 
@@ -80,10 +80,10 @@ master v0 are trustworthy.
 
 ## Infrastructure (`warehouse.infra`)
 
-Early dev (Phases 0–3): SQLite ledger, local filesystem for uploads, in-process jobs.
-Phase 4+: managed Postgres (ACID reconciliation), object store, Redis queue.
+Early dev (Phases 0–4): SQLite ledger, local filesystem for uploads, in-process jobs.
+Phase 5+: managed Postgres (ACID reconciliation), object store, Redis queue.
 
-- Row-level security on `household_id`, immutable audit log (Postgres in Phase 4)
+- Row-level security on `household_id`, immutable audit log (Postgres in Phase 5)
 
 ## Optimizer v0 (`warehouse.decision.optimizer`)
 
