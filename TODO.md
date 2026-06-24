@@ -132,6 +132,7 @@ Dashboard panels:
 6. Income optimization without principle drawdown — many family offices have recurring income obligations for family members; how should the optimizer target yield/dividends vs selling lots?
 7. Synthetic portfolio data for stress testing — generate realistic household portfolios and price paths for backtest and scenario panels without client data?
 8. Security layer and logging — authentication, authorization, audit-grade request logging, and secrets handling for pilot deployment?
+9. Heuristic agents & report writer — how should agent-driven workflows (IPS drift triage, recon exceptions, optimizer narrative) and the heuristic report writer integrate with `warehouse serve`, the audit trail, and advisor approval gates without bypassing frozen, replayable outputs?
 
 ---
 
