@@ -1,4 +1,4 @@
-"""Risk API request and response models."""
+"""Risk API models — unit hierarchy per docs/research/risk_units_measures.md."""
 
 from __future__ import annotations
 
@@ -14,6 +14,18 @@ class MeasurementMode(StrEnum):
     AUTO = "auto"
 
 
+class RiskUnitType(StrEnum):
+    SIGMA_ANNUALIZED = "sigma_annualized"
+    SIGMA_HORIZON = "sigma_horizon"
+    RETURN_FRACTION = "return_fraction"
+    USD = "usd"
+    PCT_VARIANCE = "pct_variance"
+    BETA = "beta"
+    DURATION_YEARS = "duration_years"
+    LIQUIDITY_DAYS = "liquidity_days"
+    FERMI_ESTIMATE = "fermi_estimate"
+
+
 class AssetClass(StrEnum):
     EQUITY = "equity"
     FIXED_INCOME = "fixed_income"
@@ -27,6 +39,7 @@ class AllocationSlot(BaseModel):
     asset_class: AssetClass
     weight: Decimal = Field(ge=0, le=1)
     duration_years: Decimal | None = Field(default=None, ge=0)
+    beta: Decimal | None = Field(default=None, ge=0)
     liquidity_tier: int = Field(default=1, ge=1, le=3)
     measurement: MeasurementMode = MeasurementMode.AUTO
     label: str | None = None
@@ -58,12 +71,45 @@ class RiskHorizon(BaseModel):
         return cls(years=Decimal(str(value)))
 
 
+class RiskMetric(BaseModel):
+    """Minimum disclosure: unit, α, h, window, mark_source on every metric."""
+
+    value: Decimal
+    unit_type: RiskUnitType
+    horizon_years: Decimal | None = None
+    confidence: Decimal | None = None
+    window_days: int | None = None
+    method: str | None = None
+    mark_source: str = "model_prior"
+    currency: str | None = None
+    approximation: str | None = None
+
+
+class RiskManifestMeta(BaseModel):
+    currency: str = "USD"
+    mark_source: str = "model_prior"
+    vol_window_days: int
+    stress_pack_version: str
+
+
+class Level1PortfolioRisk(BaseModel):
+    annualized_volatility: RiskMetric
+    horizon_volatility: RiskMetric
+    expected_return: RiskMetric
+    parametric_var: RiskMetric
+    parametric_es: RiskMetric
+    dollar_var: RiskMetric | None = None
+    dollar_es: RiskMetric | None = None
+    confidence_low: RiskMetric
+    confidence_high: RiskMetric
+
+
 class ClassRiskContribution(BaseModel):
     asset_class: str
     weight: Decimal
     annual_volatility: Decimal
-    horizon_volatility: Decimal
-    risk_contribution: Decimal
+    pct_variance_contribution: Decimal
+    pct_es_contribution: Decimal
     expected_return: Decimal
     measurement: MeasurementMode
     liquidity_tier: int
@@ -74,7 +120,49 @@ class DurationBucketRisk(BaseModel):
     weight: Decimal
     avg_duration_years: Decimal | None
     horizon_mismatch: Decimal
-    risk_contribution: Decimal
+    pct_variance_contribution: Decimal
+
+
+class Level2Contributions(BaseModel):
+    unit_type: RiskUnitType = RiskUnitType.PCT_VARIANCE
+    by_class: list[ClassRiskContribution]
+    by_duration: list[DurationBucketRisk]
+
+
+class SleeveSensitivity(BaseModel):
+    asset_class: str
+    weight: Decimal
+    native_unit: RiskUnitType
+    value: RiskMetric
+    measurement: MeasurementMode
+
+
+class Level3Sensitivities(BaseModel):
+    by_sleeve: list[SleeveSensitivity]
+
+
+class StressScenarioResult(BaseModel):
+    name: str
+    portfolio_return: RiskMetric
+    dollar_pnl: RiskMetric | None = None
+    by_class: dict[str, Decimal]
+
+
+class Level4Stress(BaseModel):
+    method: str = "named_stress_replay"
+    scenarios: list[StressScenarioResult]
+
+
+class LiquidityTierRisk(BaseModel):
+    tier: int
+    weight: Decimal
+    days_to_liquidate: RiskMetric
+
+
+class LiquidityRisk(BaseModel):
+    unit_type: RiskUnitType = RiskUnitType.LIQUIDITY_DAYS
+    weighted_days: RiskMetric
+    by_tier: list[LiquidityTierRisk]
 
 
 class MeasurementSummary(BaseModel):
@@ -86,13 +174,13 @@ class MeasurementSummary(BaseModel):
 class PortfolioRiskReport(BaseModel):
     portfolio_id: str | None
     horizon_years: Decimal
-    total_risk: Decimal
-    expected_return: Decimal
-    confidence_low: Decimal
-    confidence_high: Decimal
-    diversification_factor: Decimal
-    by_class: list[ClassRiskContribution]
-    by_duration: list[DurationBucketRisk]
-    measurement_summary: MeasurementSummary
     model_version: str
     input_fingerprint: str
+    manifest: RiskManifestMeta
+    level_1_portfolio: Level1PortfolioRisk
+    level_2_contributions: Level2Contributions
+    level_3_sensitivities: Level3Sensitivities
+    level_4_stress: Level4Stress
+    liquidity: LiquidityRisk
+    measurement_summary: MeasurementSummary
+    aggregation_note: str

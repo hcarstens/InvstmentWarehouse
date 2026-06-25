@@ -54,10 +54,14 @@ class Settings(BaseSettings):
     research_sandbox_path: str = "./runs/research"
     walk_forward_purge_days: int = 5
 
-    risk_model_version: str = "2026.01"
+    risk_model_version: str = "2026.02"
     risk_diversification_factor: float = 0.85
     risk_fermi_confidence_width: float = 0.15
     risk_log_inputs: bool = False
+    risk_var_alpha: float = 0.95
+    risk_es_alpha: float = 0.975
+    risk_vol_window_days: int = 252
+    risk_stress_pack_version: str = "2026.01"
 
     household_rls_enabled: bool = False
 

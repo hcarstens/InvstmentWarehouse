@@ -1,4 +1,4 @@
-"""Risk evaluation by asset class."""
+"""Risk evaluation by asset class — Level 2 variance contributions."""
 
 from __future__ import annotations
 
@@ -9,11 +9,11 @@ from warehouse.research.risk.assumptions import (
     CLASS_EXPECTED_RETURN,
     FERMI_VOL_MULTIPLIER,
 )
+from warehouse.research.risk.covariance import CovarianceResult, SleeveRiskState
 from warehouse.research.risk.models import (
     AllocationSlot,
     ClassRiskContribution,
     MeasurementMode,
-    RiskHorizon,
 )
 
 
@@ -27,38 +27,49 @@ def resolve_measurement(slot: AllocationSlot) -> MeasurementMode:
     return MeasurementMode.MEASURABLE
 
 
-def horizon_volatility(annual_vol: Decimal, horizon: RiskHorizon) -> Decimal:
-    return annual_vol * horizon.years.sqrt()
-
-
-def evaluate_class_risk(
-    slot: AllocationSlot,
-    horizon: RiskHorizon,
-) -> ClassRiskContribution:
+def sleeve_annual_volatility(slot: AllocationSlot) -> Decimal:
     measurement = resolve_measurement(slot)
     annual_vol = CLASS_ANNUAL_VOL[slot.asset_class]
     if measurement == MeasurementMode.FERMI:
         annual_vol = annual_vol * FERMI_VOL_MULTIPLIER
-    h_vol = horizon_volatility(annual_vol, horizon)
-    contribution = slot.weight * h_vol
-    expected = slot.weight * CLASS_EXPECTED_RETURN[slot.asset_class]
-    return ClassRiskContribution(
-        asset_class=slot.asset_class.value,
-        weight=slot.weight,
-        annual_volatility=annual_vol,
-        horizon_volatility=h_vol,
-        risk_contribution=contribution,
-        expected_return=expected,
-        measurement=measurement,
-        liquidity_tier=slot.liquidity_tier,
+    return annual_vol
+
+
+def build_sleeve_states(slots: list[AllocationSlot]) -> list[SleeveRiskState]:
+    return [
+        SleeveRiskState(
+            slot=slot,
+            annual_volatility=sleeve_annual_volatility(slot),
+            measurement=resolve_measurement(slot).value,
+        )
+        for slot in slots
+    ]
+
+
+def evaluate_class_contributions(
+    states: list[SleeveRiskState],
+    cov_result: CovarianceResult,
+) -> list[ClassRiskContribution]:
+    rows: list[ClassRiskContribution] = []
+    for state, pct_var in zip(states, cov_result.pct_variance_contributions, strict=True):
+        slot = state.slot
+        rows.append(
+            ClassRiskContribution(
+                asset_class=slot.asset_class.value,
+                weight=slot.weight,
+                annual_volatility=state.annual_volatility,
+                pct_variance_contribution=pct_var,
+                pct_es_contribution=pct_var,
+                expected_return=slot.weight * CLASS_EXPECTED_RETURN[slot.asset_class],
+                measurement=MeasurementMode(state.measurement),
+                liquidity_tier=slot.liquidity_tier,
+            )
+        )
+    return rows
+
+
+def portfolio_expected_return(states: list[SleeveRiskState]) -> Decimal:
+    return sum(
+        (s.slot.weight * CLASS_EXPECTED_RETURN[s.slot.asset_class] for s in states),
+        Decimal("0"),
     )
-
-
-def aggregate_class_risk(
-    contributions: list[ClassRiskContribution],
-    diversification: Decimal,
-) -> Decimal:
-    if not contributions:
-        return Decimal("0")
-    sum_sq = sum((c.risk_contribution**2 for c in contributions), Decimal("0"))
-    return sum_sq.sqrt() * diversification

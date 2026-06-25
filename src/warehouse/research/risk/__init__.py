@@ -1,6 +1,6 @@
-"""Portfolio risk evaluation — by asset class and duration.
+"""Portfolio risk evaluation — unit hierarchy Levels 1–4.
 
-See docs/research/simple_risk_models.md and docs/research/portfolio_risk.md.
+See docs/research/risk_units_measures.md and docs/research/portfolio_risk.md.
 """
 
 from warehouse.research.risk.engine import evaluate_portfolio_risk

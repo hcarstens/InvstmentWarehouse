@@ -1,8 +1,9 @@
-"""Risk API — parse requests and evaluate portfolio risk."""
+"""Risk API — parse requests and evaluate portfolio risk manifest."""
 
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from typing import Any
 
 import structlog
@@ -26,25 +27,29 @@ def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
 
     portfolio = AssetPortfolio.model_validate(body["asset_portfolio"])
     horizon = RiskHorizon.parse(body["horizon"])
-    report = evaluate_portfolio_risk(portfolio, horizon)
+    notional_raw = body.get("notional_usd")
+    notional = Decimal(str(notional_raw)) if notional_raw is not None else None
+
+    report = evaluate_portfolio_risk(portfolio, horizon, notional_usd=notional)
 
     settings = get_settings()
+    level_1 = report.level_1_portfolio
+    log_fields = {
+        "horizon_years": str(horizon.years),
+        "fingerprint": report.input_fingerprint,
+        "annualized_vol": str(level_1.annualized_volatility.value),
+        "parametric_var": str(level_1.parametric_var.value),
+        "model_version": report.model_version,
+    }
     if settings.risk_log_inputs:
         logger.info(
             "risk_evaluated",
             portfolio_id=portfolio.portfolio_id,
-            horizon_years=str(horizon.years),
-            fingerprint=report.input_fingerprint,
-            total_risk=str(report.total_risk),
+            notional_usd=str(notional) if notional else None,
+            **log_fields,
         )
     else:
-        logger.info(
-            "risk_evaluated",
-            horizon_years=str(horizon.years),
-            fingerprint=report.input_fingerprint,
-            total_risk=str(report.total_risk),
-            model_version=report.model_version,
-        )
+        logger.info("risk_evaluated", **log_fields)
 
     return report.model_dump(mode="json")
 
@@ -69,6 +74,11 @@ def risk_api_schema() -> dict[str, Any]:
     return {
         "endpoint": "/api/risk",
         "method": "POST",
+        "reference": [
+            "docs/research/risk_units_measures.md",
+            "docs/research/portfolio_risk.md",
+            "docs/research/simple_risk_models.md",
+        ],
         "request": {
             "asset_portfolio": {
                 "portfolio_id": "optional string",
@@ -76,16 +86,26 @@ def risk_api_schema() -> dict[str, Any]:
                     {
                         "asset_class": "equity|fixed_income|commodities|fx|alternatives|cash",
                         "weight": "0.0-1.0, must sum to 1",
-                        "duration_years": "optional, for fixed income / alts",
+                        "duration_years": "optional — fixed income / alts",
+                        "beta": "optional — equity sleeve",
                         "liquidity_tier": "1=liquid, 2=semi, 3=illiquid",
                         "measurement": "measurable|fermi|auto",
                     }
                 ],
             },
             "horizon": "e.g. 5y or 5 — investment horizon in years",
+            "notional_usd": "optional — enables Level 1 dollar VaR/ES and Level 4 dollar P&L",
         },
-        "response": "PortfolioRiskReport JSON with by_class, by_duration, measurement_summary",
+        "response": {
+            "level_1_portfolio": "sigma, parametric VaR/ES with (alpha, h) metadata",
+            "level_2_contributions": "pct_variance by class and duration bucket",
+            "level_3_sensitivities": "native units (beta, duration, fermi)",
+            "level_4_stress": "named replay 2008/2020/2022",
+            "liquidity": "liquidity-time days by tier",
+            "measurement_summary": "measurable vs fermi weight and risk share",
+        },
         "privacy": (
-            "Allocations are fingerprinted; raw inputs are not logged when risk_log_inputs=false"
+            "Allocations and horizons are fingerprinted; raw inputs are not logged "
+            "when risk_log_inputs=false"
         ),
     }

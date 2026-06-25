@@ -66,7 +66,9 @@ Fidelity CSV uses semicolon delimiter; Schwab uses comma.
 
 ### Research plane — risk API
 
-Evaluate portfolio risk by asset class and duration bucket. Raw allocations and horizons are
+Evaluate portfolio risk using the unit hierarchy from `docs/research/risk_units_measures.md`:
+Level 1 (σ, VaR, ES), Level 2 (% variance by class/duration), Level 3 (native sensitivities),
+Level 4 (named stress replay), plus liquidity-time units. Raw allocations and horizons are
 fingerprinted for replay metadata; they are not logged when `risk_log_inputs = false` in config.
 
 ```bash
@@ -89,14 +91,25 @@ Request body:
       {"asset_class": "alternatives", "weight": 0.1, "duration_years": 7, "liquidity_tier": 3}
     ]
   },
-  "horizon": "5y"
+  "horizon": "5y",
+  "notional_usd": 10000000
 }
 ```
 
-Response includes `total_risk`, `expected_return`, confidence band, `by_class`, `by_duration`,
-`measurement_summary` (measurable vs Fermi), `model_version`, and `input_fingerprint`.
+Response is a **risk manifest** JSON:
 
-See `docs/research/simple_risk_models.md` and `docs/research/portfolio_risk.md`.
+| Level | Contents |
+| --- | --- |
+| `level_1_portfolio` | Annualized σ, horizon σ, parametric VaR/ES with `(α, h)` metadata; optional dollar tail |
+| `level_2_contributions` | % portfolio variance by asset class and duration bucket |
+| `level_3_sensitivities` | Native units per sleeve (β, duration, fermi) |
+| `level_4_stress` | Named replay: 2008 liquidity, 2020 pandemic, 2022 inflation |
+| `liquidity` | Weighted days-to-liquidate by tier |
+
+Also includes `measurement_summary`, `model_version`, `input_fingerprint`, and `aggregation_note`.
+
+See `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`, and
+`docs/research/simple_risk_models.md`.
 
 ### Decision plane (Phase 3)
 

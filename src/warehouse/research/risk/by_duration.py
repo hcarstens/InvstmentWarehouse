@@ -1,4 +1,4 @@
-"""Risk evaluation by duration bucket and horizon mismatch."""
+"""Risk evaluation by duration bucket — Level 2 grouped variance share."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ def evaluate_duration_risk(
         bucket = _duration_bucket(slot.duration_years)
         buckets.setdefault(bucket, []).append(slot)
 
-    contrib_by_class = {c.asset_class: c.risk_contribution for c in class_contributions}
+    pct_by_class = {c.asset_class: c.pct_variance_contribution for c in class_contributions}
     results: list[DurationBucketRisk] = []
 
     for bucket_name, members in sorted(buckets.items()):
@@ -44,8 +44,8 @@ def evaluate_duration_risk(
         mismatch = Decimal("0")
         if avg_duration is not None and horizon.years > 0:
             mismatch = abs(avg_duration - horizon.years) / horizon.years
-        bucket_risk = sum(
-            (contrib_by_class.get(m.asset_class.value, Decimal("0")) for m in members),
+        pct_variance = sum(
+            (pct_by_class.get(m.asset_class.value, Decimal("0")) for m in members),
             Decimal("0"),
         )
         results.append(
@@ -54,7 +54,7 @@ def evaluate_duration_risk(
                 weight=weight,
                 avg_duration_years=avg_duration,
                 horizon_mismatch=mismatch,
-                risk_contribution=bucket_risk,
+                pct_variance_contribution=pct_variance,
             )
         )
     return results
