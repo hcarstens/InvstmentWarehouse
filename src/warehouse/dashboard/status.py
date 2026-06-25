@@ -44,7 +44,7 @@ PLANES: list[PlaneStatus] = [
         name="Research",
         package="warehouse.research",
         readiness="live",
-        note="Walk-forward backtest harness with config hash replay",
+        note="Walk-forward backtest harness; portfolio risk API (class + duration)",
     ),
     PlaneStatus(
         name="Decision",

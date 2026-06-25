@@ -1,0 +1,11 @@
+{
+  "asset_portfolio": {
+    "portfolio_id": "demo",
+    "allocations": [
+      {"asset_class": "equity", "weight": 0.6, "liquidity_tier": 1},
+      {"asset_class": "fixed_income", "weight": 0.3, "duration_years": 6.5},
+      {"asset_class": "alternatives", "weight": 0.1, "duration_years": 7, "liquidity_tier": 3}
+    ]
+  },
+  "horizon": "5y"
+}

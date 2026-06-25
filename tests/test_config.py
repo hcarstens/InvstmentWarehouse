@@ -20,6 +20,8 @@ def test_settings_from_config_file() -> None:
     assert settings.database_url == "sqlite:///./data/warehouse_dev.db"
     assert settings.tax_config_version == "2026.01"
     assert settings.walk_forward_purge_days == 5
+    assert settings.risk_model_version == "2026.01"
+    assert settings.risk_log_inputs is False
     assert settings.job_queue_url == ""
 
 

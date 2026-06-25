@@ -237,6 +237,29 @@ def tax_scenario(household: str, scenario_name: str, niit: bool, amt: bool) -> N
     click.echo(f"Scenario {result.run_id}: delta {result.tax_delta:.2f}")
 
 
+@main.group()
+def risk() -> None:
+    """Portfolio risk evaluation (research plane)."""
+
+
+@risk.command("evaluate")
+@click.argument("file", type=click.Path(exists=True, path_type=Path))
+@click.option("--horizon", default="5y", show_default=True, help="Investment horizon (e.g. 5y).")
+def risk_evaluate(file: Path, horizon: str) -> None:
+    """Evaluate portfolio risk from a JSON request file."""
+    import json as json_lib
+
+    from warehouse.research.risk.api import evaluate_risk_json
+
+    body = json_lib.loads(file.read_text())
+    body["horizon"] = horizon
+    status, payload = evaluate_risk_json(json_lib.dumps(body))
+    if status != 200:
+        click.echo(payload, err=True)
+        raise SystemExit(1)
+    click.echo(payload)
+
+
 @main.command()
 def info() -> None:
     """Print platform planes and build order."""

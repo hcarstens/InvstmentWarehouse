@@ -1,8 +1,12 @@
 # Investment Warehouse
 
-UHNW wealth platform — positions-first, dashboard-driven, after-tax north star.
+UHNW wealth platform with dev dashboard for stakeholders
 
 Public repo: https://github.com/hcarstens/InvstmentWarehouse
+
+Henry Carstens
+503 701 5741
+https://hcarstens.github.io
 
 ## Setup
 
@@ -44,6 +48,7 @@ The dashboard auto-refreshes every 30s. On first load it runs migrate + seed if 
 | `/api/phase2` | Ingest, positions, reconciliation, refresh, audit JSON |
 | `/api/phase3` | IPS drift, optimizer, approval queue, backtest JSON |
 | `/api/phase4` | Staged orders, solver comparison, custodian, alts, tax JSON |
+| `/api/risk` | Portfolio risk schema (GET) and evaluation (POST) |
 | `/?custodian=custodian_fidelity` | Filter Phase 4 custodian panel |
 
 ### Execution plane (Phase 4)
@@ -58,6 +63,40 @@ warehouse ingest --custodian custodian_fidelity tests/fixtures/fidelity_position
 ```
 
 Fidelity CSV uses semicolon delimiter; Schwab uses comma.
+
+### Research plane — risk API
+
+Evaluate portfolio risk by asset class and duration bucket. Raw allocations and horizons are
+fingerprinted for replay metadata; they are not logged when `risk_log_inputs = false` in config.
+
+```bash
+warehouse risk evaluate tests/fixtures/sample_portfolio.json --horizon 5y
+curl -s http://127.0.0.1:8765/api/risk                          # schema
+curl -s -X POST http://127.0.0.1:8765/api/risk \
+  -H 'Content-Type: application/json' \
+  -d @tests/fixtures/sample_portfolio.json
+```
+
+Request body:
+
+```json
+{
+  "asset_portfolio": {
+    "portfolio_id": "demo",
+    "allocations": [
+      {"asset_class": "equity", "weight": 0.6, "liquidity_tier": 1},
+      {"asset_class": "fixed_income", "weight": 0.3, "duration_years": 6.5},
+      {"asset_class": "alternatives", "weight": 0.1, "duration_years": 7, "liquidity_tier": 3}
+    ]
+  },
+  "horizon": "5y"
+}
+```
+
+Response includes `total_risk`, `expected_return`, confidence band, `by_class`, `by_duration`,
+`measurement_summary` (measurable vs Fermi), `model_version`, and `input_fingerprint`.
+
+See `docs/research/simple_risk_models.md` and `docs/research/portfolio_risk.md`.
 
 ### Decision plane (Phase 3)
 

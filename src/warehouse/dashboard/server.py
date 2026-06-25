@@ -255,7 +255,7 @@ def render_html(
     </table>
   </section>
 
-  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/phase1">phase1</a> · <a href="/api/phase2">phase2</a> · <a href="/api/phase3">phase3</a> · <a href="/api/phase4">phase4</a></footer>
+  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/risk">risk</a> · <a href="/api/phase1">phase1</a> · <a href="/api/phase2">phase2</a> · <a href="/api/phase3">phase3</a> · <a href="/api/phase4">phase4</a></footer>
 </body>
 </html>"""
 
@@ -316,9 +316,34 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path == "/api/risk":
+            from warehouse.research.risk.api import risk_api_schema
+
+            body = json.dumps(risk_api_schema(), indent=2).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/status":
             body = build_status_report().model_dump_json(indent=2).encode()
             self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        else:
+            self.send_error(404)
+
+    def do_POST(self) -> None:
+        if self.path == "/api/risk":
+            length = int(self.headers.get("Content-Length", "0"))
+            raw = self.rfile.read(length)
+            from warehouse.research.risk.api import evaluate_risk_json
+
+            status, body_text = evaluate_risk_json(raw)
+            body = body_text.encode()
+            self.send_response(status)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -334,6 +359,7 @@ def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
     server = HTTPServer((host, port), DashboardHandler)
     print(f"Dashboard: http://{host}:{port}/")
     print(f"Status API: http://{host}:{port}/api/status")
+    print(f"Risk API:   http://{host}:{port}/api/risk")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
