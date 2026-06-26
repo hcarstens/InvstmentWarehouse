@@ -1,206 +1,278 @@
 # Risk API Contract — Simplification Design
 
-**Status:** proposed (design only — no code yet)
-**Author:** design pass with Claude, 2026-06-26
+**Status:** v0 proposed (engine exists; new contract not built)
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
 `docs/research/simple_risk_models.md`, `docs/code_review_claude_2026-06-26.md`
+
+> **North star:** the risk plane becomes a **standalone module** with one pure entry point,
+> plugged into the larger workflow over an API. The project hands it a portfolio + a question;
+> it returns a report. It owns no DB, no decisions, no execution.
 
 ---
 
 ## 1. Goal
 
-Collapse the risk workflow to a single, pure contract:
+Collapse three entry paths into one pure contract:
 
 ```
-orchestrator → risk_api{ request, manifest } → { report, deltas }
+caller ──► evaluate_risk(request, manifest) ──► RiskResult{ report, deltas }
+              ▲                                        │
+   ledger adapter │ synthetic.rung(n) │ HTTP /api/risk/orchestrate
 ```
 
-- **Orchestrator** owns *where portfolios come from* (ledger or synthetic) and *what to do
-  with the answer* (arbitration — acting on deltas is out of scope for risk).
-- **Risk API** owns *one thing*: given a portfolio manifest and a request, compute the risk
-  report and — if the request describes a change — the deltas that change implies.
+- **Caller** owns *where portfolios come from* and *what to do with the answer* (arbitration —
+  out of scope for risk).
+- **Risk module** owns *one thing*: given a manifest + request, compute the report. The
+  `deltas` slot is reserved (see [v1](#v1--overlays--deltas)) so the response shape never changes.
 
-The current Level 1–4 engine internals (`evaluate_portfolio_risk`) stay intact. This redesign
-is about the **edges**, not the math.
+Engine internals (`evaluate_portfolio_risk`, Levels 1–4) stay intact. This is about the
+**edges**, not the math.
 
 ## 2. Why the current workflow is complex
 
-| Problem | Where | Effect |
-| --- | --- | --- |
-| Three ways in, no single contract | dict `evaluate_risk_request` ([api.py](../src/warehouse/research/risk/api.py)), object `evaluate_portfolio_risk` ([engine.py](../src/warehouse/research/risk/engine.py)), ledger `build_portfolio_from_holdings` ([portfolio_builder.py](../src/warehouse/research/risk/portfolio_builder.py)) | Manifest is implicit, split across `AssetPortfolio` + `horizon` + `notional_usd`; callers wire it differently |
-| God-orchestrator | [`load_risk_dashboard`](../src/warehouse/dashboard/risk_data.py) | Bootstraps DB, loads another dashboard for side effects, reads ledger, builds portfolio, evaluates risk, **and swallows all errors** (review finding #5) |
-| No deltas | — | Output is a single report; no "how does risk change under this proposal?" |
+- **Three ways in, no single contract** — dict [`evaluate_risk_request`](../src/warehouse/research/risk/api.py), object [`evaluate_portfolio_risk`](../src/warehouse/research/risk/engine.py), ledger [`build_portfolio_from_holdings`](../src/warehouse/research/risk/portfolio_builder.py). The "manifest" is implicit, split across `AssetPortfolio` + `horizon` + `notional_usd`.
+- **God-orchestrator** — [`load_risk_dashboard`](../src/warehouse/dashboard/risk_data.py) bootstraps the DB, loads another dashboard for side effects, reads the ledger, builds the portfolio, evaluates risk, **and swallows all errors** (`except Exception`, still live — review finding #5).
+- **No `{report, deltas}` shape** — output is a bare report; nothing reserved for "how does risk change under a proposal?"
 
-## 3. The contract
+## 3. The v0 contract
 
-One entry point. Pure. No DB, no bootstrap, no swallowed errors — it **raises** and the
-orchestrator decides presentation.
+One entry point. Pure. No DB, no bootstrap, no swallowed errors — it **raises**; the caller
+presents.
 
 ```python
-def evaluate_risk(request: RiskRequest, manifest: PortfolioManifest) -> RiskResult: ...
+def evaluate_risk(request: RiskRequest, manifest: AssetPortfolio) -> RiskResult: ...
 ```
 
-### 3.1 Types
+### 3.1 Types — reuse `AssetPortfolio`, add an envelope
+
+No new `PortfolioManifest` type (it was a near-duplicate of `AssetPortfolio`). Add two optional
+provenance fields instead, and wrap the output so `deltas` has a home from day one.
 
 ```python
-class PortfolioManifest(BaseModel):       # WHAT you hold — the unit of synthetic data
-    manifest_id: str
-    allocations: list[AllocationSlot]     # existing slot shape, inlined (replaces AssetPortfolio)
-    source: str = "synthetic"             # provenance: synthetic | ledger | scenario
-    complexity: int | None = None         # 0..N rung on the synthetic ladder (synthetic only)
+class AssetPortfolio(BaseModel):          # the manifest — WHAT you hold
+    portfolio_id: str | None = None
+    allocations: list[AllocationSlot]     # unchanged; weights sum to 1
+    source: str = "synthetic"             # + provenance: synthetic | ledger
+    complexity: int | None = None         # + synthetic rung tag (synthetic only)
 
 class RiskRequest(BaseModel):             # the QUESTION asked of the manifest
     horizon: RiskHorizon
-    notional_usd: Decimal | None = None   # evaluate at this dollar size (enables $VaR/$ES, $P&L)
-    confidence: Decimal | None = None     # α override; defaults to settings
-    overlay: ManifestOverlay | None = None  # the proposed change/scenario → drives deltas
+    notional_usd: Decimal | None = None   # evaluate at this $ size → $VaR/$ES/$P&L
+    run_scenarios: ScenarioSet = ScenarioSet.NONE   # none | high_risk | low_risk | all
+    # overlay: ManifestOverlay | None = None         # v1 — envelope already supports it
 
-class RiskResult(BaseModel):              # frozen — register in FROZEN_TYPES
-    report: PortfolioRiskReport           # risk of the manifest as-is (the baseline)
-    deltas: RiskDeltas | None = None      # None unless request.overlay is set
+class RiskResult(BaseModel):              # frozen + registered in FROZEN_TYPES (v0)
+    report: PortfolioRiskReport           # base / house-view risk of the manifest
+    scenarios: dict[str, PortfolioRiskReport] = {}  # alt regimes per run_scenarios (risk-owned)
+    deltas: RiskDeltas | None = None      # null in v0; no signature change when v1 lands
 ```
 
 **Decision — horizon/notional live in the request, not the manifest.** A manifest is *what you
-hold* (a shape); horizon and notional are *how you're asking about it*. This lets the same
-synthetic shape be evaluated at different horizons/notionals without cloning manifests.
+hold*; horizon/notional are *how you're asking*. One synthetic shape, many questions, no cloning.
 
-### 3.2 The delta model (single manifest in)
+**Decision — keep the `RiskResult` envelope even though `deltas` is always null in v0.** Returning
+a bare `PortfolioRiskReport` would make deltas a breaking return-type change later. The envelope
+is the whole point of a stable base.
 
-The orchestrator sends **one** manifest — the current portfolio. The **request** carries the
-proposed change as an `overlay`. The risk API does the rest:
+### 3.2 Risk assumptions — owned by risk, selected by a flag
 
-```
-report  = evaluate(manifest, request)                      # baseline
-if request.overlay:
-    derived = apply_overlay(manifest, request.overlay)     # risk derives the proposed manifest
-    proposed = evaluate(derived, request)
-    deltas  = diff(report, proposed)                        # baseline → proposed
-return RiskResult(report, deltas)
-```
-
-The orchestrator never constructs the proposed portfolio — it expresses *intent*; risk owns
-*computation*. The orchestrator then **arbitrates** (act / don't act / route for approval) —
-explicitly out of scope for the risk API. This keeps risk advisory-only, consistent with
-"decision support, not autonomous alpha."
+Model assumptions (vol/return priors, correlations, tail multipliers, stress shocks) are **risk
+internals, not a caller input**. The caller never constructs an assumption set — it picks which
+regimes to run via `request.run_scenarios`. Risk owns a named, version-pinned, PSD-validated
+catalog:
 
 ```python
-class ManifestOverlay(BaseModel):
-    """A declarative, compact perturbation — NOT a second full manifest."""
-    weight_tilts: dict[AssetClass, Decimal] = {}   # e.g. {equity: -0.10, fixed_income: +0.10}
-    add_sleeves: list[AllocationSlot] = []          # new exposures
-    drop_sleeves: list[AssetClass] = []             # exited exposures
-    stress_pack: str | None = None                  # named replay (reuses Level 4 vocab)
-    label: str | None = None                        # "rebalance to 60/40", "redomicile overlay"
-    # apply_overlay re-normalizes weights to sum to 1 and re-validates the manifest
+class ScenarioSet(StrEnum):           # the caller's whole surface for assumptions
+    NONE = "none"                     # base / house-view only
+    HIGH_RISK = "high_risk"           # base + crisis regime
+    LOW_RISK = "low_risk"             # base + benign regime
+    ALL = "all"
 
-class MetricDelta(BaseModel):
-    metric: str                  # "annualized_volatility" | "parametric_var" | "parametric_es" | "dollar_var"
-    baseline: Decimal
-    proposed: Decimal
-    delta: Decimal               # proposed − baseline
-    pct_change: Decimal | None
-
-class RiskDeltas(BaseModel):     # frozen — register in FROZEN_TYPES
-    overlay_label: str | None
-    baseline_fingerprint: str    # both fingerprints travel for audit replay
-    proposed_fingerprint: str
-    headline: list[MetricDelta]               # Level 1 metrics
-    by_class_variance_delta: dict[str, Decimal]  # Level 2 contribution shift
+# warehouse/research/risk/scenarios.py — INTERNAL, version-pinned, PSD-validated
+def assumptions_for(name: str) -> RiskAssumptions: ...   # base | high_risk | low_risk
 ```
 
-**Overlay vocabulary is the one design knob that grows over time.** v0 = `weight_tilts` +
-`add/drop_sleeves` + `stress_pack` covers rebalance and named-stress what-ifs. Tax-vector /
-redomicile overlays (per `tax_arbitrage.md`) are a later extension that changes the *rate
-vector*, not the allocation shape — they slot in as a new overlay field without touching the
-contract.
+- **Why risk-owned, not caller-injected** — an injected correlation matrix can be non-PSD
+  (negative portfolio variance); an owned catalog validates PSD at load, so that failure class is
+  impossible. It also keeps the integration surface an enum, not a domain object — the plug-and-play
+  boundary.
+- **Regime ≠ stress replay** — `high_risk`/`low_risk` swap the *assumption set* and re-run all of
+  Levels 1–4 (`high_risk`: correlations → ~+0.85, vols ×~1.4, fatter ES). Distinct from the Level 4
+  *named stress replay* (2008/2020/2022), which applies a fixed return shock to positions inside one
+  report.
+- **Audit** — the selected regime + `risk_model_version` fold into the report fingerprint
+  (`high_risk @ 2026.02`), so every scenario report is reproducible.
+- **Upstream assumption changes** happen in this one owned catalog; callers running `all` pick them
+  up automatically.
+- **`scenarios` map + deltas** — `run_scenarios` can return several reports, so `RiskResult.scenarios`
+  holds the alternates. `diff(report, scenarios["high_risk"])` is itself a delta — the **same diff
+  machinery** serves both assumption-regime deltas (here) and v1 portfolio-overlay deltas.
 
-## 4. Synthetic manifests — a complexity ladder
+Arbitrary caller-supplied assumptions (research sweeps, bespoke client CMAs) are an explicit escape
+hatch deferred to [v1](#v1--overlays--deltas) — the primary path stays the flag.
 
-`synthetic.py` returns `PortfolioManifest`s at increasing complexity. This is the test/demo
-spine and what satisfies the "simple → complex" requirement. Each rung lights up one more level
-of the unit hierarchy, so a failing rung localizes the break.
+## 4. Module boundary — plug-and-play
+
+The risk module is importable and runnable with **zero project state**. Its public surface is its
+package `__init__`:
 
 ```python
-def rung(level: int) -> PortfolioManifest: ...
+# warehouse/research/risk/__init__.py — the integration surface
+from .service   import evaluate_risk
+from .models    import AssetPortfolio, AllocationSlot, RiskHorizon, RiskRequest, RiskResult
+from .synthetic import rung
 ```
+
+- **Pure core** (`service`, `engine`, `models`, `covariance`, `var_es`, …) imports only stdlib,
+  pydantic, numpy/scipy, and its own version-pinned `assumptions.py` / `scenarios.py`. **No
+  `warehouse.data` / `warehouse.infra` imports.** v0 lifts the pinned constants (α, windows,
+  correlations, stress shocks) into a frozen `RiskAssumptions` catalog so the core runs without
+  project config; the legacy `get_settings()` reads collapse into the catalog defaults.
+- **Integration surfaces** (all thin, all over the same `evaluate_risk`):
+  1. **Function** — `evaluate_risk(request, manifest)` for in-process callers.
+  2. **HTTP** — `POST /api/risk/orchestrate`: JSON → `RiskRequest` + `AssetPortfolio` →
+     `evaluate_risk` → `model_dump`. The HTTP *face* and the function are **one code path, two
+     surfaces** — not two orchestration stories.
+  3. **Ledger adapter** — `build_household_manifest(household_id) -> AssetPortfolio` (tagged
+     `source="ledger"`) lives at the **edge**, not in the pure core, so the coupling to the
+     ledger stays out of the risk math.
+- **Standalone test path** — `synthetic.rung(n)` produces manifests with no DB, so the whole API
+  is exercisable in isolation.
+
+## 5. Synthetic manifests — the ground-truth corpus (v0: rungs 0–2)
+
+`synthetic.py` is the **canonical ground truth the module builds on and iterates over** — a no-DB
+corpus of `AssetPortfolio`s at increasing complexity. Every layer (engine, scenario catalog, later
+overlays/deltas) is developed and regressed against it, so a failing rung localizes the break
+before any ledger is involved.
 
 | Rung | Shape | Exercises |
 | --- | --- | --- |
 | 0 | single equity sleeve (β=1) | Level 1 σ/VaR smoke test |
 | 1 | 60/40 equity + fixed income | duration bucket, 2×2 covariance |
 | 2 | + commodities + FX | multi-asset aggregation, native sensitivity units |
-| 3 | + illiquid alternatives (tier 3) | liquidity-time units, fermi sleeves |
-| 4 | + concentrated weights, fermi-tagged | measurement modes, tail behavior, confidence band |
 
-Deltas are tested by sending `rung(n)` as the manifest with an `overlay` that morphs it toward
-`rung(n+1)`'s shape.
-
-## 5. How the orchestrator collapses
+The regression surface is the **matrix `rung × run_scenarios`** — each cell carries pinned golden
+values, composed by a test fixture (**not** a wire type):
 
 ```python
-# before: ~40-line load_risk_dashboard doing 6 jobs + swallowing errors
-manifest = build_household_manifest(household_id)            # OR synthetic.rung(3)
-result   = evaluate_risk(RiskRequest(horizon=..., notional_usd=..., overlay=proposed), manifest)
-present(result)                                              # dashboard/persist; errors propagate
+class Scenario(BaseModel):       # synthetic/test land — composes the three axes
+    portfolio: AssetPortfolio    # synthetic.rung(n)
+    request: RiskRequest         # horizon, notional, run_scenarios
+    expected: dict | None = None # golden Level-1 values for regression
 ```
 
-- `build_portfolio_from_holdings` → `build_household_manifest(household_id) -> PortfolioManifest`
-  tagged `source="ledger"`. DB/bootstrap logic leaves the risk path entirely.
-- The dict HTTP path (`evaluate_risk_request`) becomes a thin adapter: parse JSON →
-  `RiskRequest` + `PortfolioManifest` → `evaluate_risk` → `model_dump`. One code path underneath.
-- The error swallow in `load_risk_dashboard` disappears: the pure function raises, the
-  presentation layer chooses how to show failure (fixes review finding #5).
+This `Scenario` fixture is where the "manifest" ergonomics live — composing a rung with a request
+in the test layer, never bundled into the wire contract (which would force cloning the portfolio
+per regime). Rungs 3–4 (illiquid alts, fermi-tagged / concentrated) land in
+[v1](#v1--overlays--deltas).
 
-## 6. Convergence — three paths → one
+## 6. Boundaries & conventions
 
+- **Pure & deterministic** — no I/O; identical `(request, manifest)` → identical result;
+  fingerprinted for audit replay.
+- **Errors bubble** — the service raises typed errors; only the caller/adapter maps them to
+  dashboard state or HTTP codes.
+- **Advisory only** — risk computes what-would-happen; never persists trades, decides, or
+  executes. Arbitration is the caller's, behind human approval gates.
+- **Frozen results** — `RiskResult` (and the report snapshots) are immutable, registered for
+  `test_frozen.py`. (Closes the review's unfrozen-snapshot item.)
+
+## 7. Migration (5 steps — engine untouched)
+
+1. Add `RiskRequest` + `RiskResult` + `evaluate_risk` wrapping `evaluate_portfolio_risk`; freeze
+   + register `RiskResult`.
+2. Lift assumption globals into a frozen `RiskAssumptions` + internal `scenarios.py` catalog
+   (`base`/`high_risk`/`low_risk`, PSD-validated); thread it through the engine sub-modules; wire
+   `run_scenarios` → `RiskResult.scenarios`; fold the regime + `risk_model_version` into the
+   fingerprint.
+3. Add `synthetic.rung(0..2)` + the `rung × run_scenarios` golden corpus (no DB).
+4. Add `build_household_manifest`; collapse `load_risk_dashboard` to manifest → `evaluate_risk`
+   → present — **narrow the `except`, drop the `load_phase2_dashboard` side effect**.
+5. Point the HTTP adapter (`/api/risk/orchestrate`) at `evaluate_risk`; keep the legacy
+   `{asset_portfolio, horizon}` JSON shape accepted.
+
+## 8. Decisions (closed)
+
+| Question | v0 default |
+| --- | --- |
+| New `PortfolioManifest` type? | **No** — reuse `AssetPortfolio` + `source`/`complexity` |
+| Drop the `RiskResult` envelope? | **No** — keep it; `deltas=null` in v0 (non-breaking) |
+| Frozen results in v0? | **Yes** — convention-mandated, one line |
+| Synthetic ladder in v0? | **Rungs 0–2 only** (no-DB test spine); 3–4 → v1 |
+| Assumptions: injected or risk-owned? | **Risk-owned** version-pinned, PSD-validated catalog; caller picks via `run_scenarios` |
+| `run_scenarios` values | `none` \| `high_risk` \| `low_risk` \| `all` (base always runs) |
+| Arbitrary assumption override? | **v1 escape hatch** — research sweeps / bespoke CMAs only |
+| Overlay / delta math in v0? | **Defer to v1** — envelope reserved |
+| Headline delta metrics (v1) | ann_vol, parametric_var, parametric_es (+ dollar when notional) |
+| Multiple overlays per request (v1) | **Single** overlay |
+| JSON back-compat | **Keep** `{asset_portfolio, horizon}` |
+| Term for the caller | **"caller"** in code; "orchestrator" = the specific project caller |
+
+---
+
+## v1 — overlays & deltas
+
+Deferred from the base contract. The `RiskResult.deltas` slot and `RiskRequest.overlay` field are
+already reserved, so v1 adds capability **without changing the signature**.
+
+**Delta model (single manifest in).** The caller sends one manifest (current portfolio); the
+request carries the proposed change as an `overlay`; risk applies it, re-evaluates, and diffs.
+The caller never builds the proposed portfolio — it states intent; risk owns the math; the caller
+arbitrates (out of scope).
+
+```python
+report = evaluate(manifest, request)                  # baseline
+if request.overlay:
+    derived  = apply_overlay(manifest, request.overlay)   # risk derives the proposed manifest
+    proposed = evaluate(derived, request)
+    deltas   = diff(report, proposed)                      # baseline → proposed
 ```
-            ┌─ build_household_manifest (ledger)  ─┐
-manifests ──┤─ synthetic.rung(n)                  ─┼─► evaluate_risk(request, manifest) ─► {report, deltas}
-            └─ JSON adapter (HTTP)                 ─┘
+
+```python
+class ManifestOverlay(BaseModel):
+    """Declarative, compact perturbation — NOT a second full manifest."""
+    weight_tilts: dict[AssetClass, Decimal] = {}   # {equity: -0.10, fixed_income: +0.10}
+    add_sleeves: list[AllocationSlot] = []
+    drop_sleeves: list[AssetClass] = []
+    stress_pack: str | None = None                 # named replay (reuses Level 4 vocab)
+    label: str | None = None
+    # apply_overlay re-normalizes weights to 1 and re-validates
+
+class MetricDelta(BaseModel):
+    metric: str                  # "annualized_volatility" | "parametric_var" | ...
+    baseline: Decimal
+    proposed: Decimal
+    delta: Decimal               # proposed − baseline
+    pct_change: Decimal | None
+
+class RiskDeltas(BaseModel):     # frozen + registered when introduced
+    overlay_label: str | None
+    baseline_fingerprint: str    # both fingerprints travel for audit replay
+    proposed_fingerprint: str
+    headline: list[MetricDelta]                   # Level 1 metrics
+    by_class_variance_delta: dict[str, Decimal]   # Level 2 contribution shift
 ```
 
-Ledger, synthetic, and HTTP all produce a `PortfolioManifest` and call the same
-`evaluate_risk`. No capability lives in only one path.
+**Also in v1:**
 
-## 7. Migration plan (engine internals untouched)
+- **Synthetic rungs 3–4** — illiquid alternatives (liquidity-time units, tier 3) and
+  concentrated / fermi-tagged sleeves (measurement modes, tail/confidence band).
+- **Arbitrary `RiskAssumptions` override** — explicit escape hatch (`assumptions=` on
+  `evaluate_risk`) for research sweeps and bespoke client CMAs, defaulting to the catalog. The v0
+  catalog already lifts the pinned constants out of `get_settings()`; this just exposes them.
+- **Deltas dashboard panel** — baseline → proposed headline metrics, per the dashboard-first rule.
+- **Tax-vector / redomicile overlays** — change the *rate vector*, not the allocation shape
+  (`tax_arbitrage.md`); a new overlay field, contract unchanged.
 
-1. **Add types** — `PortfolioManifest`, `RiskRequest`, `RiskResult`, `RiskDeltas`,
-   `ManifestOverlay`, `MetricDelta` (new `models_io.py` alongside `models.py`).
-2. **Add `evaluate_risk` service** (`service.py`) wrapping the existing
-   `evaluate_portfolio_risk`; implement `apply_overlay` + `diff`. No engine changes.
-3. **Synthetic ladder** (`synthetic.py`) `rung(0..4)`.
-4. **Refactor builder** — `build_household_manifest` returns a `PortfolioManifest`.
-5. **Collapse orchestrator** — `load_risk_dashboard` → manifest + `evaluate_risk` + present;
-   remove the bare-`except` swallow.
-6. **Adapter** — re-point `evaluate_risk_request`/`evaluate_risk_json` at `evaluate_risk`;
-   keep the JSON wire shape backward-compatible (accept legacy `{asset_portfolio, horizon}`).
-7. **Freeze + register** — `RiskResult`, `RiskDeltas`, and the report snapshots in
-   `FROZEN_TYPES` (closes review medium item on unfrozen risk snapshots).
-8. **Tests** — synthetic ladder evaluates clean per rung; overlay/delta correctness
-   (tilt equity down ⇒ vol/VaR delta negative); adapter back-compat; frozen registry.
-9. **Dashboard** — a deltas panel (baseline → proposed headline metrics) per the
-   dashboard-first rule.
+---
 
-## 8. Boundaries & conventions
+## Review / iteration log
 
-- **Pure & deterministic.** `evaluate_risk` has no I/O; identical (request, manifest) →
-  identical result. Fingerprints on both base and proposed make deltas audit-replayable.
-- **Errors bubble.** The service raises typed errors; only the orchestrator/adapter maps them
-  to dashboard state or HTTP codes.
-- **Advisory only.** Risk computes what-would-happen; it never persists trades, decides, or
-  executes. Arbitration is the orchestrator's, behind human approval gates.
-- **Frozen results.** `RiskResult`/`RiskDeltas` are immutable snapshots, registered for the
-  `test_frozen.py` check.
-
-## 9. Open decisions (for the owner)
-
-1. **Overlay v0 vocabulary** — is `weight_tilts + add/drop_sleeves + stress_pack` enough for
-   the first orchestrator use cases, or is a tax-rate-vector overlay needed in v0?
-2. **Multiple overlays per request** — single `overlay` (one what-if) vs `list[overlay]`
-   (compare N proposals in one call, returning `list[RiskDeltas]`).
-3. **Headline metric set** — which Level 1 metrics are first-class in `RiskDeltas.headline`
-   (proposed: ann_vol, parametric_var, parametric_es, dollar_var when notional present).
-4. **Adapter back-compat window** — keep the legacy `{asset_portfolio, horizon}` JSON shape
-   indefinitely, or deprecate once the orchestrator moves to manifests.
-```
+| Date | Note |
+| --- | --- |
+| 2026-06-26 | Initial design (Claude): single contract, manifest-vs-question, overlay/deltas. |
+| 2026-06-26 | Cursor review: doc over-specified for a simplification doc; recommended a v0 cut. |
+| 2026-06-26 | Arbitration (Claude): accepted Cursor's *reuse `AssetPortfolio`*, *close decisions with defaults*, *one-page structure*; **rejected** dropping the `RiskResult` envelope (breaking change) and deferring frozen results (convention-mandated); kept a minimal synthetic spine (user requirement). Verified the two "orchestration stories" are one path + HTTP face. Result: this v0 + a `## v1` appendix. |
+| 2026-06-26 | Assumptions decision (owner + Claude): risk **owns** a version-pinned, PSD-validated scenario catalog (`base`/`high_risk`/`low_risk`); caller selects via a `run_scenarios` flag, not an injected assumptions object. `RiskResult` gains a `scenarios` map; same diff machinery serves regime + overlay deltas. Pulled the catalog + flag into v0; arbitrary override → v1 escape hatch. Reverses the earlier injectable-third-arg idea. |
