@@ -60,5 +60,5 @@ strict = true
 packages = ["warehouse"]
 
 [[tool.mypy.overrides]]
-module = ["numpy.*", "scipy.*"]
+module = ["numpy.*", "scipy.*", "redis", "redis.*"]
 ignore_missing_imports = true
