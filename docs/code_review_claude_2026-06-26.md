@@ -24,14 +24,13 @@ risk planes).
 
 ## Meta findings (toolchain)
 
-- ☐ **mypy strict is a silent no-op.** `mypy` reports `Package 'warehouse' cannot be type
-  checked due to missing py.typed marker` and checks **nothing**, despite `strict = true` and a
-  recent "mypy err fixes" commit. Fix: add empty `src/warehouse/py.typed` + package-data entry,
-  or run `mypy src/warehouse`. Highest-leverage fix — it re-enables a whole class of guardrails
-  the project believes it has.
+- ✅ **mypy strict re-enabled.** Added empty `src/warehouse/py.typed`, `package-data` in
+  `pyproject.toml`, and `mypy src/warehouse` to `.github/workflows/ci.yml`. Running `mypy`
+  without a path still warns on the package marker; CI and local checks should use
+  `mypy src/warehouse`.
 - ☐ **`ruff check .` fails with 2 errors** (E501 in `alembic/versions/002_phase2_ops.py:39`
-  and `004_phase4_execution.py:76`). CI runs ruff on push. Add the migrations to
-  `per-file-ignores` or wrap the lines.
+  and `004_phase4_execution.py:76`). **CI runs `ruff check src tests` only** — migrations are
+  out of scope until added to `per-file-ignores` or wrapped.
 
 ---
 
@@ -79,17 +78,24 @@ additional tax owed, negative = tax reduced (harvested loss lowers `estimated_ta
 negative delta is the after-tax benefit). Matches the existing
 `test_phase3.py::test_optimizer_harvests_loss_lot` assertion that the delta is `< 0`.
 
-### 4. ☐ Reconciliation ignores `as_of_date`
-`execution/reconciliation/service.py:75`. The custodian field is ingested but never compared, so
-a **stale custodian file reconciles "clean"** — the "treat a failed reconcile as
-positions-unchanged" default-on-failure `CLAUDE.md` singles out. Undermines the positions-trust
-gate that must hold before trading. Fix: assert all custodian rows share one `as_of_date`,
-surface it on the run, gate reconcile on freshness.
+### 4. ✅ Reconciliation ignores `as_of_date` — FIXED
+`execution/reconciliation/service.py`. The custodian field was ingested but never compared, so a
+**stale custodian file reconciled "clean"** — undermining the positions-trust gate.
 
-### 5. ☐ Risk dashboard swallows all errors
-`dashboard/risk_data.py:60`. Bare `except Exception` returns a benign object with `report=None`.
-The error string does reach the panel, but KeyError/AttributeError programming bugs are now
-indistinguishable from real data gaps. Fix: catch the specific domain error and re-raise the rest.
+**Fix:**
+- `ReconcileAsOfError` raised when rows have mixed `as_of_date`, when `as_of_date` is after the
+  reference market date, or when older than `reconcile_max_stale_days` (default 7) vs
+  `max(MarketPriceRow.as_of_date)`.
+- `reconcile_ingest` returns `ReconcileResult(as_of_date, breaks)`; daily refresh step detail
+  includes `as_of=…`; audit action `reconcile_as_of_ok` records dates.
+- Regression tests in `tests/test_phase2.py` (fresh, stale, mixed).
+
+### 5. ✅ Risk dashboard swallows all errors — FIXED
+`dashboard/risk_data.py`. Bare `except Exception` returned a benign object with `report=None`.
+
+**Fix:** catch domain errors only (`ValueError`, `RiskApiError`, `ValidationError`); programming
+bugs (`KeyError`, `AttributeError`, etc.) bubble. Regression tests in
+`tests/test_risk_dashboard.py`.
 
 ---
 
@@ -125,6 +131,10 @@ indistinguishable from real data gaps. Fix: catch the specific domain error and 
 
 ## Low severity (all open)
 
+- **Backtest harness is still a stub** — `research/backtest/harness.py` accepts
+  `start_date`/`end_date` but does not drive a true walk-forward simulation; tax baseline is now
+  consistent (`gross_return - tax_drag` on positive net gain) but the path is not replay-safe for
+  research claims until dates and purge windows bind the loop.
 - Duration-bucket variance shares can exceed 100% on duplicate asset classes (`by_duration.py:35`).
 - CSV parsers reject `$` / thousands-comma / parenthesis-negative formats (loud failure, but
   brittle for real custodian exports); hard-coded `utf-8` (no BOM handling).
@@ -153,12 +163,24 @@ indistinguishable from real data gaps. Fix: catch the specific domain error and 
 
 ## Recommended order from here
 
-1. **mypy py.typed marker** — free guardrail the project is already billing itself for.
-2. **Reconcile `as_of_date` freshness (#4)** + **dup-break guard** — restores the positions-trust
-   gate that everything downstream depends on.
-3. **Risk dashboard swallow (#5)** + **frozen/registry gaps** — bring the risk plane in line with
-   the conventions the rest of the repo already follows.
-4. **Tax-overlay math** — the difference between "looks like a tax platform" and "is one."
+1. **Dup-break guard on reconcile** — no uniqueness on `(ingest_run_id, account_id, security_id)`.
+2. **Frozen/registry gaps on risk types** — bring audit-critical snapshots in line with
+   `FROZEN_TYPES`.
+3. **Tax-overlay math** — the difference between "looks like a tax platform" and "is one."
+4. **Backtest walk-forward** — wire `start_date`/`end_date` and purge into the harness loop.
+5. **Risk orchestrator** — see `docs/risk_api_contract.md` for collapsing transactional flow to
+   `evaluate_risk(request, manifest) → {report, deltas}`.
+
+---
+
+## Cross-references
+
+- **Risk API contract / orchestrator sketch:** `docs/risk_api_contract.md` — proposed manifest
+  inputs, stale marks, assessment deltas, and HTTP `POST /api/risk/orchestrate` shape.
+- **Risk unit hierarchy (Levels 1–4):** `docs/research/risk_units_measures.md`,
+  `docs/research/portfolio_risk.md`.
+- **CI scope:** `ruff check src tests`, `mypy src/warehouse`, `pytest` — alembic migrations not
+  linted unless `ruff check .` is adopted repo-wide.
 
 ---
 
@@ -171,7 +193,17 @@ indistinguishable from real data gaps. Fix: catch the specific domain error and 
 | `decision/optimizer/heuristics.py` | Wire wash-sale guard; fix tax-delta no-op + document sign |
 | `decision/optimizer/mip.py` | Wire wash-sale guard |
 | `data/ledger/views.py` | Thread `wash_sale_substitute_group` into `LotPositionView` |
+| `src/warehouse/py.typed` | PEP 561 marker for strict mypy |
+| `pyproject.toml` | `package-data` for `py.typed` |
+| `.github/workflows/ci.yml` | `mypy src/warehouse` job step |
+| `execution/reconciliation/service.py` | `as_of_date` freshness gate; `ReconcileResult` |
+| `workflows/daily_refresh.py` | Surface reconcile `as_of` in step detail |
+| `dashboard/risk_data.py` | Narrow exception handling to domain errors |
+| `config.py`, `configs/development.toml` | `reconcile_max_stale_days` |
+| `data/ingest/runner.py` | `session.flush()` after custodian rows (autoflush=False) |
 | `tests/test_phase3.py`, `tests/test_phase4.py`, `tests/test_risk_dashboard.py` | Regression tests + new required field |
+| `tests/test_phase2.py` | Reconcile freshness tests (fresh / stale / mixed) |
+| `tests/test_config.py` | Assert `reconcile_max_stale_days` |
 
-**Verification:** `pytest` 67 passed; `ruff check` clean on all changed files (pre-existing
-alembic E501s remain, see meta findings).
+**Verification:** `pytest` 72 passed; `ruff check src tests` clean; `mypy src/warehouse`
+success (pre-existing alembic E501s remain outside CI scope, see meta findings).

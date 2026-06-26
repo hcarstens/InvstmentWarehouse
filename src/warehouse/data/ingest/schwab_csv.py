@@ -28,7 +28,8 @@ def parse_custodian_csv(path: Path) -> list[CustodianPositionRecord]:
         reader = csv.DictReader(handle)
         if reader.fieldnames is None:
             raise ValueError(f"Empty custodian file: {path}")
-        missing = [col for col in REQUIRED_COLUMNS if col not in reader.fieldnames]
+        missing = [
+            col for col in REQUIRED_COLUMNS if col not in reader.fieldnames]
         if missing:
             raise ValueError(f"Missing columns {missing} in {path.name}")
 
@@ -40,11 +41,13 @@ def parse_custodian_csv(path: Path) -> list[CustodianPositionRecord]:
                         account_id=row["account_id"].strip(),
                         ticker=row["ticker"].strip().upper(),
                         quantity=Decimal(row["quantity"].strip()),
-                        as_of_date=date.fromisoformat(row["as_of_date"].strip()),
+                        as_of_date=date.fromisoformat(
+                            row["as_of_date"].strip()),
                     )
                 )
             except (KeyError, ValueError, ArithmeticError) as err:
-                raise ValueError(f"Invalid row {line_no} in {path.name}: {err}") from err
+                raise ValueError(
+                    f"Invalid row {line_no} in {path.name}: {err}") from err
         if not records:
             raise ValueError(f"No position rows in {path.name}")
         return records

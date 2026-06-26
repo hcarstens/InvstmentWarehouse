@@ -18,7 +18,9 @@ configs/local.toml
 
 # IDE
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 *.swp
 .DS_Store
 

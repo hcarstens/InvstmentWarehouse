@@ -10,7 +10,10 @@ import pytest
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.decision.approval import ApprovalStatus
-from warehouse.decision.approval.service import list_approval_requests, update_approval_status
+from warehouse.decision.approval.service import (
+    list_approval_requests,
+    update_approval_status,
+)
 from warehouse.decision.constraints import evaluate_lot_sell_allowed
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.ips.monitor import build_ips_drift_report
@@ -115,7 +118,8 @@ def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
         DEMO_HOUSEHOLD_ID, positions, ips, as_of=as_of
     )
     assert not any(t.lot_id == "loss" for t in result.trades)
-    assert any(b.startswith("wash_sale_30d") for b in result.binding_constraints)
+    assert any(b.startswith("wash_sale_30d")
+               for b in result.binding_constraints)
 
 
 def load_ips_for_test() -> InvestmentPolicyStatement:
@@ -130,7 +134,8 @@ def test_optimizer_persist_and_approval() -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:
         view = run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
-        approvals = list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+        approvals = list_approval_requests(
+            session, household_id=DEMO_HOUSEHOLD_ID)
     assert view.run_id.startswith("opt_")
     assert approvals
     matching = [a for a in approvals if a.optimization_run_id == view.run_id]
@@ -142,7 +147,8 @@ def test_approval_workflow() -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
-        pending = list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)[0]
+        pending = list_approval_requests(
+            session, household_id=DEMO_HOUSEHOLD_ID)[0]
         updated = update_approval_status(
             session,
             pending.request_id,

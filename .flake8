@@ -1,0 +1,2 @@
+max-line-length = 79
+extend-ignore = E203

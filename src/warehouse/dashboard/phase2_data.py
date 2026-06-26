@@ -4,8 +4,14 @@ from pydantic import BaseModel
 
 from warehouse.config import repo_root
 from warehouse.data.ingest.runner import IngestRunSummary, list_ingest_runs
-from warehouse.data.ledger.views import HouseholdPnlSummary, LotPositionView, household_pnl_summary
-from warehouse.data.ledger.views import list_lot_positions as load_lot_positions
+from warehouse.data.ledger.views import (
+    HouseholdPnlSummary,
+    LotPositionView,
+    household_pnl_summary,
+)
+from warehouse.data.ledger.views import (
+    list_lot_positions as load_lot_positions,
+)
 from warehouse.execution.reconciliation.service import (
     ReconciliationBreak,
     list_reconciliation_breaks,
@@ -54,7 +60,8 @@ def load_phase2_dashboard() -> Phase2DashboardData:
         _ensure_demo_refresh()
         with session_scope() as session:
             ingest_runs = list_ingest_runs(session)
-            positions = load_lot_positions(session, household_id=DEMO_HOUSEHOLD_ID)
+            positions = load_lot_positions(
+                session, household_id=DEMO_HOUSEHOLD_ID)
             pnl = household_pnl_summary(session, DEMO_HOUSEHOLD_ID)
             breaks = list_reconciliation_breaks(session, open_only=True)
             steps = latest_refresh_steps(session, DEMO_HOUSEHOLD_ID)

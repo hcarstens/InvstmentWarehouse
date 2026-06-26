@@ -31,5 +31,6 @@ class Security(BaseModel):
     name: str
     asset_class: AssetClass
     tax_character: TaxCharacter
-    liquidity_tier: int = Field(default=1, ge=1, le=5, description="1=most liquid")
+    liquidity_tier: int = Field(
+        default=1, ge=1, le=5, description="1=most liquid")
     wash_sale_substitute_group: str | None = None

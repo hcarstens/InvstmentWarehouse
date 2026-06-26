@@ -126,6 +126,13 @@ warehouse --help
 - Human approval gates dominate; decision support not autonomous alpha
 - Propagate errors; prefer fixing one reconciliation bug over multiple optimizer tweaks
 
+## Line length
+
+**79 characters** — one limit, one config: `pyproject.toml` → `[tool.ruff] line-length`.
+EditorConfig, VS Code rulers, and ruff format all read that. Do not maintain a second length.
+
+Wrap imports and call sites; no `# noqa: E501`. HTML in `dashboard/render_*.py` / `server.py` may exceed 79.
+
 ## Errors bubble to surface (no silent failures)
 
 **Never swallow errors.** Failures must propagate to the caller, the dashboard, or the CLI —

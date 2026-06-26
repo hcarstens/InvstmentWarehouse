@@ -31,5 +31,6 @@ def portfolio_fingerprint(
             for s in sorted(portfolio.allocations, key=lambda x: x.asset_class.value)
         ],
     }
-    digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+    digest = hashlib.sha256(json.dumps(
+        payload, sort_keys=True).encode()).hexdigest()
     return digest[:16]

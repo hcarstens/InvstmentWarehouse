@@ -6,9 +6,15 @@ from pydantic import BaseModel
 
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.data.ledger.views import list_lot_positions
-from warehouse.decision.approval.service import ApprovalRequestView, list_approval_requests
+from warehouse.decision.approval.service import (
+    ApprovalRequestView,
+    list_approval_requests,
+)
 from warehouse.decision.constraints import active_constraint_summary
-from warehouse.decision.ips.monitor import IpsDriftReport, build_ips_drift_report
+from warehouse.decision.ips.monitor import (
+    IpsDriftReport,
+    build_ips_drift_report,
+)
 from warehouse.decision.ips.store import load_ips
 from warehouse.decision.optimizer.runner import (
     OptimizationRunView,
@@ -18,7 +24,11 @@ from warehouse.decision.optimizer.runner import (
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
-from warehouse.research.backtest.harness import BacktestRunView, list_backtest_runs, run_backtest
+from warehouse.research.backtest.harness import (
+    BacktestRunView,
+    list_backtest_runs,
+    run_backtest,
+)
 
 
 class Phase3DashboardData(BaseModel):
@@ -51,15 +61,18 @@ def load_phase3_dashboard() -> Phase3DashboardData:
         load_phase2_dashboard()
         _ensure_demo_decision_runs()
         with session_scope() as session:
-            positions = list_lot_positions(session, household_id=DEMO_HOUSEHOLD_ID)
+            positions = list_lot_positions(
+                session, household_id=DEMO_HOUSEHOLD_ID)
             ips = load_ips(session, DEMO_HOUSEHOLD_ID)
             drift = (
-                build_ips_drift_report(session, DEMO_HOUSEHOLD_ID, positions, ips)
+                build_ips_drift_report(
+                    session, DEMO_HOUSEHOLD_ID, positions, ips)
                 if ips
                 else None
             )
             opts = list_optimization_runs(session, DEMO_HOUSEHOLD_ID)
-            approvals = list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+            approvals = list_approval_requests(
+                session, household_id=DEMO_HOUSEHOLD_ID)
             backtests = list_backtest_runs(session, DEMO_HOUSEHOLD_ID)
             constraints = active_constraint_summary(ips) if ips else []
         return Phase3DashboardData(

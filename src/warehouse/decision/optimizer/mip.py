@@ -10,10 +10,16 @@ from decimal import Decimal
 
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import LotPositionView
-from warehouse.decision.constraints import evaluate_lot_sell_allowed, evaluate_wash_sale_risk
+from warehouse.decision.constraints import (
+    evaluate_lot_sell_allowed,
+    evaluate_wash_sale_risk,
+)
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
-from warehouse.decision.optimizer.heuristics import _asset_class_for_position, _holding_period_rate
+from warehouse.decision.optimizer.heuristics import (
+    _asset_class_for_position,
+    _holding_period_rate,
+)
 
 
 def run_mip_optimizer(
@@ -40,7 +46,8 @@ def run_mip_optimizer(
         if pos.market_value is None:
             continue
         ac = _asset_class_for_position(pos)
-        class_weights[ac] = class_weights.get(ac, Decimal("0")) + pos.market_value / total_mv
+        class_weights[ac] = class_weights.get(
+            ac, Decimal("0")) + pos.market_value / total_mv
 
     candidates: list[tuple[Decimal, LotPositionView]] = []
     for lot in positions:
@@ -56,7 +63,8 @@ def run_mip_optimizer(
             continue
         rate = _holding_period_rate(lot.acquisition_date, today, cfg)
         benefit = abs(lot.unrealized_gain * rate)
-        score = benefit / lot.market_value if lot.market_value > 0 else Decimal("0")
+        score = benefit / \
+            lot.market_value if lot.market_value > 0 else Decimal("0")
         candidates.append((score, lot))
 
     candidates.sort(key=lambda item: item[0], reverse=True)

@@ -107,7 +107,8 @@ def check_job_queue(settings: Settings) -> InfraCheck:
         )
 
     try:
-        client = redis.from_url(settings.job_queue_url, socket_connect_timeout=1)
+        client = redis.from_url(settings.job_queue_url,
+                                socket_connect_timeout=1)
         client.ping()
     except Exception as err:
         return InfraCheck(

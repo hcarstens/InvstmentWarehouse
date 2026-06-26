@@ -9,15 +9,26 @@ from warehouse.config import repo_root
 from warehouse.dashboard.phase4_data import load_phase4_dashboard
 from warehouse.data.ingest.fidelity_csv import parse_fidelity_csv
 from warehouse.data.ingest.registry import get_parser
-from warehouse.data.ingest.registry import list_custodians as list_parser_custodians
+from warehouse.data.ingest.registry import (
+    list_custodians as list_parser_custodians,
+)
 from warehouse.data.ingest.runner import run_custodian_ingest
 from warehouse.decision.approval import ApprovalStatus
-from warehouse.decision.approval.service import list_approval_requests, update_approval_status
+from warehouse.decision.approval.service import (
+    list_approval_requests,
+    update_approval_status,
+)
 from warehouse.decision.optimizer.compare import run_solver_comparison
 from warehouse.decision.optimizer.runner import run_and_persist_optimizer
-from warehouse.decision.tax.scenarios import TaxScenarioOverlays, run_tax_scenario
+from warehouse.decision.tax.scenarios import (
+    TaxScenarioOverlays,
+    run_tax_scenario,
+)
 from warehouse.execution.oms import OrderStatus
-from warehouse.execution.oms.service import list_staged_orders, update_order_status
+from warehouse.execution.oms.service import (
+    list_staged_orders,
+    update_order_status,
+)
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.schema_status import HEAD_REVISION
@@ -99,7 +110,8 @@ def test_oms_gate_blocks_unapproved_staging() -> None:
             stage_orders_from_approval(session, pending.request_id)
         # No order for THIS pending approval should have leaked into staging.
         orders = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)
-        assert not any(o.approval_request_id == pending.request_id for o in orders)
+        assert not any(o.approval_request_id ==
+                       pending.request_id for o in orders)
 
 
 def test_order_state_machine() -> None:
@@ -118,8 +130,10 @@ def test_order_state_machine() -> None:
             reviewer_id="advisor:test",
         )
         order = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)[0]
-        submitted = update_order_status(session, order.order_id, status=OrderStatus.SUBMITTED)
-        filled = update_order_status(session, order.order_id, status=OrderStatus.FILLED)
+        submitted = update_order_status(
+            session, order.order_id, status=OrderStatus.SUBMITTED)
+        filled = update_order_status(
+            session, order.order_id, status=OrderStatus.FILLED)
     assert submitted.status == OrderStatus.SUBMITTED.value
     assert filled.status == OrderStatus.FILLED.value
 

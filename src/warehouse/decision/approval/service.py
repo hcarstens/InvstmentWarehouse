@@ -67,7 +67,8 @@ def list_approval_requests(
     household_id: str | None = None,
     limit: int = 20,
 ) -> list[ApprovalRequestView]:
-    stmt = select(ApprovalRequestRow).order_by(ApprovalRequestRow.created_at.desc()).limit(limit)
+    stmt = select(ApprovalRequestRow).order_by(
+        ApprovalRequestRow.created_at.desc()).limit(limit)
     if household_id:
         stmt = stmt.where(ApprovalRequestRow.household_id == household_id)
     rows = session.scalars(stmt).all()
@@ -85,7 +86,8 @@ def update_approval_status(
     if row is None:
         raise ValueError(f"Approval request not found: {request_id}")
     if row.status != ApprovalStatus.PENDING.value:
-        raise ValueError(f"Approval request {request_id} is already {row.status}")
+        raise ValueError(
+            f"Approval request {request_id} is already {row.status}")
     row.status = status.value
     row.reviewer_id = reviewer_id
     row.reviewed_at = datetime.now(UTC)

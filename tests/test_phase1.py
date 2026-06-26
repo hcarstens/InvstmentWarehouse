@@ -57,5 +57,6 @@ def test_phase1_dashboard_loads() -> None:
 
 def test_workflow_definitions_seeded() -> None:
     status = build_schema_status()
-    workflows = next(t for t in status.tables if t.name == "workflow_definitions")
+    workflows = next(t for t in status.tables if t.name ==
+                     "workflow_definitions")
     assert workflows.row_count == 6

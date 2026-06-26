@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import CLASS_CORRELATIONS, DEFAULT_CLASS_CORRELATION
+from warehouse.research.risk.assumptions import (
+    CLASS_CORRELATIONS,
+    DEFAULT_CLASS_CORRELATION,
+)
 from warehouse.research.risk.models import AllocationSlot, AssetClass
 
 
@@ -51,7 +54,8 @@ def portfolio_covariance(states: list[SleeveRiskState]) -> CovarianceResult:
         for j in range(n):
             portfolio_variance += weights[i] * weights[j] * cov[i][j]
 
-    portfolio_volatility = portfolio_variance.sqrt() if portfolio_variance > 0 else Decimal("0")
+    portfolio_volatility = portfolio_variance.sqrt(
+    ) if portfolio_variance > 0 else Decimal("0")
 
     marginal_variance: list[Decimal] = []
     for i in range(n):

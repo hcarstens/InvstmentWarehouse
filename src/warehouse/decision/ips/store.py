@@ -41,7 +41,8 @@ def save_ips(session: Session, ips: InvestmentPolicyStatement) -> None:
             household_id=ips.household_id,
             version=ips.version,
             effective_date=ips.effective_date,
-            allocation_json=json.dumps([t.model_dump(mode="json") for t in ips.allocation_targets]),
+            allocation_json=json.dumps(
+                [t.model_dump(mode="json") for t in ips.allocation_targets]),
             restricted_json=json.dumps(ips.restricted_securities),
         )
     )

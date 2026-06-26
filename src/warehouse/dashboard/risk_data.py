@@ -15,7 +15,9 @@ from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
 from warehouse.research.risk.engine import evaluate_portfolio_risk
 from warehouse.research.risk.models import PortfolioRiskReport, RiskHorizon
-from warehouse.research.risk.portfolio_builder import build_portfolio_from_holdings
+from warehouse.research.risk.portfolio_builder import (
+    build_portfolio_from_holdings,
+)
 
 
 class RiskDashboardData(BaseModel):
@@ -33,14 +35,17 @@ def load_risk_dashboard(
     horizon_years: Decimal | None = None,
 ) -> RiskDashboardData:
     settings = get_settings()
-    horizon = RiskHorizon.parse(horizon_years or settings.risk_dashboard_horizon_years)
+    horizon = RiskHorizon.parse(
+        horizon_years or settings.risk_dashboard_horizon_years)
     try:
         bootstrap_database(seed=True)
         load_phase2_dashboard()
         with session_scope() as session:
             positions = list_lot_positions(session, household_id=household_id)
-            alts = list_alternative_holdings(session, household_id=household_id)
-        portfolio = build_portfolio_from_holdings(household_id, positions, alts)
+            alts = list_alternative_holdings(
+                session, household_id=household_id)
+        portfolio = build_portfolio_from_holdings(
+            household_id, positions, alts)
         notional = sum(
             (p.market_value for p in positions if p.market_value is not None),
             Decimal("0"),

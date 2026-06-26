@@ -67,8 +67,10 @@ def build_schema_status(engine: Engine | None = None) -> SchemaStatus:
             tables: list[TableStatus] = []
             if revision:
                 for model in TRACKED_TABLES:
-                    count = session.scalar(select(func.count()).select_from(model))
-                    tables.append(TableStatus(name=model.__tablename__, row_count=int(count or 0)))
+                    count = session.scalar(
+                        select(func.count()).select_from(model))
+                    tables.append(TableStatus(
+                        name=model.__tablename__, row_count=int(count or 0)))
                 last_at = _last_applied_at(session)
             else:
                 last_at = None

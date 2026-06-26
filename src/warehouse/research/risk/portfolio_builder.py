@@ -7,7 +7,11 @@ from decimal import Decimal
 
 from warehouse.data.alternatives.service import AlternativeHoldingView
 from warehouse.data.ledger.views import LotPositionView
-from warehouse.research.risk.models import AllocationSlot, AssetClass, AssetPortfolio
+from warehouse.research.risk.models import (
+    AllocationSlot,
+    AssetClass,
+    AssetPortfolio,
+)
 
 _TICKER_MAP: dict[str, tuple[AssetClass, int]] = {
     "VTI": (AssetClass.EQUITY, 1),

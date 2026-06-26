@@ -31,7 +31,8 @@ DEMO_HOUSEHOLD_ID = "hh_smith"
 
 def seed_ips_policy(session: Session) -> None:
     existing = session.scalar(
-        select(IpsPolicyRow).where(IpsPolicyRow.household_id == DEMO_HOUSEHOLD_ID).limit(1)
+        select(IpsPolicyRow).where(
+            IpsPolicyRow.household_id == DEMO_HOUSEHOLD_ID).limit(1)
     )
     if existing:
         return
@@ -80,7 +81,8 @@ def seed_demo_lots(session: Session) -> None:
 def seed_phase4_extensions(session: Session) -> None:
     """Fidelity custodian, alt holding, and fidelity lots (idempotent upgrades)."""
     if not session.scalar(
-        select(EntityRow.entity_id).where(EntityRow.entity_id == "custodian_fidelity").limit(1)
+        select(EntityRow.entity_id).where(
+            EntityRow.entity_id == "custodian_fidelity").limit(1)
     ):
         session.add(
             EntityRow(
@@ -91,7 +93,8 @@ def seed_phase4_extensions(session: Session) -> None:
             )
         )
     if not session.scalar(
-        select(EntityRow.entity_id).where(EntityRow.entity_id == "acct_fidelity").limit(1)
+        select(EntityRow.entity_id).where(
+            EntityRow.entity_id == "acct_fidelity").limit(1)
     ):
         session.add(
             EntityRow(
@@ -123,7 +126,8 @@ def seed_phase4_extensions(session: Session) -> None:
             )
         )
     if not session.scalar(
-        select(LotRow.lot_id).where(LotRow.lot_id == "lot_fidelity_vti").limit(1)
+        select(LotRow.lot_id).where(
+            LotRow.lot_id == "lot_fidelity_vti").limit(1)
     ):
         session.add(
             LotRow(
@@ -136,7 +140,8 @@ def seed_phase4_extensions(session: Session) -> None:
             )
         )
     if not session.scalar(
-        select(LotRow.lot_id).where(LotRow.lot_id == "lot_fidelity_bnd").limit(1)
+        select(LotRow.lot_id).where(
+            LotRow.lot_id == "lot_fidelity_bnd").limit(1)
     ):
         session.add(
             LotRow(
@@ -199,7 +204,8 @@ def seed_market_prices(session: Session) -> None:
     ]
     as_of = date(2026, 6, 24)
     session.add_all(
-        [MarketPriceRow(security_id=s, price=p, as_of_date=as_of) for s, p in prices]
+        [MarketPriceRow(security_id=s, price=p, as_of_date=as_of)
+         for s, p in prices]
     )
 
 

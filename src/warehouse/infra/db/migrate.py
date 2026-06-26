@@ -30,19 +30,22 @@ def current_revision(engine: Engine | None = None) -> str | None:
         inspector = inspect(conn)
         if "alembic_version" not in inspector.get_table_names():
             return None
-        row = conn.execute(text("SELECT version_num FROM alembic_version")).fetchone()
+        row = conn.execute(
+            text("SELECT version_num FROM alembic_version")).fetchone()
         return row[0] if row else None
 
 
 def record_migration_meta(revision: str) -> None:
     with session_scope() as session:
         exists = session.scalar(
-            select(SchemaMigrationMetaRow.id).where(SchemaMigrationMetaRow.revision == revision)
+            select(SchemaMigrationMetaRow.id).where(
+                SchemaMigrationMetaRow.revision == revision)
         )
         if exists:
             return
         session.add(
-            SchemaMigrationMetaRow(revision=revision, applied_at=datetime.now(UTC))
+            SchemaMigrationMetaRow(
+                revision=revision, applied_at=datetime.now(UTC))
         )
 
 

@@ -13,7 +13,11 @@ from sqlalchemy.orm import Session
 from warehouse.data.ingest.registry import get_parser
 from warehouse.data.ingest.schwab_csv import CustodianPositionRecord
 from warehouse.infra.audit.store import write_audit
-from warehouse.infra.db.models import CustodianPositionRow, IngestRunRow, SecurityRow
+from warehouse.infra.db.models import (
+    CustodianPositionRow,
+    IngestRunRow,
+    SecurityRow,
+)
 
 
 class IngestRunSummary(BaseModel):
@@ -28,9 +32,11 @@ class IngestRunSummary(BaseModel):
 
 
 def _ticker_to_security_id(session: Session, ticker: str) -> str:
-    row = session.scalar(select(SecurityRow).where(SecurityRow.ticker == ticker))
+    row = session.scalar(select(SecurityRow).where(
+        SecurityRow.ticker == ticker))
     if row is None:
-        raise ValueError(f"Unknown ticker {ticker!r} — add to security master first")
+        raise ValueError(
+            f"Unknown ticker {ticker!r} — add to security master first")
     return row.security_id
 
 
@@ -109,7 +115,8 @@ def run_custodian_ingest(
 
 def list_ingest_runs(session: Session, limit: int = 10) -> list[IngestRunSummary]:
     rows = session.scalars(
-        select(IngestRunRow).order_by(IngestRunRow.started_at.desc()).limit(limit)
+        select(IngestRunRow).order_by(
+            IngestRunRow.started_at.desc()).limit(limit)
     ).all()
     return [
         IngestRunSummary(
@@ -130,12 +137,14 @@ def load_custodian_positions(
     session: Session, ingest_run_id: str
 ) -> list[CustodianPositionRecord]:
     rows = session.scalars(
-        select(CustodianPositionRow).where(CustodianPositionRow.ingest_run_id == ingest_run_id)
+        select(CustodianPositionRow).where(
+            CustodianPositionRow.ingest_run_id == ingest_run_id)
     ).all()
     result: list[CustodianPositionRecord] = []
     for row in rows:
         ticker = session.scalar(
-            select(SecurityRow.ticker).where(SecurityRow.security_id == row.security_id)
+            select(SecurityRow.ticker).where(
+                SecurityRow.security_id == row.security_id)
         )
         if ticker is None:
             raise ValueError(f"Security {row.security_id} missing from master")

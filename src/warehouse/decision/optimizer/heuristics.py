@@ -7,7 +7,10 @@ from decimal import Decimal
 
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import LotPositionView
-from warehouse.decision.constraints import evaluate_lot_sell_allowed, evaluate_wash_sale_risk
+from warehouse.decision.constraints import (
+    evaluate_lot_sell_allowed,
+    evaluate_wash_sale_risk,
+)
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
 
@@ -52,7 +55,8 @@ def run_tax_aware_optimizer(
         if pos.market_value is None:
             continue
         ac = _asset_class_for_position(pos)
-        class_weights[ac] = class_weights.get(ac, Decimal("0")) + pos.market_value / total_mv
+        class_weights[ac] = class_weights.get(
+            ac, Decimal("0")) + pos.market_value / total_mv
 
     loss_lots = sorted(
         [p for p in positions if p.unrealized_gain is not None and p.unrealized_gain < 0],

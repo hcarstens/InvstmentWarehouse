@@ -63,10 +63,12 @@ def reconcile_ingest(
     ingest_run = session.get(IngestRunRow, ingest_run_id)
     if ingest_run is None:
         raise ValueError(f"Ingest run not found: {ingest_run_id}")
-    custodian_accounts = _accounts_for_custodian(session, ingest_run.custodian_id)
+    custodian_accounts = _accounts_for_custodian(
+        session, ingest_run.custodian_id)
 
     custodian_rows = session.scalars(
-        select(CustodianPositionRow).where(CustodianPositionRow.ingest_run_id == ingest_run_id)
+        select(CustodianPositionRow).where(
+            CustodianPositionRow.ingest_run_id == ingest_run_id)
     ).all()
     ledger = _ledger_quantities(session)
     breaks: list[ReconciliationBreak] = []
@@ -78,7 +80,8 @@ def reconcile_ingest(
         ledger_qty = ledger.get(key, Decimal("0"))
         if ledger_qty != row.quantity:
             ticker = session.scalar(
-                select(SecurityRow.ticker).where(SecurityRow.security_id == row.security_id)
+                select(SecurityRow.ticker).where(
+                    SecurityRow.security_id == row.security_id)
             )
             break_id = f"break_{uuid4().hex[:12]}"
             description = (
@@ -103,7 +106,8 @@ def reconcile_ingest(
                 resource_type="reconciliation_break",
                 resource_id=break_id,
                 household_id=household_id,
-                details={"ingest_run_id": ingest_run_id, "description": description},
+                details={"ingest_run_id": ingest_run_id,
+                         "description": description},
             )
             breaks.append(
                 ReconciliationBreak(
@@ -126,7 +130,8 @@ def reconcile_ingest(
         if ledger_qty == 0:
             continue
         ticker = session.scalar(
-            select(SecurityRow.ticker).where(SecurityRow.security_id == security_id)
+            select(SecurityRow.ticker).where(
+                SecurityRow.security_id == security_id)
         )
         break_id = f"break_{uuid4().hex[:12]}"
         description = f"{ticker or security_id}: custodian=0, ledger={ledger_qty}"
@@ -164,7 +169,8 @@ def list_reconciliation_breaks(
     open_only: bool = True,
     limit: int = 50,
 ) -> list[ReconciliationBreak]:
-    stmt = select(ReconciliationBreakRow).order_by(ReconciliationBreakRow.opened_at.desc())
+    stmt = select(ReconciliationBreakRow).order_by(
+        ReconciliationBreakRow.opened_at.desc())
     if open_only:
         stmt = stmt.where(ReconciliationBreakRow.resolved.is_(False))
     rows = session.scalars(stmt.limit(limit)).all()

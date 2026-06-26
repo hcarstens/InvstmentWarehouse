@@ -22,5 +22,8 @@ jobs:
       - name: Ruff
         run: ruff check src tests
 
+      - name: Mypy
+        run: mypy src/warehouse
+
       - name: Pytest
         run: pytest

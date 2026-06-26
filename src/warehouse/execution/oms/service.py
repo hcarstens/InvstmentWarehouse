@@ -121,7 +121,8 @@ def list_staged_orders(
     status: OrderStatus | None = None,
     limit: int = 50,
 ) -> list[StagedOrderView]:
-    stmt = select(StagedOrderRow).order_by(StagedOrderRow.created_at.desc()).limit(limit)
+    stmt = select(StagedOrderRow).order_by(
+        StagedOrderRow.created_at.desc()).limit(limit)
     if household_id:
         stmt = stmt.where(StagedOrderRow.household_id == household_id)
     if status:

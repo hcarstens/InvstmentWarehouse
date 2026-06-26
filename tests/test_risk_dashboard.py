@@ -4,14 +4,17 @@ from decimal import Decimal
 
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.risk_data import load_risk_dashboard
-from warehouse.research.risk.portfolio_builder import build_portfolio_from_holdings
+from warehouse.research.risk.portfolio_builder import (
+    build_portfolio_from_holdings,
+)
 
 
 def test_load_risk_dashboard_from_demo_holdings() -> None:
     risk = load_risk_dashboard()
     assert risk.error is None
     assert risk.report is not None
-    assert risk.report.level_1_portfolio.parametric_var.confidence == Decimal("0.95")
+    assert risk.report.level_1_portfolio.parametric_var.confidence == Decimal(
+        "0.95")
     assert len(risk.report.level_2_contributions.by_class) >= 2
     assert len(risk.report.level_4_stress.scenarios) == 3
 

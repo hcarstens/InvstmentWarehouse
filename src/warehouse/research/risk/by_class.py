@@ -9,7 +9,10 @@ from warehouse.research.risk.assumptions import (
     CLASS_EXPECTED_RETURN,
     FERMI_VOL_MULTIPLIER,
 )
-from warehouse.research.risk.covariance import CovarianceResult, SleeveRiskState
+from warehouse.research.risk.covariance import (
+    CovarianceResult,
+    SleeveRiskState,
+)
 from warehouse.research.risk.models import (
     AllocationSlot,
     ClassRiskContribution,
@@ -60,7 +63,8 @@ def evaluate_class_contributions(
                 annual_volatility=state.annual_volatility,
                 pct_variance_contribution=pct_var,
                 pct_es_contribution=pct_var,
-                expected_return=slot.weight * CLASS_EXPECTED_RETURN[slot.asset_class],
+                expected_return=slot.weight *
+                CLASS_EXPECTED_RETURN[slot.asset_class],
                 measurement=MeasurementMode(state.measurement),
                 liquidity_tier=slot.liquidity_tier,
             )
@@ -70,6 +74,7 @@ def evaluate_class_contributions(
 
 def portfolio_expected_return(states: list[SleeveRiskState]) -> Decimal:
     return sum(
-        (s.slot.weight * CLASS_EXPECTED_RETURN[s.slot.asset_class] for s in states),
+        (s.slot.weight *
+         CLASS_EXPECTED_RETURN[s.slot.asset_class] for s in states),
         Decimal("0"),
     )

@@ -11,7 +11,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.infra.audit.store import write_audit
-from warehouse.infra.db.models import AlternativeEventRow, AlternativeHoldingRow
+from warehouse.infra.db.models import (
+    AlternativeEventRow,
+    AlternativeHoldingRow,
+)
 
 
 class AlternativeHoldingView(BaseModel):

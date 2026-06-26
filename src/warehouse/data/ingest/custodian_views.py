@@ -19,7 +19,8 @@ class CustodianSummary(BaseModel):
 
 def list_custodians(session: Session) -> list[CustodianSummary]:
     rows = session.scalars(
-        select(EntityRow).where(EntityRow.entity_type == EntityType.CUSTODIAN.value)
+        select(EntityRow).where(
+            EntityRow.entity_type == EntityType.CUSTODIAN.value)
     ).all()
     return [CustodianSummary(custodian_id=r.entity_id, name=r.name) for r in rows]
 

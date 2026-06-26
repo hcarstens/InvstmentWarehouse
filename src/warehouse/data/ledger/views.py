@@ -9,7 +9,12 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from warehouse.infra.db.models import EntityRow, LotRow, MarketPriceRow, SecurityRow
+from warehouse.infra.db.models import (
+    EntityRow,
+    LotRow,
+    MarketPriceRow,
+    SecurityRow,
+)
 
 
 class LotPositionView(BaseModel):

@@ -35,7 +35,8 @@ def test_parse_custodian_csv(custodian_file: Path) -> None:
 def test_daily_refresh_end_to_end(custodian_file: Path) -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:
-        result = run_daily_refresh(session, custodian_file, household_id=DEMO_HOUSEHOLD_ID)
+        result = run_daily_refresh(
+            session, custodian_file, household_id=DEMO_HOUSEHOLD_ID)
     assert result.status in {"success", "completed_with_breaks"}
     assert len(result.steps) == 5
     assert result.steps[0].step_name == "custodian_ingest"
@@ -45,7 +46,8 @@ def test_daily_refresh_end_to_end(custodian_file: Path) -> None:
 def test_daily_refresh_reconciles_clean(custodian_file: Path) -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:
-        result = run_daily_refresh(session, custodian_file, household_id=DEMO_HOUSEHOLD_ID)
+        result = run_daily_refresh(
+            session, custodian_file, household_id=DEMO_HOUSEHOLD_ID)
     assert result.status == "success"
 
 

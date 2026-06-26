@@ -58,7 +58,8 @@ def run_solver_comparison(session: Session, household_id: str) -> SolverComparis
     )
 
     t1 = time.perf_counter()
-    mip_result = run_mip_optimizer(household_id, positions, ips, settings=settings)
+    mip_result = run_mip_optimizer(
+        household_id, positions, ips, settings=settings)
     mip_ms = int((time.perf_counter() - t1) * 1000)
     mip_view = persist_optimization(
         session,
@@ -113,10 +114,12 @@ def list_solver_comparisons(
     views: list[SolverComparisonView] = []
     for row in rows:
         h_trades = session.scalars(
-            select(OptimizationTradeRow).where(OptimizationTradeRow.run_id == row.heuristic_run_id)
+            select(OptimizationTradeRow).where(
+                OptimizationTradeRow.run_id == row.heuristic_run_id)
         ).all()
         m_trades = session.scalars(
-            select(OptimizationTradeRow).where(OptimizationTradeRow.run_id == row.mip_run_id)
+            select(OptimizationTradeRow).where(
+                OptimizationTradeRow.run_id == row.mip_run_id)
         ).all()
         views.append(
             SolverComparisonView(

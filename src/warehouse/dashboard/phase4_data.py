@@ -19,7 +19,10 @@ from warehouse.data.ingest.custodian_views import (
 from warehouse.data.ingest.runner import IngestRunSummary, run_custodian_ingest
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.approval import ApprovalStatus
-from warehouse.decision.approval.service import list_approval_requests, update_approval_status
+from warehouse.decision.approval.service import (
+    list_approval_requests,
+    update_approval_status,
+)
 from warehouse.decision.optimizer.compare import (
     SolverComparisonView,
     list_solver_comparisons,
@@ -78,7 +81,8 @@ def _ensure_demo_phase4() -> None:
                     status=ApprovalStatus.APPROVED,
                     reviewer_id="advisor:demo",
                 )
-        fidelity_runs = list_ingest_runs_for_custodian(session, "custodian_fidelity", limit=1)
+        fidelity_runs = list_ingest_runs_for_custodian(
+            session, "custodian_fidelity", limit=1)
         if not fidelity_runs:
             run_custodian_ingest(
                 session,
@@ -96,7 +100,8 @@ def load_phase4_dashboard(custodian_id: str | None = None) -> Phase4DashboardDat
         _ensure_demo_phase4()
         with session_scope() as session:
             custodians = list_custodians(session)
-            orders = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)
+            orders = list_staged_orders(
+                session, household_id=DEMO_HOUSEHOLD_ID)
             comparisons = list_solver_comparisons(session, DEMO_HOUSEHOLD_ID)
             positions = list_lot_positions_for_custodian(
                 session,

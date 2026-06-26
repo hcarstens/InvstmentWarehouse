@@ -104,7 +104,8 @@ def run_daily_refresh(
             actor_id=actor_id,
         )
         ingest_run_id = ingest.run_id
-        _finish_step(step, detail=f"{ingest.rows_processed} rows from {ingest.file_name}")
+        _finish_step(
+            step, detail=f"{ingest.rows_processed} rows from {ingest.file_name}")
         steps_out.append(
             RefreshStepView(
                 step_name=step.step_name,
@@ -184,7 +185,8 @@ def run_daily_refresh(
             resource_type="daily_refresh_run",
             resource_id=run_id,
             household_id=household_id,
-            details={"ingest_run_id": ingest_run_id or "", "breaks": str(open_breaks)},
+            details={"ingest_run_id": ingest_run_id or "",
+                     "breaks": str(open_breaks)},
         )
     except Exception as err:
         refresh.status = "error"

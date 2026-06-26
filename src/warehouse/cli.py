@@ -65,7 +65,8 @@ def ingest(file: Path, custodian: str, household: str) -> None:
             custodian_id=custodian,
             household_id=household,
         )
-    click.echo(f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)")
+    click.echo(
+        f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)")
 
 
 @main.command()
@@ -99,7 +100,8 @@ def optimize(household: str) -> None:
     click.echo(f"Optimization {result.run_id}: {len(result.trades)} trades")
     click.echo(f"  Tax delta: {result.estimated_tax_delta}")
     for trade in result.trades:
-        click.echo(f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}")
+        click.echo(
+            f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}")
 
 
 @main.command()
@@ -118,8 +120,10 @@ def backtest(household: str, start_date: str, end_date: str) -> None:
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
     with session_scope() as session:
-        result = run_backtest(session, household, start_date=start, end_date=end)
-    click.echo(f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}")
+        result = run_backtest(session, household,
+                              start_date=start, end_date=end)
+    click.echo(
+        f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}")
     click.echo(f"  Tax delta vs baseline: {result.tax_delta:.4f}")
     click.echo(f"  Config hash: {result.config_hash}")
 
@@ -141,7 +145,8 @@ def approve_list(household: str) -> None:
     with session_scope() as session:
         requests = list_approval_requests(session, household_id=household)
     for req in requests:
-        click.echo(f"{req.request_id} {req.status} run={req.optimization_run_id}")
+        click.echo(
+            f"{req.request_id} {req.status} run={req.optimization_run_id}")
 
 
 @approve.command("decide")
@@ -158,8 +163,10 @@ def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
     bootstrap_database(seed=True)
     status = ApprovalStatus.REJECTED if reject else ApprovalStatus.APPROVED
     with session_scope() as session:
-        result = update_approval_status(session, request_id, status=status, reviewer_id=reviewer)
-    click.echo(f"{result.request_id} → {result.status} by {result.reviewer_id}")
+        result = update_approval_status(
+            session, request_id, status=status, reviewer_id=reviewer)
+    click.echo(
+        f"{result.request_id} → {result.status} by {result.reviewer_id}")
 
 
 @main.group()
@@ -179,7 +186,8 @@ def order_list(household: str) -> None:
     with session_scope() as session:
         orders = list_staged_orders(session, household_id=household)
     for o in orders:
-        click.echo(f"{o.order_id} {o.status} {o.side} {o.quantity} {o.security_id}")
+        click.echo(
+            f"{o.order_id} {o.status} {o.side} {o.quantity} {o.security_id}")
 
 
 @order.command()
@@ -214,7 +222,8 @@ def compare_solvers(household: str) -> None:
     click.echo(
         f"  Heuristic: {result.heuristic_trade_count} trades, tax {result.heuristic_tax_delta}"
     )
-    click.echo(f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}")
+    click.echo(
+        f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}")
 
 
 @main.command("tax-scenario")
@@ -224,7 +233,10 @@ def compare_solvers(household: str) -> None:
 @click.option("--amt", is_flag=True, help="Apply AMT overlay.")
 def tax_scenario(household: str, scenario_name: str, niit: bool, amt: bool) -> None:
     """Run a tax scenario overlay on household unrealized gains."""
-    from warehouse.decision.tax.scenarios import TaxScenarioOverlays, run_tax_scenario
+    from warehouse.decision.tax.scenarios import (
+        TaxScenarioOverlays,
+        run_tax_scenario,
+    )
     from warehouse.infra.db.base import session_scope
     from warehouse.infra.db.bootstrap import bootstrap_database
 

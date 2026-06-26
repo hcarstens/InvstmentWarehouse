@@ -54,7 +54,8 @@ class AssetPortfolio(BaseModel):
     def weights_sum_to_one(cls, slots: list[AllocationSlot]) -> list[AllocationSlot]:
         total = sum((s.weight for s in slots), Decimal("0"))
         if abs(total - Decimal("1")) > Decimal("0.0001"):
-            raise ValueError(f"allocation weights must sum to 1.0, got {total}")
+            raise ValueError(
+                f"allocation weights must sum to 1.0, got {total}")
         return slots
 
 

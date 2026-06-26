@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import DEFAULT_BETA, DEFAULT_DURATION_YEARS
+from warehouse.research.risk.assumptions import (
+    DEFAULT_BETA,
+    DEFAULT_DURATION_YEARS,
+)
 from warehouse.research.risk.by_class import resolve_measurement
 from warehouse.research.risk.models import (
     AllocationSlot,

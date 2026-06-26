@@ -70,8 +70,10 @@ def active_constraint_summary(ips: InvestmentPolicyStatement) -> list[str]:
     active = [
         f"ips_target:{t.asset_class}={t.target_weight}" for t in ips.allocation_targets
     ]
-    active.extend(f"ips_min:{t.asset_class}>={t.min_weight}" for t in ips.allocation_targets)
-    active.extend(f"ips_max:{t.asset_class}<={t.max_weight}" for t in ips.allocation_targets)
+    active.extend(
+        f"ips_min:{t.asset_class}>={t.min_weight}" for t in ips.allocation_targets)
+    active.extend(
+        f"ips_max:{t.asset_class}<={t.max_weight}" for t in ips.allocation_targets)
     active.extend(f"restricted:{sid}" for sid in ips.restricted_securities)
     active.append("wash_sale_30d:enforced")
     active.append("tax_config:version_pinned")
