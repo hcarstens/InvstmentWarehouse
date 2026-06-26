@@ -18,7 +18,7 @@ Collapse three entry paths into one pure contract:
 ```
 caller ──► evaluate_risk(request, manifest) ──► RiskResult{ report, deltas }
               ▲                                        │
-   ledger adapter │ synthetic.rung(n) │ HTTP /api/risk/orchestrate
+   ledger adapter │ synthetic.rung(n) │ HTTP POST /api/risk
 ```
 
 - **Caller** owns *where portfolios come from* and *what to do with the answer* (arbitration —
@@ -112,6 +112,18 @@ def assumptions_for(name: str) -> RiskAssumptions: ...   # base | high_risk | lo
 Arbitrary caller-supplied assumptions (research sweeps, bespoke client CMAs) are an explicit escape
 hatch deferred to [v1](#v1--overlays--deltas) — the primary path stays the flag.
 
+| Caller sets | Risk owns |
+| --- | --- |
+| `run_scenarios` enum | `scenarios.py` catalog + PSD validation |
+| `horizon`, `notional_usd` | Engine, Levels 1–4 |
+| `manifest` (`AssetPortfolio`) | Fingerprint, `PortfolioRiskReport` |
+
+**Regime vs existing `stress.py`.** `high_risk` / `low_risk` swap the *covariance / vol priors*
+and re-run the full engine — a second pass with a different assumption set. Level 4 *named stress
+replay* (2008/2020/2022) stays in [`stress.py`](../src/warehouse/research/risk/stress.py): a fixed
+return shock *inside one report*, not a separate scenario map entry. Do not duplicate that path when
+building `scenarios.py`.
+
 ## 4. Module boundary — plug-and-play
 
 The risk module is importable and runnable with **zero project state**. Its public surface is its
@@ -131,9 +143,10 @@ from .synthetic import rung
   project config; the legacy `get_settings()` reads collapse into the catalog defaults.
 - **Integration surfaces** (all thin, all over the same `evaluate_risk`):
   1. **Function** — `evaluate_risk(request, manifest)` for in-process callers.
-  2. **HTTP** — `POST /api/risk/orchestrate`: JSON → `RiskRequest` + `AssetPortfolio` →
-     `evaluate_risk` → `model_dump`. The HTTP *face* and the function are **one code path, two
-     surfaces** — not two orchestration stories.
+  2. **HTTP** — `POST /api/risk`: JSON → `RiskRequest` + `AssetPortfolio` → `evaluate_risk` →
+     `model_dump`. `GET /api/risk` stays the schema (`risk_api_schema`). One handler, two verbs —
+     not a second route. *(Shipped today as `evaluate_risk_request`; migration re-points it at
+     `evaluate_risk` and extends the schema with `run_scenarios`.)*
   3. **Ledger adapter** — `build_household_manifest(household_id) -> AssetPortfolio` (tagged
      `source="ledger"`) lives at the **edge**, not in the pure core, so the coupling to the
      ledger stays out of the risk math.
@@ -157,7 +170,7 @@ The regression surface is the **matrix `rung × run_scenarios`** — each cell c
 values, composed by a test fixture (**not** a wire type):
 
 ```python
-class Scenario(BaseModel):       # synthetic/test land — composes the three axes
+class Scenario(BaseModel):       # tests only — NOT exported from risk/__init__.py
     portfolio: AssetPortfolio    # synthetic.rung(n)
     request: RiskRequest         # horizon, notional, run_scenarios
     expected: dict | None = None # golden Level-1 values for regression
@@ -179,19 +192,31 @@ per regime). Rungs 3–4 (illiquid alts, fermi-tagged / concentrated) land in
 - **Frozen results** — `RiskResult` (and the report snapshots) are immutable, registered for
   `test_frozen.py`. (Closes the review's unfrozen-snapshot item.)
 
-## 7. Migration (5 steps — engine untouched)
+## 7. Migration (engine untouched)
 
-1. Add `RiskRequest` + `RiskResult` + `evaluate_risk` wrapping `evaluate_portfolio_risk`; freeze
-   + register `RiskResult`.
+Ship in two slices so step 2's size is visible up front.
+
+### v0a — envelope (ship first)
+
+1. Add `RiskRequest` + `RiskResult` + `evaluate_risk(request, manifest)` wrapping
+   `evaluate_portfolio_risk`; freeze + register `RiskResult`. `run_scenarios` defaults to `none`;
+   `scenarios={}`, `deltas=null`.
+
+### v0b — scenario catalog *(largest v0 chunk)*
+
 2. Lift assumption globals into a frozen `RiskAssumptions` + internal `scenarios.py` catalog
    (`base`/`high_risk`/`low_risk`, PSD-validated); thread it through the engine sub-modules; wire
-   `run_scenarios` → `RiskResult.scenarios`; fold the regime + `risk_model_version` into the
-   fingerprint.
+   `run_scenarios` → `RiskResult.scenarios`; fold regime + `risk_model_version` into the
+   fingerprint. Reuse existing [`stress.py`](../src/warehouse/research/risk/stress.py) for Level 4
+   named replays — do not reimplement inside `scenarios.py`.
+
+### v0c — integration
+
 3. Add `synthetic.rung(0..2)` + the `rung × run_scenarios` golden corpus (no DB).
 4. Add `build_household_manifest`; collapse `load_risk_dashboard` to manifest → `evaluate_risk`
    → present — **narrow the `except`, drop the `load_phase2_dashboard` side effect**.
-5. Point the HTTP adapter (`/api/risk/orchestrate`) at `evaluate_risk`; keep the legacy
-   `{asset_portfolio, horizon}` JSON shape accepted.
+5. Point `POST /api/risk` at `evaluate_risk`; extend `GET /api/risk` schema with `run_scenarios`;
+   keep legacy `{asset_portfolio, horizon}` JSON accepted on POST.
 
 ## 8. Decisions (closed)
 
@@ -208,6 +233,7 @@ per regime). Rungs 3–4 (illiquid alts, fermi-tagged / concentrated) land in
 | Headline delta metrics (v1) | ann_vol, parametric_var, parametric_es (+ dollar when notional) |
 | Multiple overlays per request (v1) | **Single** overlay |
 | JSON back-compat | **Keep** `{asset_portfolio, horizon}` |
+| HTTP evaluate path | **`POST /api/risk`** (existing); **`GET /api/risk`** = schema. No `/orchestrate` route. |
 | Term for the caller | **"caller"** in code; "orchestrator" = the specific project caller |
 
 ---
@@ -223,11 +249,11 @@ The caller never builds the proposed portfolio — it states intent; risk owns t
 arbitrates (out of scope).
 
 ```python
-report = evaluate(manifest, request)                  # baseline
+baseline = evaluate_risk(request, manifest)           # baseline
 if request.overlay:
-    derived  = apply_overlay(manifest, request.overlay)   # risk derives the proposed manifest
-    proposed = evaluate(derived, request)
-    deltas   = diff(report, proposed)                      # baseline → proposed
+    derived = apply_overlay(manifest, request.overlay)
+    proposed = evaluate_risk(request, derived)
+    deltas = diff(baseline.report, proposed.report)
 ```
 
 ```python
@@ -276,3 +302,4 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 | 2026-06-26 | Cursor review: doc over-specified for a simplification doc; recommended a v0 cut. |
 | 2026-06-26 | Arbitration (Claude): accepted Cursor's *reuse `AssetPortfolio`*, *close decisions with defaults*, *one-page structure*; **rejected** dropping the `RiskResult` envelope (breaking change) and deferring frozen results (convention-mandated); kept a minimal synthetic spine (user requirement). Verified the two "orchestration stories" are one path + HTTP face. Result: this v0 + a `## v1` appendix. |
 | 2026-06-26 | Assumptions decision (owner + Claude): risk **owns** a version-pinned, PSD-validated scenario catalog (`base`/`high_risk`/`low_risk`); caller selects via a `run_scenarios` flag, not an injected assumptions object. `RiskResult` gains a `scenarios` map; same diff machinery serves regime + overlay deltas. Pulled the catalog + flag into v0; arbitrary override → v1 escape hatch. Reverses the earlier injectable-third-arg idea. |
+| 2026-06-26 | Cursor review (post-edit): aligned HTTP to **`POST /api/risk`** (no `/orchestrate`); fixed v1 pseudocode arg order to `(request, manifest)`; split migration into **v0a / v0b / v0c** with v0b flagged as largest chunk; tied regimes to existing `stress.py`; `Scenario` fixture marked test-only. |
