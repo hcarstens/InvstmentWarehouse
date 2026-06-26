@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from warehouse.config import get_settings
+from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.by_class import (
     build_sleeve_states,
     evaluate_class_contributions,
@@ -27,6 +27,7 @@ from warehouse.research.risk.models import (
     RiskMetric,
     RiskUnitType,
 )
+from warehouse.research.risk.scenarios import assumptions_for
 from warehouse.research.risk.sensitivity import evaluate_sensitivities
 from warehouse.research.risk.stress import evaluate_stress
 from warehouse.research.risk.var_es import (
@@ -42,14 +43,14 @@ def evaluate_portfolio_risk(
     horizon: RiskHorizon,
     *,
     notional_usd: Decimal | None = None,
+    assumptions: RiskAssumptions | None = None,
 ) -> PortfolioRiskReport:
-    settings = get_settings()
+    priors = assumptions or assumptions_for("base")
     mark_source = "model_prior"
-    window_days = settings.risk_vol_window_days
 
-    states = build_sleeve_states(portfolio.allocations)
-    cov = portfolio_covariance(states)
-    annual_return = portfolio_expected_return(states)
+    states = build_sleeve_states(portfolio.allocations, priors)
+    cov = portfolio_covariance(states, priors)
+    annual_return = portfolio_expected_return(states, priors)
     annual_vol = cov.portfolio_volatility
     horizon_vol = horizon_scale(annual_vol, horizon.years)
     horizon_return = annual_return * horizon.years
@@ -58,20 +59,20 @@ def evaluate_portfolio_risk(
         annual_vol,
         annual_return,
         horizon.years,
-        settings.risk_var_alpha,
-        window_days=window_days,
+        priors.var_alpha,
+        assumptions=priors,
         mark_source=mark_source,
     )
     es_metric = parametric_es(
         annual_vol,
         annual_return,
         horizon.years,
-        settings.risk_es_alpha,
-        window_days=window_days,
+        priors.es_alpha,
+        assumptions=priors,
         mark_source=mark_source,
     )
 
-    by_class = evaluate_class_contributions(states, cov)
+    by_class = evaluate_class_contributions(states, cov, priors)
     by_duration = evaluate_duration_risk(
         portfolio.allocations, horizon, by_class)
 
@@ -87,7 +88,7 @@ def evaluate_portfolio_risk(
     )
     fermi_share = fermi_risk if fermi_risk <= Decimal("1") else Decimal("1")
 
-    fermi_band = Decimal(str(settings.risk_fermi_confidence_width))
+    fermi_band = Decimal(str(priors.fermi_confidence_width))
     confidence_low = max(horizon_vol * (Decimal("1") -
                          fermi_band * fermi_share), Decimal("0"))
     confidence_high = horizon_vol * (Decimal("1") + fermi_band * fermi_share)
@@ -100,7 +101,7 @@ def evaluate_portfolio_risk(
         annualized_volatility=RiskMetric(
             value=annual_vol,
             unit_type=RiskUnitType.SIGMA_ANNUALIZED,
-            window_days=window_days,
+            window_days=priors.vol_window_days,
             method="covariance_matrix",
             mark_source=mark_source,
         ),
@@ -108,7 +109,7 @@ def evaluate_portfolio_risk(
             value=horizon_vol,
             unit_type=RiskUnitType.SIGMA_HORIZON,
             horizon_years=horizon.years,
-            window_days=window_days,
+            window_days=priors.vol_window_days,
             method="covariance_matrix",
             mark_source=mark_source,
             approximation="sigma_annualized_times_sqrt_h",
@@ -145,12 +146,18 @@ def evaluate_portfolio_risk(
     return PortfolioRiskReport(
         portfolio_id=portfolio.portfolio_id,
         horizon_years=horizon.years,
-        model_version=settings.risk_model_version,
+        model_version=priors.model_version,
         input_fingerprint=portfolio_fingerprint(
-            portfolio, horizon, notional_usd=notional_usd),
+            portfolio,
+            horizon,
+            notional_usd=notional_usd,
+            assumption_regime=priors.regime,
+            model_version=priors.model_version,
+        ),
         manifest=RiskManifestMeta(
-            vol_window_days=window_days,
-            stress_pack_version=settings.risk_stress_pack_version,
+            vol_window_days=priors.vol_window_days,
+            stress_pack_version=priors.stress_pack_version,
+            assumption_regime=priors.regime,
         ),
         level_1_portfolio=level_1,
         level_2_contributions=Level2Contributions(
@@ -161,6 +168,7 @@ def evaluate_portfolio_risk(
             portfolio.allocations,
             notional_usd=notional_usd,
             mark_source=mark_source,
+            assumptions=priors,
         ),
         liquidity=evaluate_liquidity(portfolio.allocations),
         measurement_summary=MeasurementSummary(

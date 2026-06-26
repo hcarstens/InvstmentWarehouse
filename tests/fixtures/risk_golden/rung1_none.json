@@ -1,0 +1,10 @@
+{
+  "rung": 1,
+  "run_scenarios": "none",
+  "expected": {
+    "annualized_vol": "0.09418280097767320064892481819",
+    "parametric_var": "0.0564047679753264056918751041",
+    "input_fingerprint": "2ef749647d2b1a02",
+    "assumption_regime": "base"
+  }
+}

@@ -5,17 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import (
-    CLASS_CORRELATIONS,
-    DEFAULT_CLASS_CORRELATION,
-)
-from warehouse.research.risk.models import AllocationSlot, AssetClass
-
-
-def pairwise_correlation(left: AssetClass, right: AssetClass) -> Decimal:
-    if left == right:
-        return Decimal("1")
-    return CLASS_CORRELATIONS.get(frozenset({left, right}), DEFAULT_CLASS_CORRELATION)
+from warehouse.research.risk.assumptions import RiskAssumptions
+from warehouse.research.risk.models import AllocationSlot
 
 
 @dataclass(frozen=True)
@@ -33,7 +24,10 @@ class CovarianceResult:
     marginal_variance: list[Decimal]
 
 
-def portfolio_covariance(states: list[SleeveRiskState]) -> CovarianceResult:
+def portfolio_covariance(
+    states: list[SleeveRiskState],
+    assumptions: RiskAssumptions,
+) -> CovarianceResult:
     n = len(states)
     if n == 0:
         zero = Decimal("0")
@@ -46,7 +40,7 @@ def portfolio_covariance(states: list[SleeveRiskState]) -> CovarianceResult:
     cov: list[list[Decimal]] = [[Decimal("0")] * n for _ in range(n)]
     for i in range(n):
         for j in range(n):
-            rho = pairwise_correlation(classes[i], classes[j])
+            rho = assumptions.pairwise_correlation(classes[i], classes[j])
             cov[i][j] = vols[i] * vols[j] * rho
 
     portfolio_variance = Decimal("0")

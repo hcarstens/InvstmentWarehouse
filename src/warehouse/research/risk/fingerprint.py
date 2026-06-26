@@ -14,11 +14,17 @@ def portfolio_fingerprint(
     horizon: RiskHorizon,
     *,
     notional_usd: Decimal | None = None,
+    assumption_regime: str = "base",
+    model_version: str = "2026.02",
 ) -> str:
     payload = {
         "portfolio_id": portfolio.portfolio_id,
         "horizon_years": str(horizon.years),
         "notional_usd": str(notional_usd) if notional_usd is not None else None,
+        "assumption_regime": assumption_regime,
+        "model_version": model_version,
+        "source": portfolio.source,
+        "complexity": portfolio.complexity,
         "allocations": [
             {
                 "asset_class": s.asset_class.value,

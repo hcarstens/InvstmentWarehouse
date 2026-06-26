@@ -114,6 +114,7 @@ class RiskManifestMeta(BaseModel):
     mark_source: str = "model_prior"
     vol_window_days: int
     stress_pack_version: str
+    assumption_regime: str = "base"
 
 
 class Level1PortfolioRisk(BaseModel):

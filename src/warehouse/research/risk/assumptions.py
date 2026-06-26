@@ -6,6 +6,7 @@ See docs/research/risk_units_measures.md and docs/research/portfolio_risk.md.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from warehouse.research.risk.models import AssetClass
@@ -50,7 +51,6 @@ CLASS_CORRELATIONS: dict[frozenset[AssetClass], Decimal] = {
     frozenset({AssetClass.ALTERNATIVES, AssetClass.CASH}): Decimal("0.00"),
 }
 
-# Default linear exposures when sleeve does not supply native sensitivity.
 DEFAULT_BETA: dict[AssetClass, Decimal] = {
     AssetClass.EQUITY: Decimal("1.0"),
     AssetClass.FIXED_INCOME: Decimal("0.0"),
@@ -71,7 +71,6 @@ DEFAULT_DURATION_YEARS: dict[AssetClass, Decimal] = {
 
 FERMI_VOL_MULTIPLIER = Decimal("1.35")
 
-# Parametric tail multipliers (standard normal).
 Z_SCORES: dict[str, Decimal] = {
     "0.95": Decimal("1.644853626951472"),
     "0.975": Decimal("1.959963984540054"),
@@ -82,14 +81,12 @@ ES_MULTIPLIERS: dict[str, Decimal] = {
     "0.975": Decimal("2.337803"),
 }
 
-# Liquidity-time units: days to liquidate at 10% ADV (Level 0 / illiquid sleeves).
 LIQUIDITY_DAYS_BY_TIER: dict[int, Decimal] = {
     1: Decimal("1"),
     2: Decimal("30"),
     3: Decimal("180"),
 }
 
-# Level 4 named stress replay — sleeve return shocks (return fraction).
 STRESS_SCENARIOS: dict[str, dict[AssetClass, Decimal]] = {
     "2008_liquidity": {
         AssetClass.EQUITY: Decimal("-0.38"),
@@ -116,3 +113,72 @@ STRESS_SCENARIOS: dict[str, dict[AssetClass, Decimal]] = {
         AssetClass.CASH: Decimal("-0.02"),
     },
 }
+
+MODEL_VERSION = "2026.02"
+STRESS_PACK_VERSION = "2026.01"
+VOL_WINDOW_DAYS = 252
+VAR_ALPHA = 0.95
+ES_ALPHA = 0.975
+FERMI_CONFIDENCE_WIDTH = 0.15
+
+
+@dataclass(frozen=True)
+class RiskAssumptions:
+    """Frozen, version-pinned assumption set for one regime."""
+
+    regime: str
+    model_version: str
+    stress_pack_version: str
+    vol_window_days: int
+    var_alpha: float
+    es_alpha: float
+    fermi_confidence_width: float
+    class_annual_vol: dict[AssetClass, Decimal]
+    class_expected_return: dict[AssetClass, Decimal]
+    default_class_correlation: Decimal
+    class_correlations: dict[frozenset[AssetClass], Decimal]
+    fermi_vol_multiplier: Decimal
+    z_scores: dict[str, Decimal]
+    es_multipliers: dict[str, Decimal]
+    stress_scenarios: dict[str, dict[AssetClass, Decimal]]
+
+    def pairwise_correlation(
+        self,
+        left: AssetClass,
+        right: AssetClass,
+    ) -> Decimal:
+        if left == right:
+            return Decimal("1")
+        return self.class_correlations.get(
+            frozenset({left, right}),
+            self.default_class_correlation,
+        )
+
+
+def base_assumption_fields() -> dict[str, object]:
+    """Pinned defaults matching configs/development.toml risk_* keys."""
+    return {
+        "regime": "base",
+        "model_version": MODEL_VERSION,
+        "stress_pack_version": STRESS_PACK_VERSION,
+        "vol_window_days": VOL_WINDOW_DAYS,
+        "var_alpha": VAR_ALPHA,
+        "es_alpha": ES_ALPHA,
+        "fermi_confidence_width": FERMI_CONFIDENCE_WIDTH,
+        "class_annual_vol": dict(CLASS_ANNUAL_VOL),
+        "class_expected_return": dict(CLASS_EXPECTED_RETURN),
+        "default_class_correlation": DEFAULT_CLASS_CORRELATION,
+        "class_correlations": dict(CLASS_CORRELATIONS),
+        "fermi_vol_multiplier": FERMI_VOL_MULTIPLIER,
+        "z_scores": dict(Z_SCORES),
+        "es_multipliers": dict(ES_MULTIPLIERS),
+        "stress_scenarios": {
+            name: dict(shocks) for name, shocks in STRESS_SCENARIOS.items()
+        },
+    }
+
+
+def build_assumptions(**overrides: object) -> RiskAssumptions:
+    fields = base_assumption_fields()
+    fields.update(overrides)
+    return RiskAssumptions(**fields)  # type: ignore[arg-type]

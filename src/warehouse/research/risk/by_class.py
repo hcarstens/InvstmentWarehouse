@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import (
-    CLASS_ANNUAL_VOL,
-    CLASS_EXPECTED_RETURN,
-    FERMI_VOL_MULTIPLIER,
-)
+from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.covariance import (
     CovarianceResult,
     SleeveRiskState,
@@ -30,19 +26,25 @@ def resolve_measurement(slot: AllocationSlot) -> MeasurementMode:
     return MeasurementMode.MEASURABLE
 
 
-def sleeve_annual_volatility(slot: AllocationSlot) -> Decimal:
+def sleeve_annual_volatility(
+    slot: AllocationSlot,
+    assumptions: RiskAssumptions,
+) -> Decimal:
     measurement = resolve_measurement(slot)
-    annual_vol = CLASS_ANNUAL_VOL[slot.asset_class]
+    annual_vol = assumptions.class_annual_vol[slot.asset_class]
     if measurement == MeasurementMode.FERMI:
-        annual_vol = annual_vol * FERMI_VOL_MULTIPLIER
+        annual_vol = annual_vol * assumptions.fermi_vol_multiplier
     return annual_vol
 
 
-def build_sleeve_states(slots: list[AllocationSlot]) -> list[SleeveRiskState]:
+def build_sleeve_states(
+    slots: list[AllocationSlot],
+    assumptions: RiskAssumptions,
+) -> list[SleeveRiskState]:
     return [
         SleeveRiskState(
             slot=slot,
-            annual_volatility=sleeve_annual_volatility(slot),
+            annual_volatility=sleeve_annual_volatility(slot, assumptions),
             measurement=resolve_measurement(slot).value,
         )
         for slot in slots
@@ -52,6 +54,7 @@ def build_sleeve_states(slots: list[AllocationSlot]) -> list[SleeveRiskState]:
 def evaluate_class_contributions(
     states: list[SleeveRiskState],
     cov_result: CovarianceResult,
+    assumptions: RiskAssumptions,
 ) -> list[ClassRiskContribution]:
     rows: list[ClassRiskContribution] = []
     for state, pct_var in zip(states, cov_result.pct_variance_contributions, strict=True):
@@ -64,7 +67,7 @@ def evaluate_class_contributions(
                 pct_variance_contribution=pct_var,
                 pct_es_contribution=pct_var,
                 expected_return=slot.weight *
-                CLASS_EXPECTED_RETURN[slot.asset_class],
+                assumptions.class_expected_return[slot.asset_class],
                 measurement=MeasurementMode(state.measurement),
                 liquidity_tier=slot.liquidity_tier,
             )
@@ -72,9 +75,14 @@ def evaluate_class_contributions(
     return rows
 
 
-def portfolio_expected_return(states: list[SleeveRiskState]) -> Decimal:
+def portfolio_expected_return(
+    states: list[SleeveRiskState],
+    assumptions: RiskAssumptions,
+) -> Decimal:
     return sum(
-        (s.slot.weight *
-         CLASS_EXPECTED_RETURN[s.slot.asset_class] for s in states),
+        (
+            s.slot.weight * assumptions.class_expected_return[s.slot.asset_class]
+            for s in states
+        ),
         Decimal("0"),
     )

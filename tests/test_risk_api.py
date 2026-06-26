@@ -34,13 +34,34 @@ from warehouse.research.risk.models import (
     RiskHorizon,
     RiskUnitType,
 )
+from warehouse.research.risk.scenarios import assumptions_for
 from warehouse.research.risk.stress import evaluate_stress
+
+_BASE = assumptions_for("base")
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_portfolio.json"
 
 
 def _sample_request() -> dict:
     return json.loads(FIXTURE.read_text())
+
+
+def test_risk_api_schema_includes_run_scenarios() -> None:
+    schema = risk_api_schema()
+    assert "run_scenarios" in schema["request"]
+    assert "scenarios" in schema["response"]
+
+
+def test_evaluate_risk_request_with_run_scenarios() -> None:
+    body = _sample_request()
+    body["run_scenarios"] = "high_risk"
+    result = evaluate_risk_request(body)
+    assert "scenarios" in result
+    assert "high_risk" in result["scenarios"]
+    assert (
+        result["scenarios"]["high_risk"]["manifest"]["assumption_regime"]
+        == "high_risk"
+    )
 
 
 def test_risk_api_schema_includes_unit_hierarchy() -> None:
@@ -127,9 +148,9 @@ def test_class_measurable_vs_fermi() -> None:
 def test_covariance_contributions_sum_to_one() -> None:
     portfolio = AssetPortfolio.model_validate(
         _sample_request()["asset_portfolio"])
-    states = build_sleeve_states(portfolio.allocations)
-    cov = portfolio_covariance(states)
-    contribs = evaluate_class_contributions(states, cov)
+    states = build_sleeve_states(portfolio.allocations, _BASE)
+    cov = portfolio_covariance(states, _BASE)
+    contribs = evaluate_class_contributions(states, cov, _BASE)
     total = sum(c.pct_variance_contribution for c in contribs)
     assert total == pytest.approx(Decimal("1"), rel=Decimal("0.0001"))
 
@@ -138,9 +159,9 @@ def test_duration_buckets_and_mismatch() -> None:
     horizon = RiskHorizon.parse("5y")
     portfolio = AssetPortfolio.model_validate(
         _sample_request()["asset_portfolio"])
-    states = build_sleeve_states(portfolio.allocations)
+    states = build_sleeve_states(portfolio.allocations, _BASE)
     by_class = evaluate_class_contributions(
-        states, portfolio_covariance(states))
+        states, portfolio_covariance(states, _BASE), _BASE)
     by_duration = evaluate_duration_risk(
         portfolio.allocations, horizon, by_class)
     medium = next(row for row in by_duration if row.bucket == "medium")
@@ -160,8 +181,12 @@ def test_fingerprint_stable_and_changes_with_notional() -> None:
 def test_stress_scenarios_are_linear_sleeve_sum() -> None:
     portfolio = AssetPortfolio.model_validate(
         _sample_request()["asset_portfolio"])
-    stress = evaluate_stress(portfolio.allocations,
-                             notional_usd=None, mark_source="model_prior")
+    stress = evaluate_stress(
+        portfolio.allocations,
+        notional_usd=None,
+        mark_source="model_prior",
+        assumptions=_BASE,
+    )
     scenario = next(s for s in stress.scenarios if s.name == "2022_inflation")
     sleeve_sum = sum(scenario.by_class.values(), Decimal("0"))
     assert sleeve_sum == scenario.portfolio_return.value

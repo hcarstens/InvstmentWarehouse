@@ -13,6 +13,7 @@ from warehouse.research.risk.models import (
     ScenarioSet,
 )
 from warehouse.research.risk.service import evaluate_risk
+from warehouse.research.risk.synthetic import rung
 
 __all__ = [
     "AssetPortfolio",
@@ -23,4 +24,5 @@ __all__ = [
     "ScenarioSet",
     "evaluate_portfolio_risk",
     "evaluate_risk",
+    "rung",
 ]

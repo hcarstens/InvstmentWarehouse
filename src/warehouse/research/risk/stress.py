@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import STRESS_SCENARIOS
+from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.models import (
     AllocationSlot,
     AssetClass,
@@ -34,9 +34,10 @@ def evaluate_stress(
     *,
     notional_usd: Decimal | None,
     mark_source: str,
+    assumptions: RiskAssumptions,
 ) -> Level4Stress:
     scenarios: list[StressScenarioResult] = []
-    for name, shocks in STRESS_SCENARIOS.items():
+    for name, shocks in assumptions.stress_scenarios.items():
         portfolio_return, by_class = _scenario_return(slots, shocks)
         return_metric = RiskMetric(
             value=portfolio_return,

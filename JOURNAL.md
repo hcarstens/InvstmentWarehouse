@@ -4,6 +4,28 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Risk API observability & notifications
+
+**Context:** Risk API v0a (`evaluate_risk`, `RiskRequest` / `RiskResult`) and build tracker (`/risk`, `warehouse serve --risk`) were in place; HTTP and dashboard paths still swallowed or under-logged failures.
+
+**Shipped:**
+
+- `research/risk/observability.py` — `log_risk_evaluated` (success, respects `risk_log_inputs`); `record_risk_failure` (structured error log + optional alert)
+- `infra/notify/dispatch.py` — `dispatch_risk_alert` for SMTP email and JSON webhook messaging
+- Config in `configs/development.toml`: `risk_notify_on_error`, `risk_notify_email_*`, `risk_notify_messaging_*`
+- `api.py` — routes through `evaluate_risk` + observability; all HTTP error paths log/notify before returning 400/422; `risk_api_schema()` documents notification keys
+- `risk_data.py` — catches only domain errors (`ValueError`, `RiskApiError`, `ValidationError`); programming errors bubble
+- Tests: `tests/test_risk_observability.py`; config defaults in `test_config.py`
+
+**Decisions:**
+
+- Notify dispatch failures re-raise — infra errors are not swallowed after a domain failure
+- Email/messaging disabled by default in dev; enable via `configs/local.toml` with SMTP host or webhook URL
+
+**Next:** v0b scenarios (`run_scenarios`, `RiskAssumptions`); v0c ledger adapter slimming `risk_data`.
+
+---
+
 ## 2026-06-24 — Phase 2 complete
 
 **Delivered:**

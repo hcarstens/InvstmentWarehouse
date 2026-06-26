@@ -33,11 +33,18 @@ def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
     horizon = RiskHorizon.parse(body["horizon"])
     notional_raw = body.get("notional_usd")
     notional = Decimal(str(notional_raw)) if notional_raw is not None else None
+    run_scenarios_raw = body.get("run_scenarios", ScenarioSet.NONE.value)
+    try:
+        run_scenarios = ScenarioSet(run_scenarios_raw)
+    except ValueError as err:
+        raise RiskApiError(
+            f"Invalid run_scenarios: {run_scenarios_raw!r}"
+        ) from err
 
     request = RiskRequest(
         horizon=horizon,
         notional_usd=notional,
-        run_scenarios=ScenarioSet.NONE,
+        run_scenarios=run_scenarios,
     )
     result = evaluate_risk(request, portfolio)
     log_risk_evaluated(
@@ -46,7 +53,13 @@ def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
         manifest=portfolio,
         surface="api",
     )
-    return result.report.model_dump(mode="json")
+    payload: dict[str, Any] = result.report.model_dump(mode="json")
+    if result.scenarios:
+        payload["scenarios"] = {
+            name: report.model_dump(mode="json")
+            for name, report in result.scenarios.items()
+        }
+    return payload
 
 
 def evaluate_risk_json(raw: str | bytes) -> tuple[int, str]:
@@ -95,6 +108,7 @@ def risk_api_schema() -> dict[str, Any]:
             },
             "horizon": "e.g. 5y or 5 — investment horizon in years",
             "notional_usd": "optional — enables Level 1 dollar VaR/ES and Level 4 dollar P&L",
+            "run_scenarios": "none | high_risk | low_risk | all — optional assumption regimes",
         },
         "response": {
             "level_1_portfolio": "sigma, parametric VaR/ES with (alpha, h) metadata",
@@ -103,6 +117,7 @@ def risk_api_schema() -> dict[str, Any]:
             "level_4_stress": "named replay 2008/2020/2022",
             "liquidity": "liquidity-time days by tier",
             "measurement_summary": "measurable vs fermi weight and risk share",
+            "scenarios": "optional map of regime → full report when run_scenarios ≠ none",
         },
         "privacy": (
             "Allocations and horizons are fingerprinted; raw inputs are not logged "

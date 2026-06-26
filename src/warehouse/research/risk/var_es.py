@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from warehouse.research.risk.assumptions import ES_MULTIPLIERS, Z_SCORES
+from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.models import RiskMetric, RiskUnitType
 
 
@@ -26,19 +26,19 @@ def parametric_var(
     horizon_years: Decimal,
     alpha: float,
     *,
-    window_days: int,
+    assumptions: RiskAssumptions,
     mark_source: str,
 ) -> RiskMetric:
     sigma_h = horizon_scale(annual_vol, horizon_years)
     mu_h = horizon_expected_return(annual_return, horizon_years)
-    z = Z_SCORES[_alpha_key(alpha)]
+    z = assumptions.z_scores[_alpha_key(alpha)]
     value = z * sigma_h - mu_h
     return RiskMetric(
         value=value,
         unit_type=RiskUnitType.RETURN_FRACTION,
         horizon_years=horizon_years,
         confidence=Decimal(str(alpha)),
-        window_days=window_days,
+        window_days=assumptions.vol_window_days,
         method="parametric",
         mark_source=mark_source,
         approximation="multivariate_normal_via_portfolio_sigma",
@@ -51,19 +51,19 @@ def parametric_es(
     horizon_years: Decimal,
     alpha: float,
     *,
-    window_days: int,
+    assumptions: RiskAssumptions,
     mark_source: str,
 ) -> RiskMetric:
     sigma_h = horizon_scale(annual_vol, horizon_years)
     mu_h = horizon_expected_return(annual_return, horizon_years)
-    es_mult = ES_MULTIPLIERS[_alpha_key(alpha)]
+    es_mult = assumptions.es_multipliers[_alpha_key(alpha)]
     value = es_mult * sigma_h - mu_h
     return RiskMetric(
         value=value,
         unit_type=RiskUnitType.RETURN_FRACTION,
         horizon_years=horizon_years,
         confidence=Decimal(str(alpha)),
-        window_days=window_days,
+        window_days=assumptions.vol_window_days,
         method="parametric",
         mark_source=mark_source,
         approximation="normal_es_from_portfolio_sigma",
