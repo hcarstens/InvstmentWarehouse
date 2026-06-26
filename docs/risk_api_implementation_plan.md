@@ -256,3 +256,65 @@ track progress at `warehouse serve --risk` → http://127.0.0.1:8765/risk or
 | 2026-06-26 | v0c shipped: `adapters/ledger.py` (`build_household_manifest`), slim `risk_data.py`, `evaluate_risk_http`, integration schema; golden HTTP parity. |
 | 2026-06-26 | v0b shipped: `RiskAssumptions`, `scenarios.py` (base/high/low, PSD), `run_scenarios` → `RiskResult.scenarios`, regime in fingerprint, `synthetic.rung(0..2)`, golden `rung×scenario` fixtures. |
 | 2026-06-26 | v0a shipped: `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk`, frozen registry, `tests/test_risk_service.py`. |
+| 2026-06-24 | Design note: Shape B as automatic risk falsification substrate (see §11). |
+
+---
+
+## 11. Shape B → automatic risk stress testing
+
+Shape B (`HouseholdFixture`: accounts, lots, alts, call schedule) is the **generative
+substrate**; Shape A (`AssetPortfolio`) is what the risk engine consumes. Implementing Shape B
+end-to-end is the right foundation for **automatic falsification** of the risk implementation
+(SDG3), with an important distinction about what gets stressed.
+
+### Pipeline
+
+```text
+cohort × seed × rung  →  emit_hnw_fixture()  →  project_to_asset_portfolio()
+                                                      ↓
+                                              evaluate_risk(request, manifest)
+```
+
+### What Shape B enables (partially shipped in v1.1)
+
+| Dimension | Mechanism |
+| --- | --- |
+| Cohort | `general_hnw`, `uhnw_inherited`, `founder_executive`, `concentrated_stress` |
+| Rung | 3 (sleeve lots) / 4 (concentration + alt calls) |
+| Seed | deterministic replay via `ProvenanceManifest` |
+| Assumption regimes | `run_scenarios` (`high_risk` / `low_risk` / `all`) |
+| Overlays | `ManifestOverlay` → `RiskDeltas` |
+
+v1.1 ships the core: `emit_hnw_fixture`, `project_to_asset_portfolio`, golden
+`rung × run_scenarios`, and Shape C scenario cards. This lets regression run **without
+hand-written JSON** and catches bugs where weight-only books pass but lot-derived projections
+fail (SDG1: Σ lots = NAV).
+
+### What Shape B does *not* automatically stress
+
+The risk engine still evaluates **sleeve weights** after projection — not lots directly.
+
+| Concern | Owner |
+| --- | --- |
+| Issuer-level concentration inside risk | Optimizer / recon (future) |
+| TLH, wash-sale, IPS binding | Shape B consumers (optimizer, recon) |
+| Level 4 named replay (2008/2020/2022) | `stress.py` — separate path inside one report |
+
+Shape B stress-tests: **(1)** projection fidelity (lots + alts → correct sleeve manifest),
+**(2)** risk math on realistic manifests, **(3)** the regression surface
+`cohort × rung × seed × run_scenarios`. It does **not** replace assumption-regime stress or
+Level 4 replay; it **feeds** them with richer inputs.
+
+### Gaps for full automatic stress testing
+
+| Gap | Purpose |
+| --- | --- |
+| **Shape B → DB seed** | Same fixture drives risk *and* optimizer/recon (end-to-end SDG3) |
+| **Matrix harness** | One runner: all cohorts × rungs × seeds × scenarios; fail on fingerprint/metric drift |
+| **Ledger adapter from Shape B** | `fixture → build_household_manifest` path, not only direct projection |
+
+### Suggested next step
+
+`stress_harness.py` (or pytest parametrization) looping
+`COHORT_IDS × rung(3,4) × seeds × ScenarioSet`, asserting goldens — generalizing
+`tests/test_hnw_synthetic.py` and `tests/fixtures/risk_golden/` into a batch falsifier.

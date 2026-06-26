@@ -1,6 +1,6 @@
 # Risk API Contract — Simplification Design
 
-**Status:** v1 shipped (overlays + deltas); compositional HNW generator planned
+**Status:** v1.1 shipped (HNW compositional generator + Shape B); overlays + deltas in v1
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
 `docs/research/simple_risk_models.md`, `docs/research/hnw_portfolios.md`,
@@ -309,3 +309,61 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 | 2026-06-26 | **v0c shipped:** `build_household_manifest`, slim `risk_data`, `evaluate_risk_http`, schema `integration` block. |
 | 2026-06-26 | **v0b shipped:** `RiskAssumptions`, `scenarios.py`, `run_scenarios` → `RiskResult.scenarios`, regime in fingerprint + manifest, `synthetic.rung(0..2)`, golden fixtures. |
 | 2026-06-26 | **v0a shipped:** `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk` in `service.py`; `AssetPortfolio.source`/`complexity`; `RiskResult` frozen + registered. |
+| 2026-06-24 | Shape B stress-testing design note added (see [v1.1](#v11--shape-b--automatic-risk-stress-testing)). |
+
+---
+
+## v1.1 — Shape B & automatic risk stress testing
+
+Shape B (`HouseholdFixture` — accounts, lots, alts, call schedule) is the **generative
+substrate** for HNW portfolios. Shape A (`AssetPortfolio`) remains the **wire shape** for
+`evaluate_risk`. Shape B is the right foundation for automatic falsification of the risk
+implementation, with a clear boundary on what risk actually evaluates.
+
+### Three shapes (recap)
+
+| Shape | Contents | Consumer |
+| --- | --- | --- |
+| **A** | `AssetPortfolio` (sleeve weights + provenance) | `evaluate_risk` |
+| **B** | Full household fixture (graph, lots, alts, calls) | Optimizer, recon, backtest; projects to A |
+| **C** | Scenario card (`seed`, `cohort_id`, fingerprint) | Historic replay catalog |
+
+### Stress pipeline
+
+```text
+cohort × seed × rung  →  emit_hnw_fixture()  →  project_to_asset_portfolio()
+                                                      ↓
+                                              evaluate_risk(request, manifest)
+```
+
+**Sweep dimensions** (v1.1 partial; matrix harness deferred):
+
+| Dimension | Surface |
+| --- | --- |
+| Cohort | `general_hnw`, `uhnw_inherited`, `founder_executive`, `concentrated_stress` |
+| Rung | 3 (sleeve lots) / 4 (concentration + alt calls) |
+| Seed | deterministic replay |
+| Assumption regimes | `request.run_scenarios` |
+| Overlays | `ManifestOverlay` → `RiskDeltas` |
+
+### What automatic Shape B stress testing covers
+
+- **Projection fidelity** — lots + alts → sleeve manifest; Σ lots = NAV (SDG1).
+- **Risk math on realistic manifests** — vol, VaR, scenarios, overlays on derived Shape A.
+- **Regression surface** — `cohort × rung × seed × run_scenarios` with pinned goldens.
+
+Risk still does **not** become lot-native: concentration at issuer, TLH, and wash-sale logic
+live on the optimizer/recon plane. Level 4 named stress replay (`stress.py`) is orthogonal —
+fixed return shocks inside one report, not a separate scenario-map entry.
+
+### Deferred for full end-to-end stress
+
+| Gap | Enables |
+| --- | --- |
+| Shape B → DB seed adapter | Same fixture drives risk + optimizer/recon smokes |
+| Batch matrix harness | `cohort × rung × seed × run_scenarios × overlay` with drift detection |
+| Shape B → `build_household_manifest` | Ledger-edge path, not only `project_to_asset_portfolio` |
+
+**Contract implication:** callers may supply Shape A from any source (hand-built, ledger,
+projection). Shape B is an internal generator output; the risk boundary is unchanged —
+`evaluate_risk(request, manifest)` never imports the compositional pipeline.
