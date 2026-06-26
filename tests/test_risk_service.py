@@ -32,8 +32,7 @@ def test_evaluate_risk_matches_engine() -> None:
         notional_usd=notional,
         run_scenarios=ScenarioSet.NONE,
     )
-    direct = evaluate_portfolio_risk(
-        portfolio, horizon, notional_usd=notional)
+    direct = evaluate_portfolio_risk(portfolio, horizon, notional_usd=notional)
     result = evaluate_risk(request, portfolio)
     assert result.deltas is None
     assert result.scenarios == {}

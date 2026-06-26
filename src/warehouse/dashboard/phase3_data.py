@@ -62,17 +62,20 @@ def load_phase3_dashboard() -> Phase3DashboardData:
         _ensure_demo_decision_runs()
         with session_scope() as session:
             positions = list_lot_positions(
-                session, household_id=DEMO_HOUSEHOLD_ID)
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             ips = load_ips(session, DEMO_HOUSEHOLD_ID)
             drift = (
                 build_ips_drift_report(
-                    session, DEMO_HOUSEHOLD_ID, positions, ips)
+                    session, DEMO_HOUSEHOLD_ID, positions, ips
+                )
                 if ips
                 else None
             )
             opts = list_optimization_runs(session, DEMO_HOUSEHOLD_ID)
             approvals = list_approval_requests(
-                session, household_id=DEMO_HOUSEHOLD_ID)
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             backtests = list_backtest_runs(session, DEMO_HOUSEHOLD_ID)
             constraints = active_constraint_summary(ips) if ips else []
         return Phase3DashboardData(

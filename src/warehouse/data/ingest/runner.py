@@ -32,11 +32,13 @@ class IngestRunSummary(BaseModel):
 
 
 def _ticker_to_security_id(session: Session, ticker: str) -> str:
-    row = session.scalar(select(SecurityRow).where(
-        SecurityRow.ticker == ticker))
+    row = session.scalar(
+        select(SecurityRow).where(SecurityRow.ticker == ticker)
+    )
     if row is None:
         raise ValueError(
-            f"Unknown ticker {ticker!r} — add to security master first")
+            f"Unknown ticker {ticker!r} — add to security master first"
+        )
     return row.security_id
 
 
@@ -113,10 +115,13 @@ def run_custodian_ingest(
     )
 
 
-def list_ingest_runs(session: Session, limit: int = 10) -> list[IngestRunSummary]:
+def list_ingest_runs(
+    session: Session, limit: int = 10
+) -> list[IngestRunSummary]:
     rows = session.scalars(
-        select(IngestRunRow).order_by(
-            IngestRunRow.started_at.desc()).limit(limit)
+        select(IngestRunRow)
+        .order_by(IngestRunRow.started_at.desc())
+        .limit(limit)
     ).all()
     return [
         IngestRunSummary(
@@ -138,13 +143,15 @@ def load_custodian_positions(
 ) -> list[CustodianPositionRecord]:
     rows = session.scalars(
         select(CustodianPositionRow).where(
-            CustodianPositionRow.ingest_run_id == ingest_run_id)
+            CustodianPositionRow.ingest_run_id == ingest_run_id
+        )
     ).all()
     result: list[CustodianPositionRecord] = []
     for row in rows:
         ticker = session.scalar(
             select(SecurityRow.ticker).where(
-                SecurityRow.security_id == row.security_id)
+                SecurityRow.security_id == row.security_id
+            )
         )
         if ticker is None:
             raise ValueError(f"Security {row.security_id} missing from master")

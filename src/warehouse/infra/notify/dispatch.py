@@ -33,7 +33,9 @@ def dispatch_risk_alert(
     """Send configured email / messaging alerts. Logs and re-raises on send failure."""
     cfg = settings or get_settings()
     if not cfg.risk_notify_on_error:
-        logger.debug("risk_notify_skipped", reason="risk_notify_on_error=false")
+        logger.debug(
+            "risk_notify_skipped", reason="risk_notify_on_error=false"
+        )
         return
 
     context = extra or {}
@@ -87,9 +89,7 @@ def _send_email(
             smtp_host=settings.risk_notify_smtp_host,
             **extra,
         )
-        raise RuntimeError(
-            f"risk alert email failed: {err}"
-        ) from err
+        raise RuntimeError(f"risk alert email failed: {err}") from err
 
     logger.info(
         "risk_email_sent",
@@ -139,9 +139,7 @@ def _send_messaging(
             webhook=webhook,
             **extra,
         )
-        raise RuntimeError(
-            f"risk alert messaging failed: {err}"
-        ) from err
+        raise RuntimeError(f"risk alert messaging failed: {err}") from err
 
     logger.info(
         "risk_messaging_sent",

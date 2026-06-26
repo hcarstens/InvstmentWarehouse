@@ -25,7 +25,9 @@ class RiskApiError(ValueError):
     """Invalid risk API request."""
 
 
-def parse_risk_request(body: dict[str, Any]) -> tuple[RiskRequest, AssetPortfolio]:
+def parse_risk_request(
+    body: dict[str, Any],
+) -> tuple[RiskRequest, AssetPortfolio]:
     if "asset_portfolio" not in body:
         raise RiskApiError("Missing required field: asset_portfolio")
     if "horizon" not in body:

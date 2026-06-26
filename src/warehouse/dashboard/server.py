@@ -28,19 +28,27 @@ def _badge(text: str, kind: str) -> str:
 
 
 def _readiness_kind(readiness: str) -> str:
-    return {"live": "ok", "partial": "warn", "stub": "muted"}.get(readiness, "muted")
+    return {"live": "ok", "partial": "warn", "stub": "muted"}.get(
+        readiness, "muted"
+    )
 
 
 def _phase_kind(status: str) -> str:
-    return {"complete": "ok", "in_progress": "warn", "planned": "muted"}.get(status, "muted")
+    return {"complete": "ok", "in_progress": "warn", "planned": "muted"}.get(
+        status, "muted"
+    )
 
 
 def _panel_kind(status: str) -> str:
-    return {"live": "ok", "stub": "warn", "planned": "muted"}.get(status, "muted")
+    return {"live": "ok", "stub": "warn", "planned": "muted"}.get(
+        status, "muted"
+    )
 
 
 def _infra_kind(status: str) -> str:
-    return {"ok": "ok", "skipped": "muted", "error": "err"}.get(status, "muted")
+    return {"ok": "ok", "skipped": "muted", "error": "err"}.get(
+        status, "muted"
+    )
 
 
 def _security_query_from_path(path: str) -> str | None:
@@ -154,7 +162,9 @@ def render_html(
         for t in schema.tables
     )
     q_value = html.escape(phase1.security_query or "")
-    phase2_html = render_phase2_sections(phase2, risk_html=render_risk_section(risk))
+    phase2_html = render_phase2_sections(
+        phase2, risk_html=render_risk_section(risk)
+    )
     phase3_html = render_phase3_sections(phase3)
     phase4_html = render_phase4_sections(phase4)
     return f"""<!DOCTYPE html>
@@ -236,9 +246,9 @@ def render_html(
 
   <section>
     <h2>Schema status</h2>
-    <p>Revision: <code>{html.escape(schema.current_revision or 'none')}</code> / {html.escape(schema.head_revision)} {schema_revision}</p>
-    <p>Last applied: {schema.last_applied_at.isoformat() if schema.last_applied_at else '—'}</p>
-    {f'<p class="error-banner">{html.escape(schema.error)}</p>' if schema.error else ''}
+    <p>Revision: <code>{html.escape(schema.current_revision or "none")}</code> / {html.escape(schema.head_revision)} {schema_revision}</p>
+    <p>Last applied: {schema.last_applied_at.isoformat() if schema.last_applied_at else "—"}</p>
+    {f'<p class="error-banner">{html.escape(schema.error)}</p>' if schema.error else ""}
     <table>
       <thead><tr><th>Table</th><th>Rows</th></tr></thead>
       <tbody>{schema_rows or '<tr><td colspan="2">No tables — run warehouse db bootstrap</td></tr>'}</tbody>
@@ -349,7 +359,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
         elif self.path.startswith("/api/phase1"):
-            phase1 = load_phase1_dashboard(security_query=_security_query_from_path(self.path))
+            phase1 = load_phase1_dashboard(
+                security_query=_security_query_from_path(self.path)
+            )
             body = phase1.model_dump_json(indent=2).encode()
             self.send_response(200 if not phase1.error else 503)
             self.send_header("Content-Type", "application/json")
@@ -360,7 +372,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             from warehouse.infra.health import run_infra_checks
 
             checks = run_infra_checks()
-            body = json.dumps([c.model_dump() for c in checks], indent=2).encode()
+            body = json.dumps(
+                [c.model_dump() for c in checks], indent=2
+            ).encode()
             has_error = any(c.status == "error" for c in checks)
             self.send_response(503 if has_error else 200)
             self.send_header("Content-Type", "application/json")
@@ -413,7 +427,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return  # quiet default request logging
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765, *, risk: bool = False) -> None:
+def serve(
+    host: str = "127.0.0.1", port: int = 8765, *, risk: bool = False
+) -> None:
     DashboardHandler.risk_landing = risk
     server = HTTPServer((host, port), DashboardHandler)
     if risk:

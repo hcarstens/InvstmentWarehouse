@@ -102,6 +102,8 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
 
 def _contract_status(deliverables: list[BuildDeliverable]) -> str:
     by_id = {d.id: d.status for d in deliverables}
+    if by_id.get("hnw-rung4") == "shipped":
+        return "v1.1"
     if by_id.get("v1-overlays") == "shipped":
         return "v1"
     if by_id.get("v0c-http") == "shipped":

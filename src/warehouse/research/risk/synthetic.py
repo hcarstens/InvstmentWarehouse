@@ -8,12 +8,30 @@ from warehouse.research.risk.models import (
     AllocationSlot,
     AssetClass,
     AssetPortfolio,
-    MeasurementMode,
 )
+from warehouse.research.synthetic.cohort import default_cohort_for_rung
+from warehouse.research.synthetic.pipeline import emit_hnw_fixture
 
 
-def rung(level: int) -> AssetPortfolio:
-    """Return a hand-built synthetic manifest at rung 0–4."""
+def rung(
+    level: int,
+    *,
+    seed: int = 0,
+    cohort_id: str | None = None,
+) -> AssetPortfolio:
+    """Return a synthetic manifest at rung 0–4.
+
+    Rungs 0–2: hand-built sleeves (no DB).
+    Rungs 3–4: compositional HNW generator (``warehouse.research.synthetic``).
+    """
+    if level in (3, 4):
+        cohort = cohort_id or default_cohort_for_rung(level)
+        fixture = emit_hnw_fixture(cohort_id=cohort, seed=seed, rung=level)
+        portfolio = fixture.asset_portfolio
+        if portfolio is None:
+            raise RuntimeError("HNW fixture missing Shape A projection")
+        return portfolio
+
     if level == 0:
         return AssetPortfolio(
             portfolio_id="synthetic-rung-0",
@@ -75,73 +93,6 @@ def rung(level: int) -> AssetPortfolio:
                     asset_class=AssetClass.FX,
                     weight=Decimal("0.1"),
                     liquidity_tier=1,
-                ),
-            ],
-        )
-    if level == 3:
-        return AssetPortfolio(
-            portfolio_id="synthetic-rung-3",
-            source="synthetic",
-            complexity=3,
-            allocations=[
-                AllocationSlot(
-                    asset_class=AssetClass.EQUITY,
-                    weight=Decimal("0.45"),
-                    beta=Decimal("1"),
-                    liquidity_tier=1,
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.FIXED_INCOME,
-                    weight=Decimal("0.25"),
-                    duration_years=Decimal("6.5"),
-                    liquidity_tier=1,
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.COMMODITIES,
-                    weight=Decimal("0.05"),
-                    liquidity_tier=2,
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.ALTERNATIVES,
-                    weight=Decimal("0.15"),
-                    duration_years=Decimal("7"),
-                    liquidity_tier=3,
-                    measurement=MeasurementMode.FERMI,
-                    label="private_markets",
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.CASH,
-                    weight=Decimal("0.10"),
-                    liquidity_tier=1,
-                ),
-            ],
-        )
-    if level == 4:
-        return AssetPortfolio(
-            portfolio_id="synthetic-rung-4",
-            source="synthetic",
-            complexity=4,
-            allocations=[
-                AllocationSlot(
-                    asset_class=AssetClass.EQUITY,
-                    weight=Decimal("0.70"),
-                    beta=Decimal("1.2"),
-                    liquidity_tier=1,
-                    label="concentrated_equity",
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.FIXED_INCOME,
-                    weight=Decimal("0.15"),
-                    duration_years=Decimal("5"),
-                    liquidity_tier=1,
-                ),
-                AllocationSlot(
-                    asset_class=AssetClass.ALTERNATIVES,
-                    weight=Decimal("0.15"),
-                    duration_years=Decimal("8"),
-                    liquidity_tier=3,
-                    measurement=MeasurementMode.FERMI,
-                    label="concentrated_alts",
                 ),
             ],
         )

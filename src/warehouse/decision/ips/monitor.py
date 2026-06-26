@@ -78,7 +78,8 @@ def build_ips_drift_report(
             weight = pos.market_value / total_mv
             if weight > Decimal("0.25"):
                 concentration.append(
-                    f"{pos.ticker} concentration {weight:.1%}")
+                    f"{pos.ticker} concentration {weight:.1%}"
+                )
 
     return IpsDriftReport(
         household_id=household_id,

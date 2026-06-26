@@ -78,7 +78,9 @@ def test_approval_stages_orders() -> None:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
         pending = [
             a
-            for a in list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+            for a in list_approval_requests(
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             if a.status == ApprovalStatus.PENDING.value
         ]
         assert pending
@@ -103,15 +105,18 @@ def test_oms_gate_blocks_unapproved_staging() -> None:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
         pending = [
             a
-            for a in list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+            for a in list_approval_requests(
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             if a.status == ApprovalStatus.PENDING.value
         ][0]
         with pytest.raises(ValueError, match="status is 'pending'"):
             stage_orders_from_approval(session, pending.request_id)
         # No order for THIS pending approval should have leaked into staging.
         orders = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)
-        assert not any(o.approval_request_id ==
-                       pending.request_id for o in orders)
+        assert not any(
+            o.approval_request_id == pending.request_id for o in orders
+        )
 
 
 def test_order_state_machine() -> None:
@@ -120,7 +125,9 @@ def test_order_state_machine() -> None:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
         pending = [
             a
-            for a in list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+            for a in list_approval_requests(
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             if a.status == ApprovalStatus.PENDING.value
         ][0]
         update_approval_status(
@@ -131,9 +138,11 @@ def test_order_state_machine() -> None:
         )
         order = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)[0]
         submitted = update_order_status(
-            session, order.order_id, status=OrderStatus.SUBMITTED)
+            session, order.order_id, status=OrderStatus.SUBMITTED
+        )
         filled = update_order_status(
-            session, order.order_id, status=OrderStatus.FILLED)
+            session, order.order_id, status=OrderStatus.FILLED
+        )
     assert submitted.status == OrderStatus.SUBMITTED.value
     assert filled.status == OrderStatus.FILLED.value
 

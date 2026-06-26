@@ -36,19 +36,27 @@ def test_high_risk_raises_vol_vs_base_on_rung_1() -> None:
         portfolio,
     )
     base_vol = base.report.level_1_portfolio.annualized_volatility.value
-    high_vol = alt.scenarios["high_risk"].level_1_portfolio.annualized_volatility.value
+    high_vol = alt.scenarios[
+        "high_risk"
+    ].level_1_portfolio.annualized_volatility.value
     assert high_vol > base_vol
 
 
 def test_run_scenarios_all_returns_two_alternate_reports() -> None:
     result = evaluate_risk(
-        RiskRequest(horizon=RiskHorizon.parse("5y"), run_scenarios=ScenarioSet.ALL),
+        RiskRequest(
+            horizon=RiskHorizon.parse("5y"), run_scenarios=ScenarioSet.ALL
+        ),
         rung(1),
     )
     assert result.report.manifest.assumption_regime == "base"
     assert set(result.scenarios) == {"high_risk", "low_risk"}
-    assert result.scenarios["high_risk"].manifest.assumption_regime == "high_risk"
-    assert result.scenarios["low_risk"].manifest.assumption_regime == "low_risk"
+    assert (
+        result.scenarios["high_risk"].manifest.assumption_regime == "high_risk"
+    )
+    assert (
+        result.scenarios["low_risk"].manifest.assumption_regime == "low_risk"
+    )
 
 
 def test_fingerprints_differ_by_regime() -> None:
@@ -75,6 +83,8 @@ def test_fingerprints_differ_by_regime() -> None:
         "rung1_high_risk.json",
         "rung2_none.json",
         "rung2_high_risk.json",
+        "rung3_none.json",
+        "rung3_high_risk.json",
     ],
 )
 def test_golden_rung_scenario_cells(fixture_name: str) -> None:
@@ -95,13 +105,11 @@ def test_golden_rung_scenario_cells(fixture_name: str) -> None:
     expected = cell["expected"]
     assert report.input_fingerprint == expected["input_fingerprint"]
     assert report.manifest.assumption_regime == expected["assumption_regime"]
-    assert (
-        report.level_1_portfolio.annualized_volatility.value
-        == Decimal(expected["annualized_vol"])
+    assert report.level_1_portfolio.annualized_volatility.value == Decimal(
+        expected["annualized_vol"]
     )
-    assert (
-        report.level_1_portfolio.parametric_var.value
-        == Decimal(expected["parametric_var"])
+    assert report.level_1_portfolio.parametric_var.value == Decimal(
+        expected["parametric_var"]
     )
 
 

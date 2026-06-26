@@ -33,23 +33,28 @@ def evaluate_duration_risk(
         buckets.setdefault(bucket, []).append(slot)
 
     pct_by_class = {
-        c.asset_class: c.pct_variance_contribution for c in class_contributions}
+        c.asset_class: c.pct_variance_contribution for c in class_contributions
+    }
     results: list[DurationBucketRisk] = []
 
     for bucket_name, members in sorted(buckets.items()):
         weight = sum((m.weight for m in members), Decimal("0"))
         durations = [
-            m.duration_years for m in members if m.duration_years is not None]
+            m.duration_years for m in members if m.duration_years is not None
+        ]
         avg_duration = (
-            sum(durations, Decimal("0")) /
-            Decimal(len(durations)) if durations else None
+            sum(durations, Decimal("0")) / Decimal(len(durations))
+            if durations
+            else None
         )
         mismatch = Decimal("0")
         if avg_duration is not None and horizon.years > 0:
             mismatch = abs(avg_duration - horizon.years) / horizon.years
         pct_variance = sum(
-            (pct_by_class.get(m.asset_class.value, Decimal("0"))
-             for m in members),
+            (
+                pct_by_class.get(m.asset_class.value, Decimal("0"))
+                for m in members
+            ),
             Decimal("0"),
         )
         results.append(

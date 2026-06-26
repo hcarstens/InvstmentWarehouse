@@ -61,7 +61,8 @@ def load_phase2_dashboard() -> Phase2DashboardData:
         with session_scope() as session:
             ingest_runs = list_ingest_runs(session)
             positions = load_lot_positions(
-                session, household_id=DEMO_HOUSEHOLD_ID)
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             pnl = household_pnl_summary(session, DEMO_HOUSEHOLD_ID)
             breaks = list_reconciliation_breaks(session, open_only=True)
             steps = latest_refresh_steps(session, DEMO_HOUSEHOLD_ID)

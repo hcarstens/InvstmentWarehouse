@@ -5,7 +5,9 @@ from pathlib import Path
 from warehouse.config import Settings, get_settings, repo_root
 
 
-def resolve_research_path(path: Path, settings: Settings | None = None) -> Path:
+def resolve_research_path(
+    path: Path, settings: Settings | None = None
+) -> Path:
     cfg = settings or get_settings()
     sandbox = (repo_root() / cfg.research_sandbox_path).resolve()
     resolved = path.resolve()
@@ -14,7 +16,9 @@ def resolve_research_path(path: Path, settings: Settings | None = None) -> Path:
     raise ValueError(f"Research path must stay under {sandbox}")
 
 
-def copy_to_research_sandbox(source: Path, settings: Settings | None = None) -> Path:
+def copy_to_research_sandbox(
+    source: Path, settings: Settings | None = None
+) -> Path:
     cfg = settings or get_settings()
     sandbox = (repo_root() / cfg.research_sandbox_path).resolve()
     sandbox.mkdir(parents=True, exist_ok=True)

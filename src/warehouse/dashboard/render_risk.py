@@ -212,9 +212,10 @@ def _render_deltas_section(deltas: RiskDeltas | None) -> str:
         for row in deltas.headline
     )
     class_rows = "".join(
-        f"<tr><td>{html.escape(asset_class)}</td>"
-        f"<td>{_pct(delta)}</td></tr>"
-        for asset_class, delta in sorted(deltas.by_class_variance_delta.items())
+        f"<tr><td>{html.escape(asset_class)}</td><td>{_pct(delta)}</td></tr>"
+        for asset_class, delta in sorted(
+            deltas.by_class_variance_delta.items()
+        )
     )
     return f"""
     <h3>Proposal deltas — {label}</h3>

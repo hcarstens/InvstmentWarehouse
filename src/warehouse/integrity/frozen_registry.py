@@ -104,7 +104,9 @@ def _mutation_probe_attr(instance: Any) -> str:
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 
-def assert_rejects_mutation(instance: Any, attr: str | None = None, value: Any = "mutated") -> None:
+def assert_rejects_mutation(
+    instance: Any, attr: str | None = None, value: Any = "mutated"
+) -> None:
     """Raise AssertionError if setattr succeeds (silent mutation)."""
     field = attr or _mutation_probe_attr(instance)
     try:

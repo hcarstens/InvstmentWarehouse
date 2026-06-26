@@ -50,14 +50,21 @@ class AssetPortfolio(BaseModel):
     allocations: list[AllocationSlot] = Field(min_length=1)
     source: str = "synthetic"
     complexity: int | None = None
+    cohort_id: str | None = None
+    generator_version: str | None = None
+    seed: int | None = None
+    tension_tags: list[str] = Field(default_factory=list)
 
     @field_validator("allocations")
     @classmethod
-    def weights_sum_to_one(cls, slots: list[AllocationSlot]) -> list[AllocationSlot]:
+    def weights_sum_to_one(
+        cls, slots: list[AllocationSlot]
+    ) -> list[AllocationSlot]:
         total = sum((s.weight for s in slots), Decimal("0"))
         if abs(total - Decimal("1")) > Decimal("0.0001"):
             raise ValueError(
-                f"allocation weights must sum to 1.0, got {total}")
+                f"allocation weights must sum to 1.0, got {total}"
+            )
         return slots
 
 

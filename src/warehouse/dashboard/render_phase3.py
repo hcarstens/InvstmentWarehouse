@@ -30,8 +30,13 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
             f"<td>{_pct(r.drift)}</td></tr>"
             for r in phase3.ips_drift.rows
         )
-        alerts = phase3.ips_drift.alerts + phase3.ips_drift.concentration_alerts
-        alert_rows = "".join(f"<li>{html.escape(a)}</li>" for a in alerts) or "<li>No alerts</li>"
+        alerts = (
+            phase3.ips_drift.alerts + phase3.ips_drift.concentration_alerts
+        )
+        alert_rows = (
+            "".join(f"<li>{html.escape(a)}</li>" for a in alerts)
+            or "<li>No alerts</li>"
+        )
 
     opt = phase3.optimization_runs[0] if phase3.optimization_runs else None
     trade_rows = ""

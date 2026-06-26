@@ -33,9 +33,15 @@ class TaxScenarioRunView(BaseModel):
     created_at: datetime
 
 
-def _baseline_tax(positions: list[LotPositionView], settings: Settings) -> Decimal:
+def _baseline_tax(
+    positions: list[LotPositionView], settings: Settings
+) -> Decimal:
     taxable_gains = sum(
-        (p.unrealized_gain for p in positions if p.unrealized_gain and p.unrealized_gain > 0),
+        (
+            p.unrealized_gain
+            for p in positions
+            if p.unrealized_gain and p.unrealized_gain > 0
+        ),
         Decimal("0"),
     )
     ltcg = Decimal(str(settings.fed_ltcg_rate))
@@ -48,7 +54,11 @@ def _scenario_tax(
     overlays: TaxScenarioOverlays,
 ) -> Decimal:
     taxable_gains = sum(
-        (p.unrealized_gain for p in positions if p.unrealized_gain and p.unrealized_gain > 0),
+        (
+            p.unrealized_gain
+            for p in positions
+            if p.unrealized_gain and p.unrealized_gain > 0
+        ),
         Decimal("0"),
     )
     ltcg = Decimal(str(settings.fed_ltcg_rate))

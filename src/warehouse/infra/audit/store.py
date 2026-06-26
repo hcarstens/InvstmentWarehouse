@@ -54,8 +54,11 @@ def list_audit_entries(
     household_id: str | None = None,
     limit: int = 50,
 ) -> list[AuditEntry]:
-    stmt = select(AuditLogRow).order_by(
-        AuditLogRow.occurred_at.desc()).limit(limit)
+    stmt = (
+        select(AuditLogRow)
+        .order_by(AuditLogRow.occurred_at.desc())
+        .limit(limit)
+    )
     if household_id:
         stmt = stmt.where(AuditLogRow.household_id == household_id)
     rows = session.scalars(stmt).all()

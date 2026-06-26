@@ -57,7 +57,9 @@ def evaluate_class_contributions(
     assumptions: RiskAssumptions,
 ) -> list[ClassRiskContribution]:
     rows: list[ClassRiskContribution] = []
-    for state, pct_var in zip(states, cov_result.pct_variance_contributions, strict=True):
+    for state, pct_var in zip(
+        states, cov_result.pct_variance_contributions, strict=True
+    ):
         slot = state.slot
         rows.append(
             ClassRiskContribution(
@@ -66,8 +68,8 @@ def evaluate_class_contributions(
                 annual_volatility=state.annual_volatility,
                 pct_variance_contribution=pct_var,
                 pct_es_contribution=pct_var,
-                expected_return=slot.weight *
-                assumptions.class_expected_return[slot.asset_class],
+                expected_return=slot.weight
+                * assumptions.class_expected_return[slot.asset_class],
                 measurement=MeasurementMode(state.measurement),
                 liquidity_tier=slot.liquidity_tier,
             )
@@ -81,7 +83,8 @@ def portfolio_expected_return(
 ) -> Decimal:
     return sum(
         (
-            s.slot.weight * assumptions.class_expected_return[s.slot.asset_class]
+            s.slot.weight
+            * assumptions.class_expected_return[s.slot.asset_class]
             for s in states
         ),
         Decimal("0"),

@@ -15,11 +15,15 @@ def _money(value: Decimal | None) -> str:
 
 
 def _status_badge(status: str) -> str:
-    kind = {"success": "ok", "error": "err", "running": "warn"}.get(status, "muted")
+    kind = {"success": "ok", "error": "err", "running": "warn"}.get(
+        status, "muted"
+    )
     return f'<span class="badge badge-{kind}">{html.escape(status)}</span>'
 
 
-def render_phase2_sections(phase2: Phase2DashboardData, *, risk_html: str = "") -> str:
+def render_phase2_sections(
+    phase2: Phase2DashboardData, *, risk_html: str = ""
+) -> str:
     ingest_rows = "".join(
         f"<tr><td>{html.escape(r.run_id)}</td>"
         f"<td>{html.escape(r.file_name)}</td>"

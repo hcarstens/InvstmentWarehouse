@@ -54,7 +54,9 @@ def apply_overlay(
         normalized = weights[asset_class] / total
         template = slot_templates.get(asset_class)
         if template is not None:
-            allocations.append(template.model_copy(update={"weight": normalized}))
+            allocations.append(
+                template.model_copy(update={"weight": normalized})
+            )
         else:
             allocations.append(
                 AllocationSlot(asset_class=asset_class, weight=normalized)
@@ -111,7 +113,9 @@ def diff_reports(
     ]
     if b1.dollar_var and p1.dollar_var:
         headline.append(
-            _metric_delta("dollar_var", b1.dollar_var.value, p1.dollar_var.value)
+            _metric_delta(
+                "dollar_var", b1.dollar_var.value, p1.dollar_var.value
+            )
         )
     if b1.dollar_es and p1.dollar_es:
         headline.append(
@@ -127,9 +131,8 @@ def diff_reports(
         for row in proposed.level_2_contributions.by_class
     }
     by_class_variance_delta = {
-        asset_class: proposed_var.get(asset_class, Decimal("0")) - baseline_var.get(
-            asset_class, Decimal("0")
-        )
+        asset_class: proposed_var.get(asset_class, Decimal("0"))
+        - baseline_var.get(asset_class, Decimal("0"))
         for asset_class in set(baseline_var) | set(proposed_var)
     }
 

@@ -15,7 +15,8 @@ def test_load_risk_dashboard_from_demo_holdings() -> None:
     assert risk.report is not None
     assert risk.source == "ledger"
     assert risk.report.level_1_portfolio.parametric_var.confidence == Decimal(
-        "0.95")
+        "0.95"
+    )
     assert len(risk.report.level_2_contributions.by_class) >= 2
     assert len(risk.report.level_4_stress.scenarios) == 3
 

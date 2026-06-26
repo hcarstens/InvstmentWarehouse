@@ -4,6 +4,20 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Risk API v1.1 HNW compositional generator
+
+**Shipped:**
+
+- `warehouse/research/synthetic/` — cohort profiles, pipeline (lots, alts, calls), Shape B `HouseholdFixture`, Shape A projection
+- `risk/synthetic.rung(3..4)` delegates to generator; provenance on `AssetPortfolio` (`cohort_id`, `generator_version`, `seed`, `tension_tags`)
+- Scenario cards (Shape C) — `build_scenario_card`, `write_scenario_card`
+- Golden matrix extended: `rung3_{none,high_risk}`; fingerprints include provenance
+- Tests: `tests/test_hnw_synthetic.py`
+
+**Next:** DB seed adapter from Shape B; tax-vector overlays; full trust-stack graphs.
+
+---
+
 ## 2026-06-24 — Risk API v1 overlays & deltas
 
 **Shipped:**

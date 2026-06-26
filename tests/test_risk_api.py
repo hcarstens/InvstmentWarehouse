@@ -51,7 +51,11 @@ def test_evaluate_risk_request_with_overlay() -> None:
         "asset_portfolio": {
             "allocations": [
                 {"asset_class": "equity", "weight": 0.6},
-                {"asset_class": "fixed_income", "weight": 0.4, "duration_years": 6.5},
+                {
+                    "asset_class": "fixed_income",
+                    "weight": 0.4,
+                    "duration_years": 6.5,
+                },
             ]
         },
         "horizon": "5y",
@@ -113,7 +117,10 @@ def test_evaluate_risk_request_returns_manifest() -> None:
     assert len(result["input_fingerprint"]) == 16
 
     level_1 = result["level_1_portfolio"]
-    assert level_1["annualized_volatility"]["unit_type"] == RiskUnitType.SIGMA_ANNUALIZED
+    assert (
+        level_1["annualized_volatility"]["unit_type"]
+        == RiskUnitType.SIGMA_ANNUALIZED
+    )
     assert float(level_1["annualized_volatility"]["value"]) > 0
     assert level_1["parametric_var"]["confidence"] == "0.95"
     assert level_1["parametric_es"]["confidence"] == "0.975"
@@ -122,18 +129,23 @@ def test_evaluate_risk_request_returns_manifest() -> None:
     level_2 = result["level_2_contributions"]
     assert len(level_2["by_class"]) == 3
     assert len(level_2["by_duration"]) >= 2
-    pct_sum = sum(float(row["pct_variance_contribution"])
-                  for row in level_2["by_class"])
+    pct_sum = sum(
+        float(row["pct_variance_contribution"]) for row in level_2["by_class"]
+    )
     assert pct_sum == pytest.approx(1.0, rel=1e-4)
 
     level_3 = result["level_3_sensitivities"]["by_sleeve"]
     assert any(row["native_unit"] == RiskUnitType.BETA for row in level_3)
-    assert any(row["native_unit"] ==
-               RiskUnitType.DURATION_YEARS for row in level_3)
+    assert any(
+        row["native_unit"] == RiskUnitType.DURATION_YEARS for row in level_3
+    )
 
     level_4 = result["level_4_stress"]["scenarios"]
     assert {s["name"] for s in level_4} == {
-        "2008_liquidity", "2020_pandemic", "2022_inflation"}
+        "2008_liquidity",
+        "2020_pandemic",
+        "2022_inflation",
+    }
 
     assert float(result["liquidity"]["weighted_days"]["value"]) > 0
     assert result["aggregation_note"]
@@ -180,7 +192,8 @@ def test_class_measurable_vs_fermi() -> None:
 
 def test_covariance_contributions_sum_to_one() -> None:
     portfolio = AssetPortfolio.model_validate(
-        _sample_request()["asset_portfolio"])
+        _sample_request()["asset_portfolio"]
+    )
     states = build_sleeve_states(portfolio.allocations, _BASE)
     cov = portfolio_covariance(states, _BASE)
     contribs = evaluate_class_contributions(states, cov, _BASE)
@@ -191,29 +204,38 @@ def test_covariance_contributions_sum_to_one() -> None:
 def test_duration_buckets_and_mismatch() -> None:
     horizon = RiskHorizon.parse("5y")
     portfolio = AssetPortfolio.model_validate(
-        _sample_request()["asset_portfolio"])
+        _sample_request()["asset_portfolio"]
+    )
     states = build_sleeve_states(portfolio.allocations, _BASE)
     by_class = evaluate_class_contributions(
-        states, portfolio_covariance(states, _BASE), _BASE)
+        states, portfolio_covariance(states, _BASE), _BASE
+    )
     by_duration = evaluate_duration_risk(
-        portfolio.allocations, horizon, by_class)
+        portfolio.allocations, horizon, by_class
+    )
     medium = next(row for row in by_duration if row.bucket == "medium")
     assert float(medium.horizon_mismatch) == pytest.approx(0.35, rel=1e-3)
 
 
 def test_fingerprint_stable_and_changes_with_notional() -> None:
     portfolio = AssetPortfolio.model_validate(
-        _sample_request()["asset_portfolio"])
+        _sample_request()["asset_portfolio"]
+    )
     horizon = RiskHorizon.parse("5y")
     base = portfolio_fingerprint(portfolio, horizon)
     assert base == portfolio_fingerprint(portfolio, horizon)
-    assert portfolio_fingerprint(
-        portfolio, horizon, notional_usd=Decimal("1000000")) != base
+    assert (
+        portfolio_fingerprint(
+            portfolio, horizon, notional_usd=Decimal("1000000")
+        )
+        != base
+    )
 
 
 def test_stress_scenarios_are_linear_sleeve_sum() -> None:
     portfolio = AssetPortfolio.model_validate(
-        _sample_request()["asset_portfolio"])
+        _sample_request()["asset_portfolio"]
+    )
     stress = evaluate_stress(
         portfolio.allocations,
         notional_usd=None,
@@ -227,7 +249,8 @@ def test_stress_scenarios_are_linear_sleeve_sum() -> None:
 
 def test_evaluate_portfolio_risk_engine() -> None:
     portfolio = AssetPortfolio.model_validate(
-        _sample_request()["asset_portfolio"])
+        _sample_request()["asset_portfolio"]
+    )
     report = evaluate_portfolio_risk(portfolio, RiskHorizon.parse("5y"))
     assert report.measurement_summary.measurable_weight == Decimal("0.9")
     assert report.measurement_summary.fermi_weight == Decimal("0.1")
@@ -242,7 +265,9 @@ def test_risk_api_http_post_and_get() -> None:
     try:
         import urllib.request
 
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/risk") as resp:
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/risk"
+        ) as resp:
             schema = json.loads(resp.read())
         assert schema["method"] == "POST"
 
@@ -254,8 +279,12 @@ def test_risk_api_http_post_and_get() -> None:
         )
         with urllib.request.urlopen(post_req) as resp:
             report = json.loads(resp.read())
-        assert float(report["level_1_portfolio"]
-                     ["annualized_volatility"]["value"]) > 0
+        assert (
+            float(
+                report["level_1_portfolio"]["annualized_volatility"]["value"]
+            )
+            > 0
+        )
     finally:
         server.shutdown()
         thread.join(timeout=2)

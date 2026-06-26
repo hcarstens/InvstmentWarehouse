@@ -48,8 +48,9 @@ def portfolio_covariance(
         for j in range(n):
             portfolio_variance += weights[i] * weights[j] * cov[i][j]
 
-    portfolio_volatility = portfolio_variance.sqrt(
-    ) if portfolio_variance > 0 else Decimal("0")
+    portfolio_volatility = (
+        portfolio_variance.sqrt() if portfolio_variance > 0 else Decimal("0")
+    )
 
     marginal_variance: list[Decimal] = []
     for i in range(n):

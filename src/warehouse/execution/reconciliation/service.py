@@ -34,18 +34,22 @@ class ReconciliationBreak(BaseModel):
 
 def _ledger_quantities(session: Session) -> dict[tuple[str, str], Decimal]:
     rows = session.execute(
-        select(LotRow.account_id, LotRow.security_id, func.sum(LotRow.quantity)).group_by(
-            LotRow.account_id, LotRow.security_id
-        )
+        select(
+            LotRow.account_id, LotRow.security_id, func.sum(LotRow.quantity)
+        ).group_by(LotRow.account_id, LotRow.security_id)
     ).all()
-    return {(account_id, security_id): quantity for account_id, security_id, quantity in rows}
+    return {
+        (account_id, security_id): quantity
+        for account_id, security_id, quantity in rows
+    }
 
 
 def _accounts_for_custodian(session: Session, custodian_id: str) -> set[str]:
     rows = session.scalars(
         select(EntityRelationshipRow.source_id).where(
             EntityRelationshipRow.target_id == custodian_id,
-            EntityRelationshipRow.relationship_type == RelationshipType.CUSTODIED_AT.value,
+            EntityRelationshipRow.relationship_type
+            == RelationshipType.CUSTODIED_AT.value,
         )
     ).all()
     return set(rows)
@@ -64,11 +68,13 @@ def reconcile_ingest(
     if ingest_run is None:
         raise ValueError(f"Ingest run not found: {ingest_run_id}")
     custodian_accounts = _accounts_for_custodian(
-        session, ingest_run.custodian_id)
+        session, ingest_run.custodian_id
+    )
 
     custodian_rows = session.scalars(
         select(CustodianPositionRow).where(
-            CustodianPositionRow.ingest_run_id == ingest_run_id)
+            CustodianPositionRow.ingest_run_id == ingest_run_id
+        )
     ).all()
     ledger = _ledger_quantities(session)
     breaks: list[ReconciliationBreak] = []
@@ -81,12 +87,11 @@ def reconcile_ingest(
         if ledger_qty != row.quantity:
             ticker = session.scalar(
                 select(SecurityRow.ticker).where(
-                    SecurityRow.security_id == row.security_id)
+                    SecurityRow.security_id == row.security_id
+                )
             )
             break_id = f"break_{uuid4().hex[:12]}"
-            description = (
-                f"{ticker or row.security_id}: custodian={row.quantity}, ledger={ledger_qty}"
-            )
+            description = f"{ticker or row.security_id}: custodian={row.quantity}, ledger={ledger_qty}"
             opened = datetime.now(UTC)
             session.add(
                 ReconciliationBreakRow(
@@ -106,8 +111,10 @@ def reconcile_ingest(
                 resource_type="reconciliation_break",
                 resource_id=break_id,
                 household_id=household_id,
-                details={"ingest_run_id": ingest_run_id,
-                         "description": description},
+                details={
+                    "ingest_run_id": ingest_run_id,
+                    "description": description,
+                },
             )
             breaks.append(
                 ReconciliationBreak(
@@ -131,10 +138,13 @@ def reconcile_ingest(
             continue
         ticker = session.scalar(
             select(SecurityRow.ticker).where(
-                SecurityRow.security_id == security_id)
+                SecurityRow.security_id == security_id
+            )
         )
         break_id = f"break_{uuid4().hex[:12]}"
-        description = f"{ticker or security_id}: custodian=0, ledger={ledger_qty}"
+        description = (
+            f"{ticker or security_id}: custodian=0, ledger={ledger_qty}"
+        )
         opened = datetime.now(UTC)
         session.add(
             ReconciliationBreakRow(
@@ -170,7 +180,8 @@ def list_reconciliation_breaks(
     limit: int = 50,
 ) -> list[ReconciliationBreak]:
     stmt = select(ReconciliationBreakRow).order_by(
-        ReconciliationBreakRow.opened_at.desc())
+        ReconciliationBreakRow.opened_at.desc()
+    )
     if open_only:
         stmt = stmt.where(ReconciliationBreakRow.resolved.is_(False))
     rows = session.scalars(stmt.limit(limit)).all()

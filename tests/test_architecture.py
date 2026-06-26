@@ -28,8 +28,17 @@ def test_workflow_catalog_has_six_core_workflows() -> None:
 def test_entity_graph_models() -> None:
     graph = EntityGraph(
         entities=[
-            Entity(entity_id="hh_1", entity_type=EntityType.HOUSEHOLD, name="Smith Family"),
-            Entity(entity_id="acct_1", entity_type=EntityType.ACCOUNT, name="Taxable", household_id="hh_1"),
+            Entity(
+                entity_id="hh_1",
+                entity_type=EntityType.HOUSEHOLD,
+                name="Smith Family",
+            ),
+            Entity(
+                entity_id="acct_1",
+                entity_type=EntityType.ACCOUNT,
+                name="Taxable",
+                household_id="hh_1",
+            ),
         ],
         relationships=[
             Relationship(
@@ -40,7 +49,9 @@ def test_entity_graph_models() -> None:
         ],
     )
     assert len(graph.entities) == 2
-    assert graph.relationships[0].relationship_type == RelationshipType.AGGREGATES
+    assert (
+        graph.relationships[0].relationship_type == RelationshipType.AGGREGATES
+    )
 
 
 def test_security_master_tax_attributes(sample_security) -> None:

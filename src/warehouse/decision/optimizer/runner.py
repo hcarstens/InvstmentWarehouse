@@ -76,8 +76,10 @@ def persist_optimization(
         resource_type="optimization_run",
         resource_id=run_id,
         household_id=result.household_id,
-        details={"trades": str(len(result.trades)),
-                 "tax_delta": str(result.estimated_tax_delta)},
+        details={
+            "trades": str(len(result.trades)),
+            "tax_delta": str(result.estimated_tax_delta),
+        },
     )
     if queue_approval:
         create_approval_request(session, run_id, result.household_id)
@@ -106,7 +108,8 @@ def run_and_persist_optimizer(
     positions = list_lot_positions(session, household_id=household_id)
     snapshot = input_snapshot_id or f"snap_{uuid4().hex[:8]}"
     result = run_tax_aware_optimizer(
-        household_id, positions, ips, settings=get_settings())
+        household_id, positions, ips, settings=get_settings()
+    )
     return persist_optimization(session, result, input_snapshot_id=snapshot)
 
 
@@ -123,7 +126,8 @@ def list_optimization_runs(
     for run in runs:
         trades = session.scalars(
             select(OptimizationTradeRow).where(
-                OptimizationTradeRow.run_id == run.run_id)
+                OptimizationTradeRow.run_id == run.run_id
+            )
         ).all()
         views.append(
             OptimizationRunView(

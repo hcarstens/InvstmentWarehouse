@@ -26,7 +26,9 @@ def render_risk_build_page(
     build: RiskBuildReport,
     risk: RiskDashboardData | None = None,
 ) -> str:
-    contract_badge = _badge(build.contract_status, _status_kind(build.contract_status))
+    contract_badge = _badge(
+        build.contract_status, _status_kind(build.contract_status)
+    )
     deliverable_rows = "".join(
         f"<tr><td>{_badge(d.slice, 'muted')}</td>"
         f"<td>{html.escape(d.name)}</td>"

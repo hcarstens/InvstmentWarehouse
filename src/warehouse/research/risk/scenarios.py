@@ -37,15 +37,15 @@ def _transform_correlations(
     crisis: bool,
 ) -> tuple[dict[frozenset[AssetClass], Decimal], Decimal]:
     if crisis:
+
         def transform(rho: Decimal) -> Decimal:
             return rho + (CRISIS_CORRELATION - rho) * CRISIS_BLEND
     else:
+
         def transform(rho: Decimal) -> Decimal:
             return rho * BENIGN_CORRELATION_SCALE
 
-    transformed = {
-        pair: transform(rho) for pair, rho in correlations.items()
-    }
+    transformed = {pair: transform(rho) for pair, rho in correlations.items()}
     new_default = transform(default)
     return transformed, new_default
 
@@ -106,11 +106,14 @@ def _build_high_risk(base: RiskAssumptions) -> RiskAssumptions:
     )
     return build_assumptions(
         regime="high_risk",
-        class_annual_vol=_scale_vols(base.class_annual_vol, HIGH_VOL_MULTIPLIER),
+        class_annual_vol=_scale_vols(
+            base.class_annual_vol, HIGH_VOL_MULTIPLIER
+        ),
         class_correlations=correlations,
         default_class_correlation=default,
         es_multipliers=_scale_es_multipliers(
-            base.es_multipliers, HIGH_ES_MULTIPLIER),
+            base.es_multipliers, HIGH_ES_MULTIPLIER
+        ),
     )
 
 
@@ -122,11 +125,14 @@ def _build_low_risk(base: RiskAssumptions) -> RiskAssumptions:
     )
     return build_assumptions(
         regime="low_risk",
-        class_annual_vol=_scale_vols(base.class_annual_vol, LOW_VOL_MULTIPLIER),
+        class_annual_vol=_scale_vols(
+            base.class_annual_vol, LOW_VOL_MULTIPLIER
+        ),
         class_correlations=correlations,
         default_class_correlation=default,
         es_multipliers=_scale_es_multipliers(
-            base.es_multipliers, LOW_ES_MULTIPLIER),
+            base.es_multipliers, LOW_ES_MULTIPLIER
+        ),
     )
 
 

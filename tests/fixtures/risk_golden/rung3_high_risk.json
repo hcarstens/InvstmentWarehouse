@@ -1,0 +1,10 @@
+{
+  "rung": 3,
+  "run_scenarios": "high_risk",
+  "expected": {
+    "annualized_vol": "0.1763003127081877144249471355",
+    "parametric_var": "0.3463866925294995289692416790",
+    "input_fingerprint": "3fd3e069dc40a441",
+    "assumption_regime": "high_risk"
+  }
+}

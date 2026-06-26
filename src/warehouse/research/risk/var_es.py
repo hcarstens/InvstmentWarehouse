@@ -16,7 +16,9 @@ def horizon_scale(annual_vol: Decimal, horizon_years: Decimal) -> Decimal:
     return annual_vol * horizon_years.sqrt()
 
 
-def horizon_expected_return(annual_return: Decimal, horizon_years: Decimal) -> Decimal:
+def horizon_expected_return(
+    annual_return: Decimal, horizon_years: Decimal
+) -> Decimal:
     return annual_return * horizon_years
 
 

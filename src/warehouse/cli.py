@@ -35,7 +35,9 @@ def db_seed() -> None:
 
     with session_scope() as session:
         created = seed_demo_data(session)
-    click.echo("Demo data seeded." if created else "Demo data already present.")
+    click.echo(
+        "Demo data seeded." if created else "Demo data already present."
+    )
 
 
 @db.command("bootstrap")
@@ -66,7 +68,8 @@ def ingest(file: Path, custodian: str, household: str) -> None:
             household_id=household,
         )
     click.echo(
-        f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)")
+        f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)"
+    )
 
 
 @main.command()
@@ -101,7 +104,8 @@ def optimize(household: str) -> None:
     click.echo(f"  Tax delta: {result.estimated_tax_delta}")
     for trade in result.trades:
         click.echo(
-            f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}")
+            f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}"
+        )
 
 
 @main.command()
@@ -120,10 +124,12 @@ def backtest(household: str, start_date: str, end_date: str) -> None:
     start = date.fromisoformat(start_date)
     end = date.fromisoformat(end_date)
     with session_scope() as session:
-        result = run_backtest(session, household,
-                              start_date=start, end_date=end)
+        result = run_backtest(
+            session, household, start_date=start, end_date=end
+        )
     click.echo(
-        f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}")
+        f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}"
+    )
     click.echo(f"  Tax delta vs baseline: {result.tax_delta:.4f}")
     click.echo(f"  Config hash: {result.config_hash}")
 
@@ -146,7 +152,8 @@ def approve_list(household: str) -> None:
         requests = list_approval_requests(session, household_id=household)
     for req in requests:
         click.echo(
-            f"{req.request_id} {req.status} run={req.optimization_run_id}")
+            f"{req.request_id} {req.status} run={req.optimization_run_id}"
+        )
 
 
 @approve.command("decide")
@@ -164,9 +171,11 @@ def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
     status = ApprovalStatus.REJECTED if reject else ApprovalStatus.APPROVED
     with session_scope() as session:
         result = update_approval_status(
-            session, request_id, status=status, reviewer_id=reviewer)
+            session, request_id, status=status, reviewer_id=reviewer
+        )
     click.echo(
-        f"{result.request_id} → {result.status} by {result.reviewer_id}")
+        f"{result.request_id} → {result.status} by {result.reviewer_id}"
+    )
 
 
 @main.group()
@@ -187,12 +196,15 @@ def order_list(household: str) -> None:
         orders = list_staged_orders(session, household_id=household)
     for o in orders:
         click.echo(
-            f"{o.order_id} {o.status} {o.side} {o.quantity} {o.security_id}")
+            f"{o.order_id} {o.status} {o.side} {o.quantity} {o.security_id}"
+        )
 
 
 @order.command()
 @click.argument("order_id")
-@click.option("--submit", is_flag=True, help="Mark submitted (default: filled).")
+@click.option(
+    "--submit", is_flag=True, help="Mark submitted (default: filled)."
+)
 def order_advance(order_id: str, submit: bool) -> None:
     """Advance a staged order to submitted or filled."""
     from warehouse.execution.oms import OrderStatus
@@ -223,15 +235,20 @@ def compare_solvers(household: str) -> None:
         f"  Heuristic: {result.heuristic_trade_count} trades, tax {result.heuristic_tax_delta}"
     )
     click.echo(
-        f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}")
+        f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}"
+    )
 
 
 @main.command("tax-scenario")
 @click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
-@click.option("--name", "scenario_name", default="niit_overlay", show_default=True)
+@click.option(
+    "--name", "scenario_name", default="niit_overlay", show_default=True
+)
 @click.option("--niit/--no-niit", default=True, show_default=True)
 @click.option("--amt", is_flag=True, help="Apply AMT overlay.")
-def tax_scenario(household: str, scenario_name: str, niit: bool, amt: bool) -> None:
+def tax_scenario(
+    household: str, scenario_name: str, niit: bool, amt: bool
+) -> None:
     """Run a tax scenario overlay on household unrealized gains."""
     from warehouse.decision.tax.scenarios import (
         TaxScenarioOverlays,
@@ -256,7 +273,12 @@ def risk() -> None:
 
 @risk.command("evaluate")
 @click.argument("file", type=click.Path(exists=True, path_type=Path))
-@click.option("--horizon", default="5y", show_default=True, help="Investment horizon (e.g. 5y).")
+@click.option(
+    "--horizon",
+    default="5y",
+    show_default=True,
+    help="Investment horizon (e.g. 5y).",
+)
 def risk_evaluate(file: Path, horizon: str) -> None:
     """Evaluate portfolio risk from a JSON request file."""
     import json as json_lib

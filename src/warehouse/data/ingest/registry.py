@@ -24,7 +24,8 @@ def get_parser(custodian_id: str) -> ParserFn:
     if parser is None:
         known = ", ".join(sorted(PARSER_REGISTRY))
         raise ValueError(
-            f"Unknown custodian {custodian_id!r} — known: {known}")
+            f"Unknown custodian {custodian_id!r} — known: {known}"
+        )
     return parser
 
 

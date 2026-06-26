@@ -53,7 +53,9 @@ def list_lot_positions(
         select(LotRow, SecurityRow, EntityRow, MarketPriceRow)
         .join(SecurityRow, LotRow.security_id == SecurityRow.security_id)
         .join(EntityRow, LotRow.account_id == EntityRow.entity_id)
-        .outerjoin(MarketPriceRow, LotRow.security_id == MarketPriceRow.security_id)
+        .outerjoin(
+            MarketPriceRow, LotRow.security_id == MarketPriceRow.security_id
+        )
     )
     if household_id:
         stmt = stmt.where(EntityRow.household_id == household_id)
@@ -62,8 +64,12 @@ def list_lot_positions(
     for lot, security, account, price_row in session.execute(stmt):
         total_cost = lot.quantity * lot.cost_basis_per_share
         market_price = price_row.price if price_row else None
-        market_value = lot.quantity * market_price if market_price is not None else None
-        unrealized = market_value - total_cost if market_value is not None else None
+        market_value = (
+            lot.quantity * market_price if market_price is not None else None
+        )
+        unrealized = (
+            market_value - total_cost if market_value is not None else None
+        )
         views.append(
             LotPositionView(
                 lot_id=lot.lot_id,
@@ -86,7 +92,9 @@ def list_lot_positions(
     return views
 
 
-def household_pnl_summary(session: Session, household_id: str) -> HouseholdPnlSummary:
+def household_pnl_summary(
+    session: Session, household_id: str
+) -> HouseholdPnlSummary:
     positions = list_lot_positions(session, household_id=household_id)
     total_mv = Decimal("0")
     total_cost = Decimal("0")

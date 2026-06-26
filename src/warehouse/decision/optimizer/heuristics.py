@@ -15,7 +15,9 @@ from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
 
 
-def _holding_period_rate(acquisition_date: date, as_of: date, settings: Settings) -> Decimal:
+def _holding_period_rate(
+    acquisition_date: date, as_of: date, settings: Settings
+) -> Decimal:
     days = (as_of - acquisition_date).days
     rate = settings.fed_ltcg_rate if days >= 365 else settings.fed_stcg_rate
     return Decimal(str(rate))
@@ -55,11 +57,16 @@ def run_tax_aware_optimizer(
         if pos.market_value is None:
             continue
         ac = _asset_class_for_position(pos)
-        class_weights[ac] = class_weights.get(
-            ac, Decimal("0")) + pos.market_value / total_mv
+        class_weights[ac] = (
+            class_weights.get(ac, Decimal("0")) + pos.market_value / total_mv
+        )
 
     loss_lots = sorted(
-        [p for p in positions if p.unrealized_gain is not None and p.unrealized_gain < 0],
+        [
+            p
+            for p in positions
+            if p.unrealized_gain is not None and p.unrealized_gain < 0
+        ],
         key=lambda p: p.unrealized_gain or Decimal("0"),
     )
 

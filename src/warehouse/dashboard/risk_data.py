@@ -53,10 +53,13 @@ def load_risk_dashboard(
 ) -> RiskDashboardData:
     settings = get_settings()
     horizon = RiskHorizon.parse(
-        horizon_years or settings.risk_dashboard_horizon_years)
+        horizon_years or settings.risk_dashboard_horizon_years
+    )
     try:
         manifest = build_household_manifest(household_id)
-        overlay = _DEMO_OVERLAY if settings.risk_dashboard_demo_overlay else None
+        overlay = (
+            _DEMO_OVERLAY if settings.risk_dashboard_demo_overlay else None
+        )
         request = RiskRequest(
             horizon=horizon,
             notional_usd=manifest.notional_usd,

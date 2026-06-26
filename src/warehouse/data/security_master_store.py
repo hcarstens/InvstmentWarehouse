@@ -21,7 +21,9 @@ def row_to_security(row: SecurityRow) -> Security:
     )
 
 
-def list_securities(session: Session, query: str | None = None) -> list[Security]:
+def list_securities(
+    session: Session, query: str | None = None
+) -> list[Security]:
     stmt = select(SecurityRow).order_by(SecurityRow.ticker)
     if query:
         pattern = f"%{query.strip()}%"

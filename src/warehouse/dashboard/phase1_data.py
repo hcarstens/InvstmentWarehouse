@@ -20,7 +20,9 @@ class Phase1DashboardData(BaseModel):
     error: str | None = None
 
 
-def load_phase1_dashboard(security_query: str | None = None) -> Phase1DashboardData:
+def load_phase1_dashboard(
+    security_query: str | None = None,
+) -> Phase1DashboardData:
     try:
         bootstrap_database(seed=True)
         with session_scope() as session:

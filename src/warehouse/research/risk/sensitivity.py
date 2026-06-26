@@ -33,7 +33,11 @@ def _native_unit(asset_class: AssetClass) -> RiskUnitType:
 
 def native_sensitivity_value(slot: AllocationSlot) -> Decimal:
     if slot.asset_class == AssetClass.EQUITY:
-        return slot.beta if slot.beta is not None else DEFAULT_BETA[slot.asset_class]
+        return (
+            slot.beta
+            if slot.beta is not None
+            else DEFAULT_BETA[slot.asset_class]
+        )
     if slot.asset_class == AssetClass.FIXED_INCOME:
         if slot.duration_years is not None:
             return slot.duration_years
@@ -49,7 +53,9 @@ def evaluate_sleeve_sensitivity(slot: AllocationSlot) -> SleeveSensitivity:
     measurement = resolve_measurement(slot)
     unit = _native_unit(slot.asset_class)
     value = native_sensitivity_value(slot)
-    method = "observed" if measurement == MeasurementMode.MEASURABLE else "fermi"
+    method = (
+        "observed" if measurement == MeasurementMode.MEASURABLE else "fermi"
+    )
     return SleeveSensitivity(
         asset_class=slot.asset_class.value,
         weight=slot.weight,
@@ -58,12 +64,18 @@ def evaluate_sleeve_sensitivity(slot: AllocationSlot) -> SleeveSensitivity:
             value=value,
             unit_type=unit,
             method=method,
-            mark_source="position" if slot.beta or slot.duration_years else "model_prior",
-            approximation=None if measurement == MeasurementMode.MEASURABLE else "fermi_prior",
+            mark_source="position"
+            if slot.beta or slot.duration_years
+            else "model_prior",
+            approximation=None
+            if measurement == MeasurementMode.MEASURABLE
+            else "fermi_prior",
         ),
         measurement=measurement,
     )
 
 
-def evaluate_sensitivities(slots: list[AllocationSlot]) -> list[SleeveSensitivity]:
+def evaluate_sensitivities(
+    slots: list[AllocationSlot],
+) -> list[SleeveSensitivity]:
     return [evaluate_sleeve_sensitivity(slot) for slot in slots]

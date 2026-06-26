@@ -43,7 +43,9 @@ def test_build_household_manifest_matches_evaluate_risk_dashboard() -> None:
         run_scenarios=ScenarioSet.NONE,
     )
     direct = evaluate_risk(request, manifest.portfolio)
-    dashboard = load_risk_dashboard(DEMO_HOUSEHOLD_ID, horizon_years=horizon.years)
+    dashboard = load_risk_dashboard(
+        DEMO_HOUSEHOLD_ID, horizon_years=horizon.years
+    )
     assert dashboard.error is None
     assert dashboard.report is not None
     assert dashboard.source == "ledger"
@@ -79,10 +81,7 @@ def test_http_post_synthetic_rung2_matches_in_process() -> None:
         server.shutdown()
         thread.join(timeout=2)
 
-    assert (
-        via_http["input_fingerprint"]
-        == in_process["input_fingerprint"]
-    )
+    assert via_http["input_fingerprint"] == in_process["input_fingerprint"]
     assert (
         via_http["level_1_portfolio"]["annualized_volatility"]["value"]
         == in_process["level_1_portfolio"]["annualized_volatility"]["value"]

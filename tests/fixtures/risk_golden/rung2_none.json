@@ -4,7 +4,7 @@
   "expected": {
     "annualized_vol": "0.09209017319996743279010359674",
     "parametric_var": "0.0687080735441772196445987814",
-    "input_fingerprint": "a071e39c7b13f269",
+    "input_fingerprint": "fbff15976389edcf",
     "assumption_regime": "base"
   }
 }

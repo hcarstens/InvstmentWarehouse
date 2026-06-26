@@ -38,11 +38,15 @@ def load_entity_graph(
                 )
             )
         ).all()
-        entity_ids = core_ids | {r.source_id for r in rel_rows} | {
-            r.target_id for r in rel_rows}
+        entity_ids = (
+            core_ids
+            | {r.source_id for r in rel_rows}
+            | {r.target_id for r in rel_rows}
+        )
         entity_rows = session.scalars(
-            select(EntityRow).where(EntityRow.entity_id.in_(
-                entity_ids)).order_by(EntityRow.entity_type)
+            select(EntityRow)
+            .where(EntityRow.entity_id.in_(entity_ids))
+            .order_by(EntityRow.entity_type)
         ).all()
         rel_rows = session.scalars(
             select(EntityRelationshipRow).where(
@@ -52,7 +56,8 @@ def load_entity_graph(
         ).all()
     else:
         entity_rows = session.scalars(
-            select(EntityRow).order_by(EntityRow.entity_type)).all()
+            select(EntityRow).order_by(EntityRow.entity_type)
+        ).all()
         rel_rows = session.scalars(select(EntityRelationshipRow)).all()
 
     return EntityGraph(

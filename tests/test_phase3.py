@@ -100,13 +100,19 @@ def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
 
     as_of = date(2026, 6, 26)
     loss = _lot(
-        "loss", security_id="vti", group="us_equity_broad",
-        unrealized=Decimal("-100"), acquired=date(2024, 1, 1),
+        "loss",
+        security_id="vti",
+        group="us_equity_broad",
+        unrealized=Decimal("-100"),
+        acquired=date(2024, 1, 1),
     )
     # A substantially-identical replacement (same substitute group) bought 5 days ago.
     replacement = _lot(
-        "repl", security_id="itot", group="us_equity_broad",
-        unrealized=Decimal("20"), acquired=date(2026, 6, 21),
+        "repl",
+        security_id="itot",
+        group="us_equity_broad",
+        unrealized=Decimal("20"),
+        acquired=date(2026, 6, 21),
     )
     positions = [loss, replacement]
 
@@ -118,8 +124,9 @@ def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
         DEMO_HOUSEHOLD_ID, positions, ips, as_of=as_of
     )
     assert not any(t.lot_id == "loss" for t in result.trades)
-    assert any(b.startswith("wash_sale_30d")
-               for b in result.binding_constraints)
+    assert any(
+        b.startswith("wash_sale_30d") for b in result.binding_constraints
+    )
 
 
 def load_ips_for_test() -> InvestmentPolicyStatement:
@@ -135,7 +142,8 @@ def test_optimizer_persist_and_approval() -> None:
     with session_scope() as session:
         view = run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
         approvals = list_approval_requests(
-            session, household_id=DEMO_HOUSEHOLD_ID)
+            session, household_id=DEMO_HOUSEHOLD_ID
+        )
     assert view.run_id.startswith("opt_")
     assert approvals
     matching = [a for a in approvals if a.optimization_run_id == view.run_id]
@@ -148,7 +156,8 @@ def test_approval_workflow() -> None:
     with session_scope() as session:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
         pending = list_approval_requests(
-            session, household_id=DEMO_HOUSEHOLD_ID)[0]
+            session, household_id=DEMO_HOUSEHOLD_ID
+        )[0]
         updated = update_approval_status(
             session,
             pending.request_id,

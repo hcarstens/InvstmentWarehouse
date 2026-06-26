@@ -38,12 +38,18 @@ CLASS_CORRELATIONS: dict[frozenset[AssetClass], Decimal] = {
     frozenset({AssetClass.EQUITY, AssetClass.COMMODITIES}): Decimal("0.35"),
     frozenset({AssetClass.EQUITY, AssetClass.FX}): Decimal("-0.15"),
     frozenset({AssetClass.EQUITY, AssetClass.ALTERNATIVES}): Decimal("0.55"),
-    frozenset({AssetClass.FIXED_INCOME, AssetClass.COMMODITIES}): Decimal("0.10"),
+    frozenset({AssetClass.FIXED_INCOME, AssetClass.COMMODITIES}): Decimal(
+        "0.10"
+    ),
     frozenset({AssetClass.FIXED_INCOME, AssetClass.FX}): Decimal("0.20"),
-    frozenset({AssetClass.FIXED_INCOME, AssetClass.ALTERNATIVES}): Decimal("0.30"),
+    frozenset({AssetClass.FIXED_INCOME, AssetClass.ALTERNATIVES}): Decimal(
+        "0.30"
+    ),
     frozenset({AssetClass.FIXED_INCOME, AssetClass.CASH}): Decimal("0.05"),
     frozenset({AssetClass.COMMODITIES, AssetClass.FX}): Decimal("0.15"),
-    frozenset({AssetClass.COMMODITIES, AssetClass.ALTERNATIVES}): Decimal("0.40"),
+    frozenset({AssetClass.COMMODITIES, AssetClass.ALTERNATIVES}): Decimal(
+        "0.40"
+    ),
     frozenset({AssetClass.FX, AssetClass.ALTERNATIVES}): Decimal("0.25"),
     frozenset({AssetClass.EQUITY, AssetClass.CASH}): Decimal("0.00"),
     frozenset({AssetClass.COMMODITIES, AssetClass.CASH}): Decimal("0.00"),

@@ -44,7 +44,9 @@ class DailyRefreshResult(BaseModel):
     steps: list[RefreshStepView]
 
 
-def _start_step(session: Session, refresh_run_id: str, step_name: str) -> DailyRefreshStepRow:
+def _start_step(
+    session: Session, refresh_run_id: str, step_name: str
+) -> DailyRefreshStepRow:
     step = DailyRefreshStepRow(
         refresh_run_id=refresh_run_id,
         step_name=step_name,
@@ -105,7 +107,9 @@ def run_daily_refresh(
         )
         ingest_run_id = ingest.run_id
         _finish_step(
-            step, detail=f"{ingest.rows_processed} rows from {ingest.file_name}")
+            step,
+            detail=f"{ingest.rows_processed} rows from {ingest.file_name}",
+        )
         steps_out.append(
             RefreshStepView(
                 step_name=step.step_name,
@@ -176,7 +180,9 @@ def run_daily_refresh(
             )
         )
 
-        refresh.status = "success" if open_breaks == 0 else "completed_with_breaks"
+        refresh.status = (
+            "success" if open_breaks == 0 else "completed_with_breaks"
+        )
         refresh.finished_at = datetime.now(UTC)
         write_audit(
             session,
@@ -185,8 +191,10 @@ def run_daily_refresh(
             resource_type="daily_refresh_run",
             resource_id=run_id,
             household_id=household_id,
-            details={"ingest_run_id": ingest_run_id or "",
-                     "breaks": str(open_breaks)},
+            details={
+                "ingest_run_id": ingest_run_id or "",
+                "breaks": str(open_breaks),
+            },
         )
     except Exception as err:
         refresh.status = "error"
@@ -213,7 +221,9 @@ def run_daily_refresh(
     )
 
 
-def latest_refresh_steps(session: Session, household_id: str) -> list[RefreshStepView]:
+def latest_refresh_steps(
+    session: Session, household_id: str
+) -> list[RefreshStepView]:
     run = session.scalar(
         select(DailyRefreshRunRow)
         .where(DailyRefreshRunRow.household_id == household_id)

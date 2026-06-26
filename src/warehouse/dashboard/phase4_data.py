@@ -68,10 +68,14 @@ def _ensure_demo_phase4() -> None:
                 scenario_name="niit_overlay",
                 overlays=TaxScenarioOverlays(apply_niit=True),
             )
-        if not list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID, limit=1):
+        if not list_staged_orders(
+            session, household_id=DEMO_HOUSEHOLD_ID, limit=1
+        ):
             pending = [
                 a
-                for a in list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+                for a in list_approval_requests(
+                    session, household_id=DEMO_HOUSEHOLD_ID
+                )
                 if a.status == ApprovalStatus.PENDING.value
             ]
             if pending:
@@ -82,7 +86,8 @@ def _ensure_demo_phase4() -> None:
                     reviewer_id="advisor:demo",
                 )
         fidelity_runs = list_ingest_runs_for_custodian(
-            session, "custodian_fidelity", limit=1)
+            session, "custodian_fidelity", limit=1
+        )
         if not fidelity_runs:
             run_custodian_ingest(
                 session,
@@ -92,7 +97,9 @@ def _ensure_demo_phase4() -> None:
             )
 
 
-def load_phase4_dashboard(custodian_id: str | None = None) -> Phase4DashboardData:
+def load_phase4_dashboard(
+    custodian_id: str | None = None,
+) -> Phase4DashboardData:
     selected = custodian_id or DEFAULT_CUSTODIAN
     try:
         bootstrap_database(seed=True)
@@ -101,7 +108,8 @@ def load_phase4_dashboard(custodian_id: str | None = None) -> Phase4DashboardDat
         with session_scope() as session:
             custodians = list_custodians(session)
             orders = list_staged_orders(
-                session, household_id=DEMO_HOUSEHOLD_ID)
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
             comparisons = list_solver_comparisons(session, DEMO_HOUSEHOLD_ID)
             positions = list_lot_positions_for_custodian(
                 session,

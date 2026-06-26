@@ -40,8 +40,9 @@ PHASES: list[Phase] = [
         status="complete",
         panels=[
             DashboardPanel(name="Entity graph view", phase=1, status="live"),
-            DashboardPanel(name="Security master browser",
-                           phase=1, status="live"),
+            DashboardPanel(
+                name="Security master browser", phase=1, status="live"
+            ),
             DashboardPanel(name="Schema status", phase=1, status="live"),
         ],
     ),
@@ -55,10 +56,12 @@ PHASES: list[Phase] = [
             DashboardPanel(name="Positions & lots", phase=2, status="live"),
             DashboardPanel(name="Risk manifest", phase=2, status="live"),
             DashboardPanel(name="Risk build tracker", phase=2, status="live"),
-            DashboardPanel(name="Reconciliation queue",
-                           phase=2, status="live"),
-            DashboardPanel(name="Daily refresh timeline",
-                           phase=2, status="live"),
+            DashboardPanel(
+                name="Reconciliation queue", phase=2, status="live"
+            ),
+            DashboardPanel(
+                name="Daily refresh timeline", phase=2, status="live"
+            ),
             DashboardPanel(name="Audit log stream", phase=2, status="live"),
         ],
     ),
@@ -72,8 +75,9 @@ PHASES: list[Phase] = [
             DashboardPanel(name="Optimizer proposals", phase=3, status="live"),
             DashboardPanel(name="Approval queue", phase=3, status="live"),
             DashboardPanel(name="Backtest results", phase=3, status="live"),
-            DashboardPanel(name="Constraint binding report",
-                           phase=3, status="live"),
+            DashboardPanel(
+                name="Constraint binding report", phase=3, status="live"
+            ),
         ],
     ),
     Phase(
@@ -97,12 +101,15 @@ PHASES: list[Phase] = [
         dashboard_summary="Postgres ledger, Redis queue, object store, RLS — prod parity",
         status="planned",
         panels=[
-            DashboardPanel(name="Postgres migration status",
-                           phase=5, status="planned"),
-            DashboardPanel(name="Job queue monitor",
-                           phase=5, status="planned"),
-            DashboardPanel(name="Object store health",
-                           phase=5, status="planned"),
+            DashboardPanel(
+                name="Postgres migration status", phase=5, status="planned"
+            ),
+            DashboardPanel(
+                name="Job queue monitor", phase=5, status="planned"
+            ),
+            DashboardPanel(
+                name="Object store health", phase=5, status="planned"
+            ),
         ],
     ),
 ]

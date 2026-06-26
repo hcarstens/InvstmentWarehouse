@@ -31,7 +31,9 @@ def _scenario_regimes(run_scenarios: ScenarioSet) -> tuple[str, ...]:
     return ()
 
 
-def _resolve_assumptions(assumptions: RiskAssumptions | None) -> RiskAssumptions:
+def _resolve_assumptions(
+    assumptions: RiskAssumptions | None,
+) -> RiskAssumptions:
     if assumptions is None:
         return assumptions_for("base")
     if assumptions.regime not in ("base", "high_risk", "low_risk"):

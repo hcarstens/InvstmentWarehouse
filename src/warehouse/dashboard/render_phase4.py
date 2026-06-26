@@ -34,7 +34,7 @@ def render_phase4_sections(phase4: Phase4DashboardData) -> str:
 
     custodian_options = "".join(
         f'<option value="{html.escape(c.custodian_id)}"'
-        f'{" selected" if c.custodian_id == phase4.selected_custodian_id else ""}>'
+        f"{' selected' if c.custodian_id == phase4.selected_custodian_id else ''}>"
         f"{html.escape(c.name)}</option>"
         for c in phase4.custodians
     )

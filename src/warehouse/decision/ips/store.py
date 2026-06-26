@@ -24,7 +24,9 @@ def row_to_ips(row: IpsPolicyRow) -> InvestmentPolicyStatement:
     )
 
 
-def load_ips(session: Session, household_id: str) -> InvestmentPolicyStatement | None:
+def load_ips(
+    session: Session, household_id: str
+) -> InvestmentPolicyStatement | None:
     row = session.scalar(
         select(IpsPolicyRow)
         .where(IpsPolicyRow.household_id == household_id)
@@ -42,7 +44,8 @@ def save_ips(session: Session, ips: InvestmentPolicyStatement) -> None:
             version=ips.version,
             effective_date=ips.effective_date,
             allocation_json=json.dumps(
-                [t.model_dump(mode="json") for t in ips.allocation_targets]),
+                [t.model_dump(mode="json") for t in ips.allocation_targets]
+            ),
             restricted_json=json.dumps(ips.restricted_securities),
         )
     )

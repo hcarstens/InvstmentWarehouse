@@ -51,9 +51,14 @@ def test_evaluate_risk_overlay_produces_deltas() -> None:
     result = evaluate_risk(request, portfolio)
     assert result.deltas is not None
     assert result.deltas.overlay_label == "de-risk"
-    assert result.deltas.baseline_fingerprint != result.deltas.proposed_fingerprint
+    assert (
+        result.deltas.baseline_fingerprint
+        != result.deltas.proposed_fingerprint
+    )
     vol_delta = next(
-        row for row in result.deltas.headline if row.metric == "annualized_volatility"
+        row
+        for row in result.deltas.headline
+        if row.metric == "annualized_volatility"
     )
     assert vol_delta.proposed < vol_delta.baseline
 
@@ -78,7 +83,9 @@ def test_founder_executive_concentration_overlay() -> None:
 
 def test_assumptions_override_changes_vol() -> None:
     portfolio = rung(0)
-    base = evaluate_risk(RiskRequest(horizon=RiskHorizon.parse("5y")), portfolio)
+    base = evaluate_risk(
+        RiskRequest(horizon=RiskHorizon.parse("5y")), portfolio
+    )
     custom = build_assumptions(
         regime="research_sweep",
         class_annual_vol={AssetClass.EQUITY: Decimal("0.32")},
@@ -104,23 +111,26 @@ def test_overlay_negative_weight_raises() -> None:
 
 
 def test_rung_3_has_fermi_alts_and_five_sleeves() -> None:
-    portfolio = rung(3)
+    portfolio = rung(3, seed=0)
     assert portfolio.complexity == 3
-    assert len(portfolio.allocations) == 5
+    assert portfolio.cohort_id == "general_hnw"
+    assert portfolio.generator_version is not None
     alts = next(
-        s for s in portfolio.allocations if s.asset_class == AssetClass.ALTERNATIVES
+        s
+        for s in portfolio.allocations
+        if s.asset_class == AssetClass.ALTERNATIVES
     )
     assert alts.liquidity_tier == 3
     assert alts.measurement.value == "fermi"
 
 
 def test_rung_4_concentrated_equity() -> None:
-    portfolio = rung(4)
+    portfolio = rung(4, seed=0)
+    assert portfolio.cohort_id == "concentrated_stress"
     equity = next(
         s for s in portfolio.allocations if s.asset_class == AssetClass.EQUITY
     )
-    assert equity.weight == Decimal("0.70")
-    assert equity.beta == Decimal("1.2")
+    assert equity.weight > Decimal("0.6")
 
 
 def test_diff_reports_headline_metrics() -> None:

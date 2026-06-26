@@ -42,9 +42,7 @@ def test_record_risk_failure_logs_without_notify_when_disabled(
 
 
 def test_evaluate_risk_json_records_invalid_json_failure() -> None:
-    with patch(
-        "warehouse.research.risk.api.record_risk_failure"
-    ) as record:
+    with patch("warehouse.research.risk.api.record_risk_failure") as record:
         status, body = evaluate_risk_json("{not json")
         assert status == 400
         assert "Invalid JSON" in json.loads(body)["error"]

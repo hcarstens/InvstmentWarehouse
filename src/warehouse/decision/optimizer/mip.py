@@ -46,8 +46,9 @@ def run_mip_optimizer(
         if pos.market_value is None:
             continue
         ac = _asset_class_for_position(pos)
-        class_weights[ac] = class_weights.get(
-            ac, Decimal("0")) + pos.market_value / total_mv
+        class_weights[ac] = (
+            class_weights.get(ac, Decimal("0")) + pos.market_value / total_mv
+        )
 
     candidates: list[tuple[Decimal, LotPositionView]] = []
     for lot in positions:
@@ -63,8 +64,11 @@ def run_mip_optimizer(
             continue
         rate = _holding_period_rate(lot.acquisition_date, today, cfg)
         benefit = abs(lot.unrealized_gain * rate)
-        score = benefit / \
-            lot.market_value if lot.market_value > 0 else Decimal("0")
+        score = (
+            benefit / lot.market_value
+            if lot.market_value > 0
+            else Decimal("0")
+        )
         candidates.append((score, lot))
 
     candidates.sort(key=lambda item: item[0], reverse=True)

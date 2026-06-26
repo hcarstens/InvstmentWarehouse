@@ -75,27 +75,37 @@ def evaluate_portfolio_risk(
 
     by_class = evaluate_class_contributions(states, cov, priors)
     by_duration = evaluate_duration_risk(
-        portfolio.allocations, horizon, by_class)
+        portfolio.allocations, horizon, by_class
+    )
 
     measurable_weight = sum(
-        (c.weight for c in by_class if c.measurement == MeasurementMode.MEASURABLE),
+        (
+            c.weight
+            for c in by_class
+            if c.measurement == MeasurementMode.MEASURABLE
+        ),
         Decimal("0"),
     )
     fermi_weight = Decimal("1") - measurable_weight
     fermi_risk = sum(
-        (c.pct_variance_contribution for c in by_class if c.measurement ==
-         MeasurementMode.FERMI),
+        (
+            c.pct_variance_contribution
+            for c in by_class
+            if c.measurement == MeasurementMode.FERMI
+        ),
         Decimal("0"),
     )
     fermi_share = fermi_risk if fermi_risk <= Decimal("1") else Decimal("1")
 
     fermi_band = Decimal(str(priors.fermi_confidence_width))
-    confidence_low = max(horizon_vol * (Decimal("1") -
-                         fermi_band * fermi_share), Decimal("0"))
+    confidence_low = max(
+        horizon_vol * (Decimal("1") - fermi_band * fermi_share), Decimal("0")
+    )
     confidence_high = horizon_vol * (Decimal("1") + fermi_band * fermi_share)
 
-    dollar_var = dollar_tail(
-        var_metric, notional_usd) if notional_usd else None
+    dollar_var = (
+        dollar_tail(var_metric, notional_usd) if notional_usd else None
+    )
     dollar_es = dollar_tail(es_metric, notional_usd) if notional_usd else None
 
     level_1 = Level1PortfolioRisk(
@@ -162,9 +172,11 @@ def evaluate_portfolio_risk(
         ),
         level_1_portfolio=level_1,
         level_2_contributions=Level2Contributions(
-            by_class=by_class, by_duration=by_duration),
+            by_class=by_class, by_duration=by_duration
+        ),
         level_3_sensitivities=Level3Sensitivities(
-            by_sleeve=evaluate_sensitivities(portfolio.allocations)),
+            by_sleeve=evaluate_sensitivities(portfolio.allocations)
+        ),
         level_4_stress=evaluate_stress(
             portfolio.allocations,
             notional_usd=notional_usd,
