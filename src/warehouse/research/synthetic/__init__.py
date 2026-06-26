@@ -1,5 +1,10 @@
 """Compositional HNW synthetic portfolio generator (Shape B → Shape A)."""
 
+from warehouse.research.synthetic.asset_test_suite import (
+    AssetTestSuiteResult,
+    load_asset_test_summary,
+    run_asset_test_suite,
+)
 from warehouse.research.synthetic.cohort import (
     COHORT_IDS,
     GENERATOR_VERSION,
@@ -35,6 +40,7 @@ __all__ = [
     "COHORT_IDS",
     "GENERATOR_VERSION",
     "HNW_ASSET_TYPES",
+    "AssetTestSuiteResult",
     "HarnessCell",
     "HouseholdFixture",
     "HnwAssetType",
@@ -47,7 +53,9 @@ __all__ = [
     "emit_hnw_fixture",
     "hnw_asset_spec",
     "iter_hnw_combinations",
+    "load_asset_test_summary",
     "project_to_asset_portfolio",
+    "run_asset_test_suite",
     "run_combination_matrix",
     "run_harness_cell",
     "summarize_matrix",

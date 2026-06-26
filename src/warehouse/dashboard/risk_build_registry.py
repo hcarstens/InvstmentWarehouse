@@ -108,6 +108,24 @@ RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = [
         doc_href="docs/research/hnw_portfolios.md#rung-ladder",
         note="founder_executive, concentrated_stress",
     ),
+    BuildDeliverable(
+        id="asset-test-phase-a",
+        track="hnw_synthetic",
+        slice="v1.2",
+        name="Risk asset test suite — Phase A (singles)",
+        status="shipped",
+        doc_href="docs/risk_api_implementation_plan.md#12-hnw-leaf-type-combinatorial-harness-v12--shipped",
+        note="Walk each HNW leaf type → evaluate_risk → write report JSON",
+    ),
+    BuildDeliverable(
+        id="asset-test-phase-b",
+        track="hnw_synthetic",
+        slice="v1.2",
+        name="Risk asset test suite — Phase B (combinations)",
+        status="shipped",
+        doc_href="docs/risk_api_implementation_plan.md#12-hnw-leaf-type-combinatorial-harness-v12--shipped",
+        note="Walk 2+ leaf combos → evaluate_risk → write report JSON",
+    ),
 ]
 
 SYNTHETIC_RUNGS: list[BuildRung] = [

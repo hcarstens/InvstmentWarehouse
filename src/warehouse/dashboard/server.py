@@ -6,6 +6,7 @@ import html
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 from warehouse.config import repo_root
@@ -377,6 +378,36 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ).encode()
             has_error = any(c.status == "error" for c in checks)
             self.send_response(503 if has_error else 200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        elif path_only == "/api/risk/asset-tests":
+            from warehouse.research.synthetic.asset_test_suite import (
+                AssetTestPhase,
+                run_asset_test_suite,
+            )
+
+            parsed = urlparse(self.path)
+            qs = parse_qs(parsed.query)
+            phase_raw = (qs.get("phase") or ["a"])[0].strip().upper()
+            if phase_raw not in ("A", "B"):
+                body = json.dumps({"error": "phase must be a or b"}).encode()
+                self.send_response(400)
+            else:
+                phase = cast(AssetTestPhase, phase_raw)
+                max_size_raw = qs.get("max_size")
+                phase_b_max_size = (
+                    int(max_size_raw[0])
+                    if max_size_raw and phase == "B"
+                    else None
+                )
+                suite = run_asset_test_suite(
+                    phase,
+                    phase_b_max_size=phase_b_max_size,
+                )
+                body = suite.model_dump_json(indent=2).encode()
+                self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()

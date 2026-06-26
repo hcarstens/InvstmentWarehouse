@@ -7,6 +7,61 @@ import html
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.risk_build_data import RiskBuildReport
 from warehouse.dashboard.risk_data import RiskDashboardData
+from warehouse.research.synthetic.asset_test_suite import (
+    AssetTestSuiteResult,
+    load_asset_test_summary,
+)
+
+
+def _asset_test_summary_rows(suite: AssetTestSuiteResult | None) -> str:
+    if suite is None:
+        return "<tr><td colspan='4'><em>No run yet — use API link below</em></td></tr>"
+    rows = "".join(
+        f"<tr><td>{html.escape(', '.join(c.types))}</td>"
+        f"<td>{html.escape(c.status)}</td>"
+        f"<td><code>{html.escape(c.fingerprint or '—')}</code></td>"
+        f"<td><code>{html.escape(c.report_path or '—')}</code></td></tr>"
+        for c in suite.cells[:8]
+    )
+    extra = ""
+    if len(suite.cells) > 8:
+        extra = (
+            f"<tr><td colspan='4'><em>… {len(suite.cells) - 8} more cells "
+            f"(see API JSON)</em></td></tr>"
+        )
+    return rows + extra
+
+
+def _asset_test_stats(suite: AssetTestSuiteResult | None, phase: str) -> str:
+    if suite is None:
+        return f"Phase {phase}: not run"
+    parts = ", ".join(f"{k}={v}" for k, v in sorted(suite.summary.items()))
+    return (
+        f"Phase {phase}: {suite.cells_run} cells · {parts} · "
+        f"<code>{html.escape(suite.reports_dir)}</code>"
+    )
+
+
+def render_asset_test_section() -> str:
+    phase_a = load_asset_test_summary("A")
+    phase_b = load_asset_test_summary("B")
+    return f"""
+  <h2>Risk asset test suite</h2>
+  <p>Walk HNW leaf types through <code>evaluate_risk</code>; per-cell JSON under
+  <code>runs/research/risk_asset_tests/</code>.</p>
+  <p>{_asset_test_stats(phase_a, "A")}</p>
+  <p>{_asset_test_stats(phase_b, "B")}</p>
+  <p>
+    <a href="/api/risk/asset-tests?phase=a">Run Phase A (JSON)</a> ·
+    <a href="/api/risk/asset-tests?phase=b&amp;max_size=2">Run Phase B pairs (JSON)</a> ·
+    <a href="/api/risk/asset-tests?phase=b">Run Phase B full (JSON)</a>
+  </p>
+  <h3>Phase A — last run (sample)</h3>
+  <table>
+    <tr><th>Types</th><th>Status</th><th>Fingerprint</th><th>Report</th></tr>
+    {_asset_test_summary_rows(phase_a)}
+  </table>
+"""
 
 
 def _badge(text: str, kind: str) -> str:
@@ -115,6 +170,7 @@ def render_risk_build_page(
   </table>
   <h2>Docs</h2>
   <ul>{doc_rows}</ul>
+  {render_asset_test_section()}
   <h2>Live risk manifest (demo household)</h2>
   {risk_section}
   <footer><p>Stakeholder view — <code>warehouse serve --risk</code> opens this page.

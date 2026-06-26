@@ -97,11 +97,24 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
         )
     )
 
+    asset_suite_ok = _file_exists(
+        "src/warehouse/research/synthetic/asset_test_suite.py"
+    )
+    checks.append(
+        BuildSmokeCheck(
+            name="risk asset test suite",
+            ok=asset_suite_ok,
+            detail="Phase A/B — leaf types → evaluate_risk → report JSON",
+        )
+    )
+
     return checks
 
 
 def _contract_status(deliverables: list[BuildDeliverable]) -> str:
     by_id = {d.id: d.status for d in deliverables}
+    if by_id.get("asset-test-phase-b") == "shipped":
+        return "v1.2"
     if by_id.get("hnw-rung4") == "shipped":
         return "v1.1"
     if by_id.get("v1-overlays") == "shipped":
