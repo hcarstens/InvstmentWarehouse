@@ -8,11 +8,19 @@ from warehouse.research.risk.models import (
     AssetPortfolio,
     PortfolioRiskReport,
     RiskHorizon,
+    RiskRequest,
+    RiskResult,
+    ScenarioSet,
 )
+from warehouse.research.risk.service import evaluate_risk
 
 __all__ = [
     "AssetPortfolio",
     "PortfolioRiskReport",
     "RiskHorizon",
+    "RiskRequest",
+    "RiskResult",
+    "ScenarioSet",
     "evaluate_portfolio_risk",
+    "evaluate_risk",
 ]

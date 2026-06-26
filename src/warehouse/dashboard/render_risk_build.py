@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import html
 
+from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.risk_build_data import RiskBuildReport
 from warehouse.dashboard.risk_data import RiskDashboardData
-from warehouse.dashboard.render_risk import render_risk_section
 
 
 def _badge(text: str, kind: str) -> str:

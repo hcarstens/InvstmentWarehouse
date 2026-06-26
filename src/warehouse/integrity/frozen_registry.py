@@ -12,11 +12,22 @@ from pydantic import BaseModel, ValidationError
 from warehouse.config import Settings
 from warehouse.models.events import Event, EventType
 from warehouse.research.backtest import BacktestResult
+from warehouse.research.risk.engine import evaluate_portfolio_risk
+from warehouse.research.risk.models import (
+    AllocationSlot,
+    AssetClass,
+    AssetPortfolio,
+    RiskHorizon,
+    RiskRequest,
+    RiskResult,
+    ScenarioSet,
+)
 
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
     BacktestResult,
     Event,
+    RiskResult,
     Settings,
 )
 
@@ -42,6 +53,21 @@ def _sample_instance(cls: type[Any]) -> Any:
         )
     if cls is Settings:
         return Settings()
+    if cls is RiskResult:
+        portfolio = AssetPortfolio(
+            allocations=[
+                AllocationSlot(
+                    asset_class=AssetClass.EQUITY,
+                    weight=Decimal("1"),
+                )
+            ],
+        )
+        request = RiskRequest(
+            horizon=RiskHorizon(years=Decimal("5")),
+            run_scenarios=ScenarioSet.NONE,
+        )
+        report = evaluate_portfolio_risk(portfolio, request.horizon)
+        return RiskResult(report=report, scenarios={}, deltas=None)
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -52,6 +78,8 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "event_id"
     if isinstance(instance, Settings):
         return "app_env"
+    if isinstance(instance, RiskResult):
+        return "deltas"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

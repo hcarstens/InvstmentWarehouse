@@ -6,12 +6,14 @@ from warehouse.dashboard.server import render_risk_build_html
 
 def test_risk_build_report_has_deliverables() -> None:
     report = load_risk_build_report()
-    assert report.contract_status == "proposed"
+    assert report.contract_status == "v0a"
     assert len(report.deliverables) >= 7
     assert len(report.rungs) == 5
-    assert report.shipped_count == 0
+    assert report.shipped_count == 1
     assert any(d.id == "v0a-envelope" for d in report.deliverables)
     assert any(d.track == "hnw_synthetic" for d in report.deliverables)
+    v0a = next(d for d in report.deliverables if d.id == "v0a-envelope")
+    assert v0a.status == "shipped"
 
 
 def test_render_risk_build_html_sections() -> None:
@@ -22,4 +24,6 @@ def test_render_risk_build_html_sections() -> None:
     assert "Smoke checks" in html
     assert "v0a-envelope" not in html
     assert "evaluate_risk service" in html
+    service_check = next(c for c in load_risk_build_report().smoke_checks if c.name == "evaluate_risk service")
+    assert service_check.ok
     assert "Level 1" in html

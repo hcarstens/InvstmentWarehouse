@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MeasurementMode(StrEnum):
@@ -48,6 +48,8 @@ class AllocationSlot(BaseModel):
 class AssetPortfolio(BaseModel):
     portfolio_id: str | None = None
     allocations: list[AllocationSlot] = Field(min_length=1)
+    source: str = "synthetic"
+    complexity: int | None = None
 
     @field_validator("allocations")
     @classmethod
@@ -70,6 +72,27 @@ class RiskHorizon(BaseModel):
                 return cls(years=Decimal(text[:-1]))
             return cls(years=Decimal(text))
         return cls(years=Decimal(str(value)))
+
+
+class ScenarioSet(StrEnum):
+    NONE = "none"
+    HIGH_RISK = "high_risk"
+    LOW_RISK = "low_risk"
+    ALL = "all"
+
+
+class RiskRequest(BaseModel):
+    horizon: RiskHorizon
+    notional_usd: Decimal | None = None
+    run_scenarios: ScenarioSet = ScenarioSet.NONE
+
+
+class RiskResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    report: PortfolioRiskReport
+    scenarios: dict[str, PortfolioRiskReport] = Field(default_factory=dict)
+    deltas: None = None
 
 
 class RiskMetric(BaseModel):

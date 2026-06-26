@@ -1,6 +1,6 @@
 # Risk API — Implementation Plan (HNW-informed)
 
-**Status:** plan (not started)
+**Status:** v0a shipped (v0b+ not started)
 **Date:** 2026-06-26
 **Inputs:** [`risk_api_contract.md`](risk_api_contract.md) (design),
 [`hnw_portfolios.md`](research/hnw_portfolios.md) (synthetic corpus + axioms),
@@ -251,4 +251,4 @@ track progress at `warehouse serve --risk` → http://127.0.0.1:8765/risk or
 
 | Date | Note |
 | --- | --- |
-| 2026-06-26 | Initial plan: HNW Shape A/B split, rung ownership, SDG acceptance mapped to v0a/b/c. |
+| 2026-06-26 | v0a shipped: `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk`, frozen registry, `tests/test_risk_service.py`. |

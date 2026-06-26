@@ -32,7 +32,7 @@ RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = [
         track="risk_contract",
         slice="v0a",
         name="RiskRequest + RiskResult + evaluate_risk",
-        status="planned",
+        status="shipped",
         doc_href="docs/risk_api_implementation_plan.md#v0a--envelope-1-pr",
         note="Wrap evaluate_portfolio_risk; freeze RiskResult",
     ),
