@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from alembic import context
 from warehouse.config import get_settings
-from warehouse.infra.db.base import Base
 from warehouse.infra.db import models  # noqa: F401 — register ORM metadata
+from warehouse.infra.db.base import Base
 
 config = context.config
 if config.config_file_name is not None:

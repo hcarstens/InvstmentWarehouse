@@ -56,28 +56,29 @@ def run_backtest(
     cfg = settings or get_settings()
     purge_days = cfg.walk_forward_purge_days
     if (end_date - start_date).days < purge_days:
-        raise WalkForwardError(
-            f"Backtest window {start_date} to {end_date} shorter than purge {purge_days} days"
-        )
+        window_days = (end_date - start_date).days
+        raise WalkForwardError(f"{window_days}d < {purge_days}d purge min")
 
     positions = list_lot_positions(session, household_id=household_id)
     if not positions:
         raise ValueError(f"No positions for household {household_id}")
 
-    start_value = sum(p.total_cost_basis for p in positions)
-    end_value = sum((p.market_value or Decimal("0")) for p in positions)
+    start_value = sum((p.total_cost_basis for p in positions), Decimal("0"))
+    end_value = sum(
+        (p.market_value or Decimal("0") for p in positions),
+        Decimal("0"),
+    )
     if start_value <= 0:
         raise ValueError("Backtest start value must be positive")
 
     gross_return = (end_value - start_value) / start_value
-    taxable_gains = sum(
-        (p.unrealized_gain for p in positions if p.unrealized_gain and p.unrealized_gain > 0),
-        Decimal("0"),
-    )
+    net_gain = end_value - start_value
+    taxable = max(net_gain, Decimal("0"))
     ltcg = Decimal(str(cfg.fed_ltcg_rate))
-    tax_cost = taxable_gains * ltcg / start_value
-    after_tax_return = gross_return - tax_cost
-    baseline_after_tax_return = gross_return * (Decimal("1") - ltcg)
+    tax_drag = taxable * ltcg / start_value
+    # Baseline matches after-tax until harvest replay lowers taxable gains.
+    after_tax_return = gross_return - tax_drag
+    baseline_after_tax_return = gross_return - tax_drag
     tax_delta = after_tax_return - baseline_after_tax_return
 
     snapshot = input_snapshot_id or f"snap_{uuid4().hex[:8]}"

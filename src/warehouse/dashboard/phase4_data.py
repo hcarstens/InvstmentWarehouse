@@ -16,7 +16,8 @@ from warehouse.data.ingest.custodian_views import (
     list_ingest_runs_for_custodian,
     list_lot_positions_for_custodian,
 )
-from warehouse.data.ingest.runner import run_custodian_ingest
+from warehouse.data.ingest.runner import IngestRunSummary, run_custodian_ingest
+from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.approval.service import list_approval_requests, update_approval_status
 from warehouse.decision.optimizer.compare import (
@@ -42,8 +43,8 @@ class Phase4DashboardData(BaseModel):
     custodians: list[CustodianSummary]
     staged_orders: list[StagedOrderView]
     solver_comparisons: list[SolverComparisonView]
-    custodian_positions: list
-    custodian_ingest_runs: list
+    custodian_positions: list[LotPositionView]
+    custodian_ingest_runs: list[IngestRunSummary]
     alternative_holdings: list[AlternativeHoldingView]
     alternative_events: list[AlternativeEventView]
     tax_scenarios: list[TaxScenarioRunView]

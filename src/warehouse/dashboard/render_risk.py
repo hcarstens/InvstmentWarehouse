@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import html
+from collections.abc import Callable
 from decimal import Decimal
 
 from warehouse.dashboard.risk_data import RiskDashboardData
-from warehouse.research.risk.models import PortfolioRiskReport
+from warehouse.research.risk.models import PortfolioRiskReport, RiskMetric
 
 
 def _pct(value: Decimal | None) -> str:
@@ -27,7 +28,7 @@ def _money(value: Decimal | None) -> str:
     return f"${float(value):,.0f}"
 
 
-def _metric_meta(label: str, metric) -> str:
+def _metric_meta(label: str, metric: RiskMetric) -> str:
     parts = [label, f"<code>{html.escape(metric.unit_type.value)}</code>"]
     if metric.confidence is not None:
         parts.append(f"α={html.escape(str(metric.confidence))}")
@@ -180,7 +181,11 @@ def _render_report(risk: RiskDashboardData, report: PortfolioRiskReport) -> str:
   </section>"""
 
 
-def _level1_row(label: str, metric, fmt) -> str:
+def _level1_row(
+    label: str,
+    metric: RiskMetric,
+    fmt: Callable[[Decimal], str],
+) -> str:
     return (
         f"<tr><td>{html.escape(label)}</td>"
         f"<td>{html.escape(fmt(metric.value))}</td>"

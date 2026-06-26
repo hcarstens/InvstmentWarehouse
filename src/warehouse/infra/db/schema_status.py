@@ -7,7 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy import func, inspect, select
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from warehouse.infra.db.engine import create_db_engine
 from warehouse.infra.db.migrate import current_revision
@@ -25,7 +25,7 @@ from warehouse.infra.db.models import (
 
 HEAD_REVISION = "004_phase4"
 
-TRACKED_TABLES: tuple[type, ...] = (
+TRACKED_TABLES: tuple[type[DeclarativeBase], ...] = (
     EntityRow,
     EntityRelationshipRow,
     SecurityRow,

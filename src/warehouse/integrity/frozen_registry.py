@@ -75,7 +75,8 @@ def frozen_type_samples() -> list[tuple[type[Any], Any]]:
 def is_registered_frozen_type(cls: type[Any]) -> bool:
     if cls in FROZEN_TYPES:
         return True
-    if is_dataclass(cls) and cls.__dataclass_params__.frozen:
+    dc_params = getattr(cls, "__dataclass_params__", None)
+    if is_dataclass(cls) and dc_params is not None and dc_params.frozen:
         return True
     if issubclass(cls, BaseModel) and cls.model_config.get("frozen"):
         return True

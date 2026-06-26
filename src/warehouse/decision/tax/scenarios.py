@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.config import Settings, get_settings
-from warehouse.data.ledger.views import list_lot_positions
+from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 
 
 class TaxScenarioOverlays(BaseModel):
@@ -33,7 +33,7 @@ class TaxScenarioRunView(BaseModel):
     created_at: datetime
 
 
-def _baseline_tax(positions: list, settings: Settings) -> Decimal:
+def _baseline_tax(positions: list[LotPositionView], settings: Settings) -> Decimal:
     taxable_gains = sum(
         (p.unrealized_gain for p in positions if p.unrealized_gain and p.unrealized_gain > 0),
         Decimal("0"),
@@ -43,7 +43,7 @@ def _baseline_tax(positions: list, settings: Settings) -> Decimal:
 
 
 def _scenario_tax(
-    positions: list,
+    positions: list[LotPositionView],
     settings: Settings,
     overlays: TaxScenarioOverlays,
 ) -> Decimal:
