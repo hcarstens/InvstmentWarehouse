@@ -41,6 +41,17 @@ risk_vol_window_days = 252
 risk_stress_pack_version = "2026.01"
 risk_dashboard_horizon_years = 5.0
 
+# Risk API — logging uses risk_log_inputs; failures can alert via email / webhook
+risk_notify_on_error = true
+risk_notify_email_enabled = false
+risk_notify_email_to = ""
+risk_notify_email_from = "warehouse-noreply@localhost"
+risk_notify_smtp_host = ""
+risk_notify_smtp_port = 587
+risk_notify_messaging_enabled = false
+risk_notify_messaging_webhook_url = ""
+risk_notify_messaging_channel = "risk-api"
+
 reconcile_max_stale_days = 7
 
 household_rls_enabled = false

@@ -25,6 +25,9 @@ def test_settings_from_config_file() -> None:
     assert settings.risk_es_alpha == 0.975
     assert settings.risk_vol_window_days == 252
     assert settings.risk_log_inputs is False
+    assert settings.risk_notify_on_error is True
+    assert settings.risk_notify_email_enabled is False
+    assert settings.risk_notify_messaging_enabled is False
     assert settings.job_queue_url == ""
 
 

@@ -68,6 +68,18 @@ class Settings(BaseSettings):
     risk_stress_pack_version: str = "2026.01"
     risk_dashboard_horizon_years: float = 5.0
 
+    risk_notify_on_error: bool = True
+    risk_notify_email_enabled: bool = False
+    risk_notify_email_to: str = ""
+    risk_notify_email_from: str = "warehouse-noreply@localhost"
+    risk_notify_smtp_host: str = ""
+    risk_notify_smtp_port: int = 587
+    risk_notify_messaging_enabled: bool = False
+    risk_notify_messaging_webhook_url: str = ""
+    risk_notify_messaging_channel: str = "risk-api"
+
+    reconcile_max_stale_days: int = 7
+
     household_rls_enabled: bool = False
 
     @classmethod

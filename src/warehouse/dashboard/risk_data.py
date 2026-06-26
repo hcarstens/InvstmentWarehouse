@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from warehouse.config import get_settings
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
@@ -13,11 +13,23 @@ from warehouse.data.ledger.views import list_lot_positions
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
-from warehouse.research.risk.engine import evaluate_portfolio_risk
-from warehouse.research.risk.models import PortfolioRiskReport, RiskHorizon
+from warehouse.research.risk.api import RiskApiError
+from warehouse.research.risk.models import (
+    PortfolioRiskReport,
+    RiskHorizon,
+    RiskRequest,
+    ScenarioSet,
+)
+from warehouse.research.risk.observability import (
+    log_risk_evaluated,
+    record_risk_failure,
+)
 from warehouse.research.risk.portfolio_builder import (
     build_portfolio_from_holdings,
 )
+from warehouse.research.risk.service import evaluate_risk
+
+_DOMAIN_ERRORS = (ValueError, RiskApiError, ValidationError)
 
 
 class RiskDashboardData(BaseModel):
@@ -50,19 +62,31 @@ def load_risk_dashboard(
             (p.market_value for p in positions if p.market_value is not None),
             Decimal("0"),
         ) + sum((a.current_nav for a in alts), Decimal("0"))
-        report = evaluate_portfolio_risk(
-            portfolio,
-            horizon,
+        request = RiskRequest(
+            horizon=horizon,
             notional_usd=notional if notional > 0 else None,
+            run_scenarios=ScenarioSet.NONE,
+        )
+        result = evaluate_risk(request, portfolio)
+        log_risk_evaluated(
+            result,
+            request=request,
+            manifest=portfolio,
+            surface="dashboard",
         )
         return RiskDashboardData(
             household_id=household_id,
             horizon_years=horizon.years,
             notional_usd=notional if notional > 0 else None,
-            report=report,
+            report=result.report,
             source="positions_and_alternatives",
         )
-    except Exception as err:
+    except _DOMAIN_ERRORS as err:
+        record_risk_failure(
+            err,
+            surface="dashboard",
+            household_id=household_id,
+        )
         return RiskDashboardData(
             household_id=household_id,
             horizon_years=horizon.years,
