@@ -13,6 +13,7 @@ def test_load_risk_dashboard_from_demo_holdings() -> None:
     risk = load_risk_dashboard()
     assert risk.error is None
     assert risk.report is not None
+    assert risk.source == "ledger"
     assert risk.report.level_1_portfolio.parametric_var.confidence == Decimal(
         "0.95")
     assert len(risk.report.level_2_contributions.by_class) >= 2
@@ -29,6 +30,14 @@ def test_render_risk_section_includes_levels() -> None:
     assert "2022_inflation" in html
     assert risk.report is not None
     assert risk.report.input_fingerprint in html
+
+
+def test_render_risk_section_includes_deltas_when_overlay_enabled() -> None:
+    risk = load_risk_dashboard()
+    html = render_risk_section(risk)
+    if risk.deltas is not None:
+        assert "Proposal deltas" in html
+        assert "annualized_volatility" in html
 
 
 def test_portfolio_builder_maps_bnd_and_alts() -> None:

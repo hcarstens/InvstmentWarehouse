@@ -57,7 +57,16 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
         BuildSmokeCheck(
             name="risk HTTP adapter",
             ok=api_ok,
-            detail="evaluate_risk_request (legacy path until v0c)",
+            detail="evaluate_risk_http → evaluate_risk",
+        )
+    )
+
+    ledger_ok = _file_exists("src/warehouse/research/risk/adapters/ledger.py")
+    checks.append(
+        BuildSmokeCheck(
+            name="ledger manifest adapter",
+            ok=ledger_ok,
+            detail="build_household_manifest — v0c edge",
         )
     )
 

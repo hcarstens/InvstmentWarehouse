@@ -7,7 +7,11 @@ from collections.abc import Callable
 from decimal import Decimal
 
 from warehouse.dashboard.risk_data import RiskDashboardData
-from warehouse.research.risk.models import PortfolioRiskReport, RiskMetric
+from warehouse.research.risk.models import (
+    PortfolioRiskReport,
+    RiskDeltas,
+    RiskMetric,
+)
 
 
 def _pct(value: Decimal | None) -> str:
@@ -55,10 +59,15 @@ def render_risk_section(risk: RiskDashboardData) -> str:
     <p>No risk report available.</p>
   </section>"""
 
-    return _render_report(risk, report)
+    return _render_report(risk, report, deltas=risk.deltas)
 
 
-def _render_report(risk: RiskDashboardData, report: PortfolioRiskReport) -> str:
+def _render_report(
+    risk: RiskDashboardData,
+    report: PortfolioRiskReport,
+    *,
+    deltas: RiskDeltas | None = None,
+) -> str:
     l1 = report.level_1_portfolio
     summary = (
         f"<p><strong>Horizon {html.escape(str(risk.horizon_years))}y</strong> · "
@@ -131,6 +140,8 @@ def _render_report(risk: RiskDashboardData, report: PortfolioRiskReport) -> str:
     )
     liq_days = _num(report.liquidity.weighted_days.value, 0)
 
+    deltas_section = _render_deltas_section(deltas)
+
     return f"""  <section>
     <h2>Risk manifest — {html.escape(risk.household_id)}</h2>
     <p class="subtitle">L1–L4 unit hierarchy and liquidity-time (see research docs)</p>
@@ -177,8 +188,49 @@ def _render_report(risk: RiskDashboardData, report: PortfolioRiskReport) -> str:
     </table>
 
     <p>{meas_line}</p>
+    {deltas_section}
     <p><a href="/api/risk">Risk API schema</a> · POST evaluate with fingerprinted inputs</p>
   </section>"""
+
+
+def _render_deltas_section(deltas: RiskDeltas | None) -> str:
+    if deltas is None:
+        return ""
+    label = html.escape(deltas.overlay_label or "overlay")
+
+    def _fmt(metric: str, value: Decimal) -> str:
+        if metric.startswith("dollar"):
+            return _money(value)
+        return _pct(value)
+
+    rows = "".join(
+        f"<tr><td>{html.escape(row.metric)}</td>"
+        f"<td>{_fmt(row.metric, row.baseline)}</td>"
+        f"<td>{_fmt(row.metric, row.proposed)}</td>"
+        f"<td>{_fmt(row.metric, row.delta)}</td>"
+        f"<td>{_pct(row.pct_change) if row.pct_change is not None else '—'}</td></tr>"
+        for row in deltas.headline
+    )
+    class_rows = "".join(
+        f"<tr><td>{html.escape(asset_class)}</td>"
+        f"<td>{_pct(delta)}</td></tr>"
+        for asset_class, delta in sorted(deltas.by_class_variance_delta.items())
+    )
+    return f"""
+    <h3>Proposal deltas — {label}</h3>
+    <p>Baseline <code>{html.escape(deltas.baseline_fingerprint)}</code> →
+       proposed <code>{html.escape(deltas.proposed_fingerprint)}</code></p>
+    <h4>Level 1 headline</h4>
+    <table>
+      <thead><tr><th>Metric</th><th>Baseline</th><th>Proposed</th>
+        <th>Δ</th><th>Δ%</th></tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+    <h4>Level 2 variance share shift</h4>
+    <table>
+      <thead><tr><th>Class</th><th>Δ % variance</th></tr></thead>
+      <tbody>{class_rows or '<tr><td colspan="2">No shift</td></tr>'}</tbody>
+    </table>"""
 
 
 def _level1_row(

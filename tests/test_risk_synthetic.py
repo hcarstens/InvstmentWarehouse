@@ -9,7 +9,7 @@ from warehouse.research.risk.synthetic import rung
 
 
 def test_rung_weights_sum_to_one() -> None:
-    for level in (0, 1, 2):
+    for level in (0, 1, 2, 3, 4):
         portfolio = rung(level)
         total = sum(slot.weight for slot in portfolio.allocations)
         assert total == Decimal("1")
@@ -32,4 +32,4 @@ def test_rung_2_includes_commodities_and_fx() -> None:
 
 def test_rung_out_of_range_raises() -> None:
     with pytest.raises(ValueError, match="not defined"):
-        rung(3)
+        rung(5)

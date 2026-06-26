@@ -67,6 +67,7 @@ class Settings(BaseSettings):
     risk_vol_window_days: int = 252
     risk_stress_pack_version: str = "2026.01"
     risk_dashboard_horizon_years: float = 5.0
+    risk_dashboard_demo_overlay: bool = True
 
     risk_notify_on_error: bool = True
     risk_notify_email_enabled: bool = False

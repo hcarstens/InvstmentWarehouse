@@ -81,10 +81,39 @@ class ScenarioSet(StrEnum):
     ALL = "all"
 
 
+class ManifestOverlay(BaseModel):
+    """Declarative perturbation — NOT a second full manifest."""
+
+    weight_tilts: dict[AssetClass, Decimal] = Field(default_factory=dict)
+    add_sleeves: list[AllocationSlot] = Field(default_factory=list)
+    drop_sleeves: list[AssetClass] = Field(default_factory=list)
+    stress_pack: str | None = None
+    label: str | None = None
+
+
 class RiskRequest(BaseModel):
     horizon: RiskHorizon
     notional_usd: Decimal | None = None
     run_scenarios: ScenarioSet = ScenarioSet.NONE
+    overlay: ManifestOverlay | None = None
+
+
+class MetricDelta(BaseModel):
+    metric: str
+    baseline: Decimal
+    proposed: Decimal
+    delta: Decimal
+    pct_change: Decimal | None = None
+
+
+class RiskDeltas(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    overlay_label: str | None
+    baseline_fingerprint: str
+    proposed_fingerprint: str
+    headline: list[MetricDelta]
+    by_class_variance_delta: dict[str, Decimal]
 
 
 class RiskResult(BaseModel):
@@ -92,7 +121,7 @@ class RiskResult(BaseModel):
 
     report: PortfolioRiskReport
     scenarios: dict[str, PortfolioRiskReport] = Field(default_factory=dict)
-    deltas: None = None
+    deltas: RiskDeltas | None = None
 
 
 class RiskMetric(BaseModel):

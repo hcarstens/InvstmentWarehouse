@@ -8,8 +8,10 @@ from typing import Any
 
 from warehouse.research.risk.models import (
     AssetPortfolio,
+    ManifestOverlay,
     RiskHorizon,
     RiskRequest,
+    RiskResult,
     ScenarioSet,
 )
 from warehouse.research.risk.observability import (
@@ -23,7 +25,7 @@ class RiskApiError(ValueError):
     """Invalid risk API request."""
 
 
-def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
+def parse_risk_request(body: dict[str, Any]) -> tuple[RiskRequest, AssetPortfolio]:
     if "asset_portfolio" not in body:
         raise RiskApiError("Missing required field: asset_portfolio")
     if "horizon" not in body:
@@ -41,11 +43,22 @@ def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
             f"Invalid run_scenarios: {run_scenarios_raw!r}"
         ) from err
 
+    overlay = None
+    if "overlay" in body:
+        overlay = ManifestOverlay.model_validate(body["overlay"])
+
     request = RiskRequest(
         horizon=horizon,
         notional_usd=notional,
         run_scenarios=run_scenarios,
+        overlay=overlay,
     )
+    return request, portfolio
+
+
+def evaluate_risk_http(body: dict[str, Any]) -> RiskResult:
+    """HTTP/in-process entry — parse body, evaluate, log success."""
+    request, portfolio = parse_risk_request(body)
     result = evaluate_risk(request, portfolio)
     log_risk_evaluated(
         result,
@@ -53,13 +66,23 @@ def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
         manifest=portfolio,
         surface="api",
     )
+    return result
+
+
+def risk_result_to_json(result: RiskResult) -> dict[str, Any]:
     payload: dict[str, Any] = result.report.model_dump(mode="json")
     if result.scenarios:
         payload["scenarios"] = {
             name: report.model_dump(mode="json")
             for name, report in result.scenarios.items()
         }
+    if result.deltas is not None:
+        payload["deltas"] = result.deltas.model_dump(mode="json")
     return payload
+
+
+def evaluate_risk_request(body: dict[str, Any]) -> dict[str, Any]:
+    return risk_result_to_json(evaluate_risk_http(body))
 
 
 def evaluate_risk_json(raw: str | bytes) -> tuple[int, str]:
@@ -87,14 +110,18 @@ def risk_api_schema() -> dict[str, Any]:
     return {
         "endpoint": "/api/risk",
         "method": "POST",
+        "entry_point": "evaluate_risk(request, manifest)",
         "reference": [
             "docs/research/risk_units_measures.md",
             "docs/research/portfolio_risk.md",
             "docs/research/simple_risk_models.md",
+            "docs/risk_api_contract.md",
         ],
         "request": {
             "asset_portfolio": {
                 "portfolio_id": "optional string",
+                "source": "optional — synthetic | ledger (provenance)",
+                "complexity": "optional — synthetic rung tag",
                 "allocations": [
                     {
                         "asset_class": "equity|fixed_income|commodities|fx|alternatives|cash",
@@ -109,6 +136,13 @@ def risk_api_schema() -> dict[str, Any]:
             "horizon": "e.g. 5y or 5 — investment horizon in years",
             "notional_usd": "optional — enables Level 1 dollar VaR/ES and Level 4 dollar P&L",
             "run_scenarios": "none | high_risk | low_risk | all — optional assumption regimes",
+            "overlay": {
+                "weight_tilts": "optional dict asset_class → delta weight before renormalize",
+                "add_sleeves": "optional AllocationSlot list",
+                "drop_sleeves": "optional asset_class list",
+                "stress_pack": "optional Level 4 scenario name for proposed eval",
+                "label": "optional overlay label for audit",
+            },
         },
         "response": {
             "level_1_portfolio": "sigma, parametric VaR/ES with (alpha, h) metadata",
@@ -118,6 +152,14 @@ def risk_api_schema() -> dict[str, Any]:
             "liquidity": "liquidity-time days by tier",
             "measurement_summary": "measurable vs fermi weight and risk share",
             "scenarios": "optional map of regime → full report when run_scenarios ≠ none",
+            "deltas": "optional RiskDeltas when overlay present — headline metric shifts",
+        },
+        "integration": {
+            "in_process": "evaluate_risk(RiskRequest, AssetPortfolio, assumptions=...)",
+            "http_post": "JSON body → parse_risk_request → evaluate_risk_http",
+            "ledger": "build_household_manifest(household_id) → evaluate_risk",
+            "synthetic": "rung(0..4) for no-DB regression",
+            "overlay": "request.overlay → apply_overlay → diff baseline vs proposed",
         },
         "privacy": (
             "Allocations and horizons are fingerprinted; raw inputs are not logged "

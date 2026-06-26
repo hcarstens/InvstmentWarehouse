@@ -17,6 +17,8 @@ from warehouse.research.risk.models import (
     AllocationSlot,
     AssetClass,
     AssetPortfolio,
+    MetricDelta,
+    RiskDeltas,
     RiskHorizon,
     RiskRequest,
     RiskResult,
@@ -27,6 +29,7 @@ from warehouse.research.risk.models import (
 FROZEN_TYPES: tuple[type[Any], ...] = (
     BacktestResult,
     Event,
+    RiskDeltas,
     RiskResult,
     Settings,
 )
@@ -68,6 +71,22 @@ def _sample_instance(cls: type[Any]) -> Any:
         )
         report = evaluate_portfolio_risk(portfolio, request.horizon)
         return RiskResult(report=report, scenarios={}, deltas=None)
+    if cls is RiskDeltas:
+        return RiskDeltas(
+            overlay_label="demo",
+            baseline_fingerprint="baseline",
+            proposed_fingerprint="proposed",
+            headline=[
+                MetricDelta(
+                    metric="annualized_volatility",
+                    baseline=Decimal("0.10"),
+                    proposed=Decimal("0.11"),
+                    delta=Decimal("0.01"),
+                    pct_change=Decimal("0.10"),
+                )
+            ],
+            by_class_variance_delta={"equity": Decimal("0.02")},
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -80,6 +99,8 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "app_env"
     if isinstance(instance, RiskResult):
         return "deltas"
+    if isinstance(instance, RiskDeltas):
+        return "overlay_label"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

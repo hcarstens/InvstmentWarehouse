@@ -1,6 +1,6 @@
 # Risk API — Implementation Plan (HNW-informed)
 
-**Status:** v0b shipped (v0c+ not started)
+**Status:** v1 shipped (overlays + deltas); HNW compositional generator remains planned
 **Date:** 2026-06-26
 **Inputs:** [`risk_api_contract.md`](risk_api_contract.md) (design),
 [`hnw_portfolios.md`](research/hnw_portfolios.md) (synthetic corpus + axioms),
@@ -251,5 +251,7 @@ track progress at `warehouse serve --risk` → http://127.0.0.1:8765/risk or
 
 | Date | Note |
 | --- | --- |
+| 2026-06-26 | v1 shipped: `ManifestOverlay`, `RiskDeltas`, `apply_overlay`/`diff_reports`, `evaluate_risk(assumptions=)`, rungs 3–4, dashboard deltas panel. |
+| 2026-06-26 | v0c shipped: `adapters/ledger.py` (`build_household_manifest`), slim `risk_data.py`, `evaluate_risk_http`, integration schema; golden HTTP parity. |
 | 2026-06-26 | v0b shipped: `RiskAssumptions`, `scenarios.py` (base/high/low, PSD), `run_scenarios` → `RiskResult.scenarios`, regime in fingerprint, `synthetic.rung(0..2)`, golden `rung×scenario` fixtures. |
 | 2026-06-26 | v0a shipped: `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk`, frozen registry, `tests/test_risk_service.py`. |

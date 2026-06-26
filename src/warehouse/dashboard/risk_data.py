@@ -1,4 +1,4 @@
-"""Risk dashboard data — household portfolio manifest from ledger marks."""
+"""Risk dashboard data — manifest → evaluate_risk → present."""
 
 from __future__ import annotations
 
@@ -7,15 +7,14 @@ from decimal import Decimal
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import get_settings
-from warehouse.dashboard.phase2_data import load_phase2_dashboard
-from warehouse.data.alternatives.service import list_alternative_holdings
-from warehouse.data.ledger.views import list_lot_positions
-from warehouse.infra.db.base import session_scope
-from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
+from warehouse.research.risk.adapters.ledger import build_household_manifest
 from warehouse.research.risk.api import RiskApiError
 from warehouse.research.risk.models import (
+    AssetClass,
+    ManifestOverlay,
     PortfolioRiskReport,
+    RiskDeltas,
     RiskHorizon,
     RiskRequest,
     ScenarioSet,
@@ -24,12 +23,17 @@ from warehouse.research.risk.observability import (
     log_risk_evaluated,
     record_risk_failure,
 )
-from warehouse.research.risk.portfolio_builder import (
-    build_portfolio_from_holdings,
-)
 from warehouse.research.risk.service import evaluate_risk
 
 _DOMAIN_ERRORS = (ValueError, RiskApiError, ValidationError)
+
+_DEMO_OVERLAY = ManifestOverlay(
+    label="reduce equity 10% → fixed income",
+    weight_tilts={
+        AssetClass.EQUITY: Decimal("-0.10"),
+        AssetClass.FIXED_INCOME: Decimal("0.10"),
+    },
+)
 
 
 class RiskDashboardData(BaseModel):
@@ -38,6 +42,7 @@ class RiskDashboardData(BaseModel):
     notional_usd: Decimal | None
     report: PortfolioRiskReport | None
     source: str
+    deltas: RiskDeltas | None = None
     error: str | None = None
 
 
@@ -50,36 +55,28 @@ def load_risk_dashboard(
     horizon = RiskHorizon.parse(
         horizon_years or settings.risk_dashboard_horizon_years)
     try:
-        bootstrap_database(seed=True)
-        load_phase2_dashboard()
-        with session_scope() as session:
-            positions = list_lot_positions(session, household_id=household_id)
-            alts = list_alternative_holdings(
-                session, household_id=household_id)
-        portfolio = build_portfolio_from_holdings(
-            household_id, positions, alts)
-        notional = sum(
-            (p.market_value for p in positions if p.market_value is not None),
-            Decimal("0"),
-        ) + sum((a.current_nav for a in alts), Decimal("0"))
+        manifest = build_household_manifest(household_id)
+        overlay = _DEMO_OVERLAY if settings.risk_dashboard_demo_overlay else None
         request = RiskRequest(
             horizon=horizon,
-            notional_usd=notional if notional > 0 else None,
+            notional_usd=manifest.notional_usd,
             run_scenarios=ScenarioSet.NONE,
+            overlay=overlay,
         )
-        result = evaluate_risk(request, portfolio)
+        result = evaluate_risk(request, manifest.portfolio)
         log_risk_evaluated(
             result,
             request=request,
-            manifest=portfolio,
+            manifest=manifest.portfolio,
             surface="dashboard",
         )
         return RiskDashboardData(
             household_id=household_id,
             horizon_years=horizon.years,
-            notional_usd=notional if notional > 0 else None,
+            notional_usd=manifest.notional_usd,
             report=result.report,
-            source="positions_and_alternatives",
+            source=manifest.portfolio.source,
+            deltas=result.deltas,
         )
     except _DOMAIN_ERRORS as err:
         record_risk_failure(
@@ -92,6 +89,6 @@ def load_risk_dashboard(
             horizon_years=horizon.years,
             notional_usd=None,
             report=None,
-            source="positions_and_alternatives",
+            source="ledger",
             error=str(err),
         )

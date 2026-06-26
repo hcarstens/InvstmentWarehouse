@@ -40,6 +40,7 @@ risk_es_alpha = 0.975
 risk_vol_window_days = 252
 risk_stress_pack_version = "2026.01"
 risk_dashboard_horizon_years = 5.0
+risk_dashboard_demo_overlay = true
 
 # Risk API — logging uses risk_log_inputs; failures can alert via email / webhook
 risk_notify_on_error = true

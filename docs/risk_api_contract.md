@@ -1,6 +1,6 @@
 # Risk API Contract — Simplification Design
 
-**Status:** v0b shipped (`run_scenarios`, scenario catalog); v0c+ proposed
+**Status:** v1 shipped (overlays + deltas); compositional HNW generator planned
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
 `docs/research/simple_risk_models.md`, `docs/research/hnw_portfolios.md`,
@@ -305,5 +305,7 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 | 2026-06-26 | Assumptions decision (owner + Claude): risk **owns** a version-pinned, PSD-validated scenario catalog (`base`/`high_risk`/`low_risk`); caller selects via a `run_scenarios` flag, not an injected assumptions object. `RiskResult` gains a `scenarios` map; same diff machinery serves regime + overlay deltas. Pulled the catalog + flag into v0; arbitrary override → v1 escape hatch. Reverses the earlier injectable-third-arg idea. |
 | 2026-06-26 | Cursor review (post-edit): aligned HTTP to **`POST /api/risk`** (no `/orchestrate`); fixed v1 pseudocode arg order to `(request, manifest)`; split migration into **v0a / v0b / v0c** with v0b flagged as largest chunk; tied regimes to existing `stress.py`; `Scenario` fixture marked test-only. |
 | 2026-06-26 | Implementation plan added: [`risk_api_implementation_plan.md`](risk_api_implementation_plan.md) — HNW Shape A/B split, rung ownership, SDG acceptance → v0a/b/c PR sequence. |
+| 2026-06-26 | **v1 shipped:** `ManifestOverlay`, `RiskDeltas`, overlay/diff in `overlay.py`, `request.overlay`, dashboard deltas panel, `synthetic.rung(3..4)`. |
+| 2026-06-26 | **v0c shipped:** `build_household_manifest`, slim `risk_data`, `evaluate_risk_http`, schema `integration` block. |
 | 2026-06-26 | **v0b shipped:** `RiskAssumptions`, `scenarios.py`, `run_scenarios` → `RiskResult.scenarios`, regime in fingerprint + manifest, `synthetic.rung(0..2)`, golden fixtures. |
 | 2026-06-26 | **v0a shipped:** `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk` in `service.py`; `AssetPortfolio.source`/`complexity`; `RiskResult` frozen + registered. |

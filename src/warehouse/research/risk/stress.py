@@ -35,9 +35,15 @@ def evaluate_stress(
     notional_usd: Decimal | None,
     mark_source: str,
     assumptions: RiskAssumptions,
+    stress_filter: str | None = None,
 ) -> Level4Stress:
     scenarios: list[StressScenarioResult] = []
-    for name, shocks in assumptions.stress_scenarios.items():
+    packs = assumptions.stress_scenarios
+    if stress_filter is not None:
+        if stress_filter not in packs:
+            raise ValueError(f"unknown stress_pack: {stress_filter}")
+        packs = {stress_filter: packs[stress_filter]}
+    for name, shocks in packs.items():
         portfolio_return, by_class = _scenario_return(slots, shocks)
         return_metric = RiskMetric(
             value=portfolio_return,

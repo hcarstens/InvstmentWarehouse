@@ -4,6 +4,37 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-24 — Risk API v1 overlays & deltas
+
+**Shipped:**
+
+- `ManifestOverlay`, `MetricDelta`, `RiskDeltas` (frozen); `RiskRequest.overlay`
+- `overlay.py` — `apply_overlay`, `diff_reports`
+- `evaluate_risk(..., assumptions=)` escape hatch for research sweeps
+- `synthetic.rung(3..4)` — 5-sleeve HNW-shaped + concentrated equity manifests
+- Dashboard deltas panel (`risk_dashboard_demo_overlay`); API `overlay` + `deltas` in response
+- Tests: `tests/test_risk_v1.py`
+
+**Deferred:** compositional HNW generator (`warehouse/research/synthetic/`), tax-vector overlays.
+
+---
+
+## 2026-06-24 — Risk API v0c integration
+
+**Context:** v0a envelope and v0b scenario catalog shipped; dashboard still bootstrapped DB, called `load_phase2_dashboard` for side effects, and inlined ledger reads.
+
+**Shipped:**
+
+- `research/risk/adapters/ledger.py` — `build_household_manifest(household_id)` → `HouseholdRiskManifest` (`source="ledger"`, NAV notional)
+- Slim `dashboard/risk_data.py` — manifest → `evaluate_risk` → present; no phase2 coupling; domain errors only
+- `api.py` — `parse_risk_request`, `evaluate_risk_http`, `risk_result_to_json`; schema `integration` block
+- Tests: `tests/test_risk_integration.py` (ledger, HTTP rung2 parity, `KeyError` bubbles)
+- Build tracker: contract status **v0c** (5 deliverables shipped)
+
+**Next:** v1 overlays + `RiskDeltas`; HNW compositional generator (rungs 3–4).
+
+---
+
 ## 2026-06-24 — Risk API observability & notifications
 
 **Context:** Risk API v0a (`evaluate_risk`, `RiskRequest` / `RiskResult`) and build tracker (`/risk`, `warehouse serve --risk`) were in place; HTTP and dashboard paths still swallowed or under-logged failures.

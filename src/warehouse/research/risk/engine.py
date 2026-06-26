@@ -44,6 +44,7 @@ def evaluate_portfolio_risk(
     *,
     notional_usd: Decimal | None = None,
     assumptions: RiskAssumptions | None = None,
+    stress_filter: str | None = None,
 ) -> PortfolioRiskReport:
     priors = assumptions or assumptions_for("base")
     mark_source = "model_prior"
@@ -169,6 +170,7 @@ def evaluate_portfolio_risk(
             notional_usd=notional_usd,
             mark_source=mark_source,
             assumptions=priors,
+            stress_filter=stress_filter,
         ),
         liquidity=evaluate_liquidity(portfolio.allocations),
         measurement_summary=MeasurementSummary(

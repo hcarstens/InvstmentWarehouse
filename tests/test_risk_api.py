@@ -46,6 +46,39 @@ def _sample_request() -> dict:
     return json.loads(FIXTURE.read_text())
 
 
+def test_evaluate_risk_request_with_overlay() -> None:
+    body = {
+        "asset_portfolio": {
+            "allocations": [
+                {"asset_class": "equity", "weight": 0.6},
+                {"asset_class": "fixed_income", "weight": 0.4, "duration_years": 6.5},
+            ]
+        },
+        "horizon": "5y",
+        "overlay": {
+            "label": "de-risk",
+            "weight_tilts": {"equity": -0.1, "fixed_income": 0.1},
+        },
+    }
+    result = evaluate_risk_request(body)
+    assert "deltas" in result
+    assert result["deltas"]["overlay_label"] == "de-risk"
+
+
+def test_risk_api_schema_includes_overlay() -> None:
+    schema = risk_api_schema()
+    assert "overlay" in schema["request"]
+    assert "deltas" in schema["response"]
+
+
+def test_risk_api_schema_includes_integration() -> None:
+    schema = risk_api_schema()
+    assert schema["entry_point"] == "evaluate_risk(request, manifest)"
+    assert "integration" in schema
+    assert "ledger" in schema["integration"]
+    assert "run_scenarios" in schema["request"]
+
+
 def test_risk_api_schema_includes_run_scenarios() -> None:
     schema = risk_api_schema()
     assert "run_scenarios" in schema["request"]
