@@ -55,6 +55,10 @@ select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
 packages = ["warehouse"]
+
+[[tool.mypy.overrides]]
+module = ["numpy.*", "scipy.*"]
+ignore_missing_imports = true

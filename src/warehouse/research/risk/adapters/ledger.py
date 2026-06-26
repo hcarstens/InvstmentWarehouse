@@ -7,9 +7,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 from warehouse.config import repo_root
-from warehouse.data.alternatives.service import list_alternative_holdings
+from warehouse.data.alternatives.service import (
+    AlternativeHoldingView,
+    list_alternative_holdings,
+)
 from warehouse.data.ingest.runner import list_ingest_runs
-from warehouse.data.ledger.views import list_lot_positions
+from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
@@ -42,8 +45,8 @@ def _ensure_demo_refresh() -> None:
 
 
 def _household_notional(
-    positions: list,
-    alt_holdings: list,
+    positions: list[LotPositionView],
+    alt_holdings: list[AlternativeHoldingView],
 ) -> Decimal:
     lot_nav = sum(
         (p.market_value for p in positions if p.market_value is not None),
