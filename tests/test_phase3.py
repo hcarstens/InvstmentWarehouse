@@ -1,15 +1,18 @@
 """Phase 3 — optimizer, IPS drift, approval, backtest."""
 
+from __future__ import annotations
+
 from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
-from warehouse.data.ledger.views import list_lot_positions
+from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.approval.service import list_approval_requests, update_approval_status
 from warehouse.decision.constraints import evaluate_lot_sell_allowed
+from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.ips.monitor import build_ips_drift_report
 from warehouse.decision.ips.store import load_ips
 from warehouse.decision.optimizer.heuristics import run_tax_aware_optimizer
@@ -59,6 +62,68 @@ def test_optimizer_harvests_loss_lot() -> None:
         result = run_tax_aware_optimizer(DEMO_HOUSEHOLD_ID, positions, ips)
     assert any(t.lot_id == "lot_vti_2" for t in result.trades)
     assert result.estimated_tax_delta < Decimal("0")
+
+
+def _lot(
+    lot_id: str,
+    *,
+    security_id: str,
+    group: str | None,
+    unrealized: Decimal,
+    acquired: date,
+) -> LotPositionView:
+    return LotPositionView(
+        lot_id=lot_id,
+        account_id="acct_1",
+        account_name="Acct",
+        security_id=security_id,
+        ticker=security_id.upper(),
+        security_name=security_id,
+        quantity=Decimal("10"),
+        cost_basis_per_share=Decimal("100"),
+        total_cost_basis=Decimal("1000"),
+        market_price=Decimal("90"),
+        market_value=Decimal("900"),
+        unrealized_gain=unrealized,
+        acquisition_date=acquired,
+        is_restricted=False,
+        wash_sale_substitute_group=group,
+    )
+
+
+def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
+    """A loss lot whose substitute group was repurchased within 30d must not be harvested."""
+    from warehouse.decision.constraints import evaluate_wash_sale_risk
+
+    as_of = date(2026, 6, 26)
+    loss = _lot(
+        "loss", security_id="vti", group="us_equity_broad",
+        unrealized=Decimal("-100"), acquired=date(2024, 1, 1),
+    )
+    # A substantially-identical replacement (same substitute group) bought 5 days ago.
+    replacement = _lot(
+        "repl", security_id="itot", group="us_equity_broad",
+        unrealized=Decimal("20"), acquired=date(2026, 6, 21),
+    )
+    positions = [loss, replacement]
+
+    triggers = evaluate_wash_sale_risk(loss, positions, as_of=as_of)
+    assert triggers and "wash_sale_30d" in triggers[0]
+
+    ips = load_ips_for_test()
+    result = run_tax_aware_optimizer(
+        DEMO_HOUSEHOLD_ID, positions, ips, as_of=as_of
+    )
+    assert not any(t.lot_id == "loss" for t in result.trades)
+    assert any(b.startswith("wash_sale_30d") for b in result.binding_constraints)
+
+
+def load_ips_for_test() -> InvestmentPolicyStatement:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        ips = load_ips(session, DEMO_HOUSEHOLD_ID)
+    assert ips is not None
+    return ips
 
 
 def test_optimizer_persist_and_approval() -> None:

@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import LotPositionView
-from warehouse.decision.constraints import evaluate_lot_sell_allowed
+from warehouse.decision.constraints import evaluate_lot_sell_allowed, evaluate_wash_sale_risk
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
 
@@ -19,7 +19,13 @@ def _holding_period_rate(acquisition_date: date, as_of: date, settings: Settings
 
 
 def _tax_on_gain(gain: Decimal, rate: Decimal) -> Decimal:
-    return gain * rate if gain > 0 else gain * rate
+    """Tax-liability delta from realizing ``gain`` at ``rate``, vs the do-nothing baseline.
+
+    Sign convention: positive = additional tax owed (realized gain), negative = tax
+    reduced (harvested loss, where ``gain < 0``). Harvesting losses therefore lowers
+    ``estimated_tax_delta`` — a negative delta is the after-tax benefit.
+    """
+    return gain * rate
 
 
 def run_tax_aware_optimizer(
@@ -59,6 +65,10 @@ def run_tax_aware_optimizer(
         if not allowed:
             continue
         if lot.unrealized_gain is None or lot.market_value is None:
+            continue
+        wash_triggers = evaluate_wash_sale_risk(lot, positions, as_of=today)
+        if wash_triggers:
+            binding.update(wash_triggers)
             continue
         rate = _holding_period_rate(lot.acquisition_date, today, cfg)
         harvest_tax = _tax_on_gain(lot.unrealized_gain, rate)

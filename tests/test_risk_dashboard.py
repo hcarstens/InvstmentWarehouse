@@ -51,6 +51,7 @@ def test_portfolio_builder_maps_bnd_and_alts() -> None:
             unrealized_gain=Decimal("0"),
             acquisition_date=date(2024, 1, 1),
             is_restricted=False,
+            wash_sale_substitute_group=None,
         ),
         LotPositionView(
             lot_id="l2",
@@ -67,6 +68,7 @@ def test_portfolio_builder_maps_bnd_and_alts() -> None:
             unrealized_gain=Decimal("0"),
             acquisition_date=date(2024, 1, 1),
             is_restricted=False,
+            wash_sale_substitute_group=None,
         ),
     ]
     alts = [

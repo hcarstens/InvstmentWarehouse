@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from warehouse.decision.approval import ApprovalStatus
 from warehouse.execution.oms import OrderStatus
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import (
@@ -42,6 +43,13 @@ def stage_orders_from_approval(
     approval = session.get(ApprovalRequestRow, approval_request_id)
     if approval is None:
         raise ValueError(f"Approval request not found: {approval_request_id}")
+    # Human approval gate — enforce at the OMS boundary, not just the caller.
+    # No order reaches staging without an APPROVED sign-off (CLAUDE.md: gates dominate).
+    if approval.status != ApprovalStatus.APPROVED.value:
+        raise ValueError(
+            f"Cannot stage orders for {approval_request_id}: approval status is "
+            f"'{approval.status}', expected '{ApprovalStatus.APPROVED.value}'"
+        )
 
     existing = session.scalar(
         select(StagedOrderRow.order_id)

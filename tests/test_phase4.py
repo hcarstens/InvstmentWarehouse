@@ -83,6 +83,25 @@ def test_approval_stages_orders() -> None:
     assert orders[0].approval_request_id == pending[0].request_id
 
 
+def test_oms_gate_blocks_unapproved_staging() -> None:
+    """OMS must refuse to stage orders for a PENDING approval — gate enforced at boundary."""
+    from warehouse.execution.oms.service import stage_orders_from_approval
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
+        pending = [
+            a
+            for a in list_approval_requests(session, household_id=DEMO_HOUSEHOLD_ID)
+            if a.status == ApprovalStatus.PENDING.value
+        ][0]
+        with pytest.raises(ValueError, match="status is 'pending'"):
+            stage_orders_from_approval(session, pending.request_id)
+        # No order for THIS pending approval should have leaked into staging.
+        orders = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)
+        assert not any(o.approval_request_id == pending.request_id for o in orders)
+
+
 def test_order_state_machine() -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:

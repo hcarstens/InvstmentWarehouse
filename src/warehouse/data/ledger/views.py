@@ -27,6 +27,7 @@ class LotPositionView(BaseModel):
     unrealized_gain: Decimal | None
     acquisition_date: date
     is_restricted: bool
+    wash_sale_substitute_group: str | None
 
 
 class HouseholdPnlSummary(BaseModel):
@@ -74,6 +75,7 @@ def list_lot_positions(
                 unrealized_gain=unrealized,
                 acquisition_date=lot.acquisition_date,
                 is_restricted=lot.is_restricted,
+                wash_sale_substitute_group=security.wash_sale_substitute_group,
             )
         )
     return views

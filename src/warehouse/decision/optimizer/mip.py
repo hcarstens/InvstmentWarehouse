@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import LotPositionView
-from warehouse.decision.constraints import evaluate_lot_sell_allowed
+from warehouse.decision.constraints import evaluate_lot_sell_allowed, evaluate_wash_sale_risk
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
 from warehouse.decision.optimizer.heuristics import _asset_class_for_position, _holding_period_rate
@@ -49,6 +49,10 @@ def run_mip_optimizer(
         allowed, lot_binding = evaluate_lot_sell_allowed(lot, ips)
         binding.update(lot_binding)
         if not allowed or lot.market_value is None:
+            continue
+        wash_triggers = evaluate_wash_sale_risk(lot, positions, as_of=today)
+        if wash_triggers:
+            binding.update(wash_triggers)
             continue
         rate = _holding_period_rate(lot.acquisition_date, today, cfg)
         benefit = abs(lot.unrealized_gain * rate)
