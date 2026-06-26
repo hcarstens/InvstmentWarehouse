@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     risk_es_alpha: float = 0.975
     risk_vol_window_days: int = 252
     risk_stress_pack_version: str = "2026.01"
+    risk_dashboard_horizon_years: float = 5.0
 
     household_rls_enabled: bool = False
 

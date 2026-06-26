@@ -52,6 +52,7 @@ PHASES: list[Phase] = [
         panels=[
             DashboardPanel(name="Ingest status", phase=2, status="live"),
             DashboardPanel(name="Positions & lots", phase=2, status="live"),
+            DashboardPanel(name="Risk manifest", phase=2, status="live"),
             DashboardPanel(name="Reconciliation queue", phase=2, status="live"),
             DashboardPanel(name="Daily refresh timeline", phase=2, status="live"),
             DashboardPanel(name="Audit log stream", phase=2, status="live"),

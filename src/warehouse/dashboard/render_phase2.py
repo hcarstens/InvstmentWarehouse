@@ -19,7 +19,7 @@ def _status_badge(status: str) -> str:
     return f'<span class="badge badge-{kind}">{html.escape(status)}</span>'
 
 
-def render_phase2_sections(phase2: Phase2DashboardData) -> str:
+def render_phase2_sections(phase2: Phase2DashboardData, *, risk_html: str = "") -> str:
     ingest_rows = "".join(
         f"<tr><td>{html.escape(r.run_id)}</td>"
         f"<td>{html.escape(r.file_name)}</td>"
@@ -97,6 +97,8 @@ def render_phase2_sections(phase2: Phase2DashboardData) -> str:
       <tbody>{position_rows or '<tr><td colspan="7">No lots</td></tr>'}</tbody>
     </table>
   </section>
+
+{risk_html}
 
   <section>
     <h2>Reconciliation queue</h2>

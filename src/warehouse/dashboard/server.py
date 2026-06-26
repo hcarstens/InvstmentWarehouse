@@ -14,6 +14,8 @@ from warehouse.dashboard.phase4_data import load_phase4_dashboard
 from warehouse.dashboard.render_phase2 import render_phase2_sections
 from warehouse.dashboard.render_phase3 import render_phase3_sections
 from warehouse.dashboard.render_phase4 import render_phase4_sections
+from warehouse.dashboard.render_risk import render_risk_section
+from warehouse.dashboard.risk_data import load_risk_dashboard
 from warehouse.dashboard.status import build_status_report
 
 
@@ -54,6 +56,7 @@ def render_html(
     report = build_status_report()
     phase1 = load_phase1_dashboard(security_query=security_query)
     phase2 = load_phase2_dashboard()
+    risk = load_risk_dashboard(household_id=phase2.household_id)
     phase3 = load_phase3_dashboard()
     phase4 = load_phase4_dashboard(custodian_id=custodian_id)
     phase_rows = "".join(
@@ -126,7 +129,7 @@ def render_html(
         for t in schema.tables
     )
     q_value = html.escape(phase1.security_query or "")
-    phase2_html = render_phase2_sections(phase2)
+    phase2_html = render_phase2_sections(phase2, risk_html=render_risk_section(risk))
     phase3_html = render_phase3_sections(phase3)
     phase4_html = render_phase4_sections(phase4)
     return f"""<!DOCTYPE html>
