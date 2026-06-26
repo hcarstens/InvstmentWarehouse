@@ -5,7 +5,10 @@ from __future__ import annotations
 import html
 import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+
+from warehouse.config import repo_root
 
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
@@ -15,6 +18,8 @@ from warehouse.dashboard.render_phase2 import render_phase2_sections
 from warehouse.dashboard.render_phase3 import render_phase3_sections
 from warehouse.dashboard.render_phase4 import render_phase4_sections
 from warehouse.dashboard.render_risk import render_risk_section
+from warehouse.dashboard.render_risk_build import render_risk_build_page
+from warehouse.dashboard.risk_build_data import load_risk_build_report
 from warehouse.dashboard.risk_data import load_risk_dashboard
 from warehouse.dashboard.status import build_status_report
 
@@ -47,6 +52,27 @@ def _security_query_from_path(path: str) -> str | None:
 def _custodian_from_path(path: str) -> str | None:
     query = parse_qs(urlparse(path).query).get("custodian", [])
     return query[0] if query else None
+
+
+def render_risk_build_html(*, include_live_manifest: bool = True) -> str:
+    build = load_risk_build_report()
+    risk = load_risk_dashboard() if include_live_manifest else None
+    return render_risk_build_page(build, risk)
+
+
+def _safe_docs_path(url_path: str) -> Path | None:
+    if not url_path.startswith("/docs/"):
+        return None
+    rel = url_path[len("/docs/") :]
+    if ".." in rel or rel.startswith("/"):
+        return None
+    root = (repo_root() / "docs").resolve()
+    candidate = (root / rel).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate if candidate.is_file() else None
 
 
 def render_html(
@@ -258,18 +284,41 @@ def render_html(
     </table>
   </section>
 
-  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/risk">risk</a> · <a href="/api/phase1">phase1</a> · <a href="/api/phase2">phase2</a> · <a href="/api/phase3">phase3</a> · <a href="/api/phase4">phase4</a></footer>
+  <footer>Generated {report.generated_at.isoformat()} · auto-refresh 30s · <a href="/risk">risk build</a> · <a href="/api/status">status</a> · <a href="/api/health">health</a> · <a href="/api/risk">risk API</a> · <a href="/api/phase1">phase1</a> · <a href="/api/phase2">phase2</a> · <a href="/api/phase3">phase3</a> · <a href="/api/phase4">phase4</a></footer>
 </body>
 </html>"""
 
 
 class DashboardHandler(BaseHTTPRequestHandler):
+    risk_landing: bool = False
+
     def do_GET(self) -> None:
-        if self.path.startswith("/") and self.path.split("?")[0] in ("/", "/dashboard"):
-            body = render_html(
-                security_query=_security_query_from_path(self.path),
-                custodian_id=_custodian_from_path(self.path),
-            ).encode()
+        path_only = self.path.split("?")[0]
+        if path_only in ("/risk", "/risk/"):
+            body = render_risk_build_html().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        doc_path = _safe_docs_path(path_only)
+        if doc_path is not None:
+            body = doc_path.read_text(encoding="utf-8").encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only in ("/", "/dashboard"):
+            if self.risk_landing:
+                body = render_risk_build_html().encode()
+            else:
+                body = render_html(
+                    security_query=_security_query_from_path(self.path),
+                    custodian_id=_custodian_from_path(self.path),
+                ).encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -319,6 +368,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path == "/api/risk/build":
+            body = load_risk_build_report().model_dump_json(indent=2).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/risk":
             from warehouse.research.risk.api import risk_api_schema
 
@@ -358,9 +414,15 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return  # quiet default request logging
 
 
-def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
+def serve(host: str = "127.0.0.1", port: int = 8765, *, risk: bool = False) -> None:
+    DashboardHandler.risk_landing = risk
     server = HTTPServer((host, port), DashboardHandler)
-    print(f"Dashboard: http://{host}:{port}/")
+    if risk:
+        print(f"Risk build: http://{host}:{port}/")
+    else:
+        print(f"Dashboard: http://{host}:{port}/")
+    print(f"Risk build: http://{host}:{port}/risk")
+    print(f"Build API:  http://{host}:{port}/api/risk/build")
     print(f"Status API: http://{host}:{port}/api/status")
     print(f"Risk API:   http://{host}:{port}/api/risk")
     try:

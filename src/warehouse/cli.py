@@ -291,8 +291,13 @@ def info() -> None:
 @main.command()
 @click.option("--host", default="127.0.0.1", show_default=True)
 @click.option("--port", default=8765, show_default=True)
-def serve(host: str, port: int) -> None:
+@click.option(
+    "--risk",
+    is_flag=True,
+    help="Open the risk & synthetic build tracker as the landing page.",
+)
+def serve(host: str, port: int, risk: bool) -> None:
     """Start the living status dashboard."""
     from warehouse.dashboard.server import serve as run_dashboard
 
-    run_dashboard(host=host, port=port)
+    run_dashboard(host=host, port=port, risk=risk)

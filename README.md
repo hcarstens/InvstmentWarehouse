@@ -30,6 +30,7 @@ warehouse --help
 
 ```bash
 warehouse serve                  # http://127.0.0.1:8765/ — living status report
+warehouse serve --risk           # risk & synthetic build tracker (stakeholder view)
 warehouse serve --port 9000      # custom port
 warehouse info                   # platform summary in the terminal
 ```
@@ -41,6 +42,9 @@ The dashboard auto-refreshes every 30s. On first load it runs migrate + seed if 
 | URL | Description |
 | --- | --- |
 | `/` | Full dashboard (entity graph, securities, schema status) |
+| `/risk` | Risk API + HNW synthetic build tracker (deliverables, rungs, smoke checks) |
+| `/api/risk/build` | Build tracker JSON (for CI / automation) |
+| `/docs/risk_api_contract.md` | Serve contract doc as plain text from repo |
 | `/?q=VTI` | Security master filter by ticker, name, or CUSIP |
 | `/api/status` | Platform status JSON |
 | `/api/health` | Infrastructure checks (503 if any fail) |

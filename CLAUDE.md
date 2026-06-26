@@ -112,6 +112,7 @@ pip install -e ".[dev]"
 pytest                        # no Docker required
 pytest tests/test_frozen.py   # immutability registry
 warehouse serve               # living status dashboard (primary entry point)
+warehouse serve --risk        # risk & synthetic build tracker landing page
 warehouse db bootstrap        # migrate + seed demo household
 warehouse db upgrade          # Alembic migrations only
 warehouse info                # CLI summary
@@ -199,5 +200,6 @@ pytest tests/test_frozen.py   # frozen registry immutability
 - `docs/heuristics/Libraries.md` — repo organization axioms (HLib1–HLib6)
 - `docs/heuristics/Cartography.md` — module/map structure axioms (C1–C8)
 - `docs/risk_api_contract.md` — risk API v0 contract
+- `docs/risk_api_implementation_plan.md` — HNW-informed build plan (v0a/b/c PRs)
 - `TODO.md` — phased deliverables
 - `JOURNAL.md` — build log

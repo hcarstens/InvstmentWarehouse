@@ -3,7 +3,8 @@
 **Status:** v0 proposed (engine exists; new contract not built)
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
-`docs/research/simple_risk_models.md`, `docs/code_review_claude_2026-06-26.md`
+`docs/research/simple_risk_models.md`, `docs/research/hnw_portfolios.md`,
+`docs/risk_api_implementation_plan.md`, `docs/code_review_claude_2026-06-26.md`
 
 > **North star:** the risk plane becomes a **standalone module** with one pure entry point,
 > plugged into the larger workflow over an API. The project hands it a portfolio + a question;
@@ -303,3 +304,4 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 | 2026-06-26 | Arbitration (Claude): accepted Cursor's *reuse `AssetPortfolio`*, *close decisions with defaults*, *one-page structure*; **rejected** dropping the `RiskResult` envelope (breaking change) and deferring frozen results (convention-mandated); kept a minimal synthetic spine (user requirement). Verified the two "orchestration stories" are one path + HTTP face. Result: this v0 + a `## v1` appendix. |
 | 2026-06-26 | Assumptions decision (owner + Claude): risk **owns** a version-pinned, PSD-validated scenario catalog (`base`/`high_risk`/`low_risk`); caller selects via a `run_scenarios` flag, not an injected assumptions object. `RiskResult` gains a `scenarios` map; same diff machinery serves regime + overlay deltas. Pulled the catalog + flag into v0; arbitrary override → v1 escape hatch. Reverses the earlier injectable-third-arg idea. |
 | 2026-06-26 | Cursor review (post-edit): aligned HTTP to **`POST /api/risk`** (no `/orchestrate`); fixed v1 pseudocode arg order to `(request, manifest)`; split migration into **v0a / v0b / v0c** with v0b flagged as largest chunk; tied regimes to existing `stress.py`; `Scenario` fixture marked test-only. |
+| 2026-06-26 | Implementation plan added: [`risk_api_implementation_plan.md`](risk_api_implementation_plan.md) — HNW Shape A/B split, rung ownership, SDG acceptance → v0a/b/c PR sequence. |
