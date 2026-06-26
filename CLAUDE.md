@@ -150,6 +150,22 @@ Rules:
 
 Prefer a loud failure over a wrong portfolio state.
 
+## Heuristic frameworks
+
+Read and apply the axiom sets in `docs/heuristics/` when reasoning in the matching
+domain. Do not paste the full axioms into responses — use them as lenses.
+
+| When you are… | Read and apply |
+| --- | --- |
+| Designing, reviewing, or implementing **risk** (measurement, scenarios, stress, limits, portfolio construction, `warehouse.research.risk`, risk API/dashboard) | [`docs/heuristics/Risk Management.md`](docs/heuristics/Risk%20Management.md) — RM1–RM7 (quantify, diversify, prevent, EV, tails, factor independence, controllable exposure) |
+| Thinking about **repo or project organization** (where code/docs live, naming, discovery, package boundaries, docs layout) | [`docs/heuristics/Libraries.md`](docs/heuristics/Libraries.md) — HLib1–HLib6 (collocation, fixed location, hierarchy, controlled vocabulary, citation chaining, single entry point) |
+| Thinking about **module or system structure** (planes, packages, APIs, dashboards, how subsystems map to reality) | [`docs/heuristics/Cartography.md`](docs/heuristics/Cartography.md) — C1–C8 (projection, scale, coordinates, purposeful omission, legend, hierarchy, orientation, self-contained maps) |
+
+**Overlap:** Libraries and Cartography both apply to structure — Libraries for *where things
+live and how they are found*; Cartography for *how the abstraction represents reality* (what
+to show, distort, or omit). Risk Management applies only to the risk plane and risk-adjacent
+decision work (IPS limits, stress, concentration), not general Python style.
+
 ## Frozen variables (immutability check)
 
 Audit-critical and replay-critical objects must be **immutable after construction**.
@@ -179,5 +195,9 @@ pytest tests/test_frozen.py   # frozen registry immutability
 ## Key docs
 
 - `docs/research/sharpe_founding_engineer_brief.md` — platform synthesis
+- `docs/heuristics/Risk Management.md` — risk reasoning axioms (RM1–RM7)
+- `docs/heuristics/Libraries.md` — repo organization axioms (HLib1–HLib6)
+- `docs/heuristics/Cartography.md` — module/map structure axioms (C1–C8)
+- `docs/risk_api_contract.md` — risk API v0 contract
 - `TODO.md` — phased deliverables
 - `JOURNAL.md` — build log
