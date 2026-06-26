@@ -9,8 +9,6 @@ from warehouse.research.risk.models import (
     AssetClass,
     AssetPortfolio,
 )
-from warehouse.research.synthetic.cohort import default_cohort_for_rung
-from warehouse.research.synthetic.pipeline import emit_hnw_fixture
 
 
 def rung(
@@ -25,6 +23,9 @@ def rung(
     Rungs 3–4: compositional HNW generator (``warehouse.research.synthetic``).
     """
     if level in (3, 4):
+        from warehouse.research.synthetic.cohort import default_cohort_for_rung
+        from warehouse.research.synthetic.pipeline import emit_hnw_fixture
+
         cohort = cohort_id or default_cohort_for_rung(level)
         fixture = emit_hnw_fixture(cohort_id=cohort, seed=seed, rung=level)
         portfolio = fixture.asset_portfolio

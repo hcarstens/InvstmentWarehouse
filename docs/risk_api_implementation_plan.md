@@ -318,3 +318,61 @@ Level 4 replay; it **feeds** them with richer inputs.
 `stress_harness.py` (or pytest parametrization) looping
 `COHORT_IDS × rung(3,4) × seeds × ScenarioSet`, asserting goldens — generalizing
 `tests/test_hnw_synthetic.py` and `tests/fixtures/risk_golden/` into a batch falsifier.
+
+---
+
+## 12. HNW leaf-type combinatorial harness *(v1.2 — shipped)*
+
+Walk the **15 HNW leaf types** (A–O per `docs/research/hnw_asset_types.md`) through
+`evaluate_risk` in increasing combination sizes: 1-at-a-time, then pairs, triples, … up to
+full `2^15 − 1` subsets.
+
+### Two layers (do not conflate)
+
+| Layer | Count | Risk wire | Module |
+| --- | --- | --- | --- |
+| **Leaf types** | 15 (A–O) | One `AllocationSlot` per leaf (`label` = leaf id) | `hnw_asset_types.py` |
+| **Risk sleeves** | 6 (`AssetClass`) | Covariance / vol priors | `assumptions.py` |
+
+Several leaves roll up to the same sleeve (e.g. B and G → `equity`); the harness keeps them
+as **separate slots** so combination tests exercise multi-slot covariance, fermi marks, and
+liquidity tiers.
+
+### Pipeline (no DB required for risk-only)
+
+```text
+combinations(HnwAssetType, k=1..15)
+  → build_manifest_from_hnw_types()     # Shape A, equal weight
+  → evaluate_risk(request, manifest)    # ok | ips_excluded | error
+```
+
+| Outcome | When |
+| --- | --- |
+| `ok` | Investable leaf set → `RiskResult` with fingerprint + vol |
+| `ips_excluded` | Philanthropic (N) or personal-use (O) in the combo |
+| `error` | Unexpected failure — harness should stay at zero in CI |
+
+**Modules:** `warehouse/research/synthetic/hnw_asset_types.py`,
+`hnw_manifest.py`, `stress_harness.py`. Tests: `tests/test_risk_hnw_combinations.py`.
+
+### Synthetic DB *(deferred — Phase 2)*
+
+Risk combinatorial falsification does **not** need a database. **Shape B → DB seed** is the
+next slice when the same leaf combos must drive optimizer, recon, and `build_household_manifest`:
+
+```text
+build_manifest_from_hnw_types(types)
+  → emit fixture with lots per leaf (Shape B)
+  → seed_synthetic_household(session, fixture)   # NOT YET
+  → build_household_manifest(hh_id) → evaluate_risk
+  → optimizer / recon smoke
+```
+
+Until the seed adapter exists, run risk-only stress in-process:
+
+```python
+from warehouse.research.synthetic import run_harness_cell, HnwAssetType
+
+cell = run_harness_cell((HnwAssetType.PUBLIC_EQUITY, HnwAssetType.PE_VC))
+# cell.status, cell.fingerprint, cell.annualized_vol
+```
