@@ -167,6 +167,7 @@ SYNTHETIC_RUNGS: list[BuildRung] = [
 ]
 
 BUILD_DOC_LINKS: list[tuple[str, str]] = [
+    ("Dev contract registry", "docs/dev_contract_registry.md"),
     ("Risk API contract", "docs/risk_api_contract.md"),
     ("Implementation plan", "docs/risk_api_implementation_plan.md"),
     ("HNW portfolios research", "docs/research/hnw_portfolios.md"),

@@ -1,0 +1,41 @@
+---
+description: Maintain dev contract registry and build tracker when adding tracks or shipping slices
+globs: docs/**/*contract*,docs/**/*implementation*,docs/dev_contract_registry.md,src/warehouse/dashboard/risk_build_registry.py
+alwaysApply: false
+---
+
+# Dev contract registry
+
+Read `docs/dev_contract_registry.md` before adding tracks, contracts, or cross-plane features.
+
+## Doc layers
+
+- **Contract** wins on conflict (boundaries, closed decisions).
+- **Plan** = PR slices + acceptance.
+- **Research** informs only — never override contract §8 without amendment.
+
+## Adding a track or deliverable
+
+1. Contract or plan doc exists with acceptance criteria.
+2. Register in `docs/dev_contract_registry.md` §2 (track) and/or §8 template.
+3. Add `BuildDeliverable` row in `risk_build_registry.py` (`status="planned"`, stable `id`).
+4. Set `depends_on` — do not start until deps are `shipped`.
+5. Add boundary row to registry §3 if new package ownership.
+6. Target a `falsifier_test` pytest id before marking `shipped`.
+
+## Shipping a slice (same PR)
+
+- `risk_build_registry.py` → `shipped`
+- Contract review log line if boundaries/decisions touched
+- Falsifier test in CI
+- Dashboard reads registry (no stub while shipped)
+
+## Removing / deferring
+
+- Set `status="deferred"` or `retired` — never delete `id`s silently.
+- Reason in `note` + plan doc.
+
+## Boundary check
+
+Risk pure core must not import `research.synthetic` pipeline or `decision.ips`.
+Caller composes Shape A (`evaluate_risk`) + IPS (decision plane) separately.

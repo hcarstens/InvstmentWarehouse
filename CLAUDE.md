@@ -195,6 +195,7 @@ pytest tests/test_frozen.py   # frozen registry immutability
 
 ## Key docs
 
+- `docs/dev_contract_registry.md` — scopes, boundaries, track status (index + amendment protocol)
 - `docs/research/sharpe_founding_engineer_brief.md` — platform synthesis
 - `docs/heuristics/Risk Management.md` — risk reasoning axioms (RM1–RM7)
 - `docs/heuristics/Libraries.md` — repo organization axioms (HLib1–HLib6)

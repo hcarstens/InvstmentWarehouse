@@ -4,8 +4,8 @@
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
 `docs/research/simple_risk_models.md`, `docs/research/hnw_portfolios.md`,
-`docs/research/synthetic_ips.md`, `docs/risk_api_implementation_plan.md`,
-`docs/code_review_claude_2026-06-26.md`
+`docs/research/synthetic_ips.md`, `docs/dev_contract_registry.md`,
+`docs/risk_api_implementation_plan.md`, `docs/code_review_claude_2026-06-26.md`
 
 > **North star:** the risk plane becomes a **standalone module** with one pure entry point,
 > plugged into the larger workflow over an API. The project hands it a portfolio + a question;
