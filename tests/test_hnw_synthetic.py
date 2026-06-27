@@ -12,6 +12,7 @@ from warehouse.research.risk.synthetic import rung
 from warehouse.research.synthetic import (
     COHORT_IDS,
     emit_hnw_fixture,
+    emit_synthetic_household,
     project_to_asset_portfolio,
 )
 from warehouse.research.synthetic.cohort import sample_sleeve_weights
@@ -92,3 +93,13 @@ def test_all_cohort_ids_defined() -> None:
 def test_unknown_cohort_raises() -> None:
     with pytest.raises(KeyError):
         sample_sleeve_weights("unknown_cohort", seed=0)
+
+
+def test_emit_synthetic_household_bundle_coherent() -> None:
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    assert bundle.validation.ok
+    assert bundle.fixture.total_nav_usd > 0
+    assert bundle.ips.household_id == bundle.fixture.household_id
+    manifest = bundle.fixture.asset_portfolio
+    assert manifest is not None
+    assert manifest.cohort_id == "general_hnw"

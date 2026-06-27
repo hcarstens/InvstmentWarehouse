@@ -122,6 +122,26 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
         )
     )
 
+    ips_emit_ok = _file_exists("src/warehouse/research/synthetic/ips_emit.py")
+    checks.append(
+        BuildSmokeCheck(
+            name="emit_ips_for_cohort",
+            ok=ips_emit_ok,
+            detail="research/synthetic/ips_emit.py — si1",
+        )
+    )
+
+    ips_validate_ok = _file_exists(
+        "src/warehouse/research/synthetic/ips_validate.py"
+    )
+    checks.append(
+        BuildSmokeCheck(
+            name="validate_ips + emit_synthetic_household",
+            ok=ips_validate_ok,
+            detail="research/synthetic/ips_validate.py — si2",
+        )
+    )
+
     return checks
 
 

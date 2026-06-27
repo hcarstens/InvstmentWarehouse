@@ -14,6 +14,11 @@ from warehouse.research.synthetic.cohort import (
     sample_sleeve_weights,
     tension_tags_for,
 )
+from warehouse.research.synthetic.ips_emit import emit_ips_for_cohort
+from warehouse.research.synthetic.ips_validate import (
+    IpsValidationError,
+    validate_ips,
+)
 from warehouse.research.synthetic.manifest import project_to_asset_portfolio
 from warehouse.research.synthetic.models import (
     HouseholdFixture,
@@ -21,6 +26,7 @@ from warehouse.research.synthetic.models import (
     SyntheticAccount,
     SyntheticAltCall,
     SyntheticAltHolding,
+    SyntheticHouseholdBundle,
     SyntheticLot,
 )
 
@@ -328,3 +334,61 @@ def emit_hnw_fixture(
     )
     shape_a = project_to_asset_portfolio(fixture)
     return fixture.model_copy(update={"asset_portfolio": shape_a})
+
+
+def _weights_from_shape_a(
+    fixture: HouseholdFixture,
+) -> dict[AssetClass, Decimal]:
+    portfolio = fixture.asset_portfolio
+    if portfolio is None:
+        portfolio = project_to_asset_portfolio(fixture)
+    return {slot.asset_class: slot.weight for slot in portfolio.allocations}
+
+
+def _seal_ips_provenance(
+    fixture: HouseholdFixture,
+    ips_id: str,
+) -> HouseholdFixture:
+    ips_hash = _stage_hash("ips", ips_id)
+    provenance = fixture.provenance.model_copy(
+        update={
+            "stage_hashes": [*fixture.provenance.stage_hashes, ips_hash],
+        }
+    )
+    return fixture.model_copy(update={"provenance": provenance})
+
+
+def emit_synthetic_household(
+    *,
+    cohort_id: str,
+    seed: int,
+    rung: int = 3,
+    household_id: str | None = None,
+    nav_usd: Decimal = _DEFAULT_NAV,
+    validate: bool = True,
+) -> SyntheticHouseholdBundle:
+    """Emit Shape B fixture + co-generated IPS; validate before sealing."""
+    fixture = emit_hnw_fixture(
+        cohort_id=cohort_id,
+        seed=seed,
+        rung=rung,
+        household_id=household_id,
+        nav_usd=nav_usd,
+    )
+    weights = _weights_from_shape_a(fixture)
+    ips = emit_ips_for_cohort(
+        cohort_id=cohort_id,
+        seed=seed,
+        household_id=fixture.household_id,
+        weights=weights,
+        rung=rung,
+    )
+    validation = validate_ips(fixture, ips)
+    if validate and not validation.ok:
+        raise IpsValidationError(validation)
+    fixture = _seal_ips_provenance(fixture, ips.ips_id)
+    return SyntheticHouseholdBundle(
+        fixture=fixture,
+        ips=ips,
+        validation=validation,
+    )

@@ -4,6 +4,36 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-27 — Synthetic IPS si2 (validate_ips + bundle)
+
+**Shipped:**
+
+- **`validate_ips`** — Shape A sleeve min/max, single-name concentration, liquidity
+  tier 1+2 vs unfunded alt commitments (`research/synthetic/ips_validate.py`)
+- **`emit_synthetic_household`** — fixture + IPS co-generated from Shape A weights;
+  validates before sealing IPS stage hash in provenance
+- **`SyntheticHouseholdBundle`** / **`IpsValidationResult`** models
+- **Tests** — bundle pass/fail, `concentrated_stress` binding CI gate, mismatch rejection
+
+**Next:** si3 workflow smokes + scenario card IPS metadata.
+
+---
+
+## 2026-06-27 — Synthetic IPS si1 (emit_ips_for_cohort)
+
+**Shipped:**
+
+- **`COHORT_IPS_PRIORS`** — concentration, liquidity floor, allocation band width per cohort
+  (`research/synthetic/ips_cohort.py`)
+- **`emit_ips_for_cohort`** — builds `InvestmentPolicyStatement` from sampled sleeve weights;
+  `concentrated_stress` tight equity ceiling + portfolio concentration range for SDG2 binding path
+- **Tests** — `tests/test_synthetic_ips.py` (determinism, priors, binding path)
+- **Dashboard** — registry `si1-emit-ips` shipped; smoke check for `ips_emit.py`
+
+**Next:** si2 `validate_ips` + `emit_synthetic_household` bundle.
+
+---
+
 ## 2026-06-27 — Synthetic IPS si0a–si0b + contract registry
 
 **Context:** HNW portfolio generator (Shape B, rungs 3–4) shipped without a paired

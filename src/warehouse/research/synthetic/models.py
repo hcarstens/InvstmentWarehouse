@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.research.risk.models import AssetPortfolio
 
 
@@ -73,3 +74,17 @@ class HouseholdFixture(BaseModel):
     alternative_holdings: list[SyntheticAltHolding]
     asset_portfolio: AssetPortfolio | None = None
     total_nav_usd: Decimal
+
+
+class IpsValidationResult(BaseModel):
+    ok: bool
+    binding_constraints: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+class SyntheticHouseholdBundle(BaseModel):
+    """Co-generated Shape B fixture + IPS + validation gate result."""
+
+    fixture: HouseholdFixture
+    ips: InvestmentPolicyStatement
+    validation: IpsValidationResult
