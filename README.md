@@ -161,8 +161,11 @@ pytest tests/test_frozen.py      # immutability registry
 ruff check src tests
 ```
 
+See [`CI.md`](CI.md) for the full CI command reference (GitHub Actions, mypy, track falsifiers).
+
 ## Project docs
 
+- `CI.md` — CI commands and pre-push checklist
 - `CLAUDE.md` — architecture and conventions
 - `TODO.md` — phased deliverables
 - `JOURNAL.md` — build log
