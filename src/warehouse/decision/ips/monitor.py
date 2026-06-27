@@ -31,16 +31,12 @@ class IpsDriftReport(BaseModel):
     concentration_alerts: list[str]
 
 
-def build_ips_drift_report(
-    session: Session,
+def build_ips_drift_report_from_views(
     household_id: str,
     positions: list[LotPositionView],
-    ips: InvestmentPolicyStatement | None = None,
+    ips: InvestmentPolicyStatement,
 ) -> IpsDriftReport:
-    policy = ips or load_ips(session, household_id)
-    if policy is None:
-        raise ValueError(f"No IPS found for household {household_id}")
-
+    """Session-less IPS drift report for synthetic workflow smokes."""
     total_mv = sum((p.market_value or Decimal("0")) for p in positions)
     class_mv: dict[IpsSleeve, Decimal] = {}
     for pos in positions:
@@ -53,7 +49,7 @@ def build_ips_drift_report(
 
     rows: list[AllocationDriftRow] = []
     weights: dict[IpsSleeve, Decimal] = {}
-    for target in policy.allocation_targets:
+    for target in ips.allocation_targets:
         mv = class_mv.get(target.asset_class, Decimal("0"))
         current = mv / total_mv if total_mv > 0 else Decimal("0")
         weights[target.asset_class] = current
@@ -69,7 +65,7 @@ def build_ips_drift_report(
         )
 
     concentration: list[str] = []
-    cap = policy.concentration_limit_pct
+    cap = ips.concentration_limit_pct
     if total_mv > 0:
         for pos in positions:
             if pos.market_value is None:
@@ -81,8 +77,8 @@ def build_ips_drift_report(
                     f"(limit {cap:.1%})"
                 )
 
-    alerts = drift_vs_ips(weights, policy)
-    alerts.extend(liquidity_vs_ips(positions, policy))
+    alerts = drift_vs_ips(weights, ips)
+    alerts.extend(liquidity_vs_ips(positions, ips))
 
     return IpsDriftReport(
         household_id=household_id,
@@ -90,3 +86,15 @@ def build_ips_drift_report(
         alerts=alerts,
         concentration_alerts=concentration,
     )
+
+
+def build_ips_drift_report(
+    session: Session,
+    household_id: str,
+    positions: list[LotPositionView],
+    ips: InvestmentPolicyStatement | None = None,
+) -> IpsDriftReport:
+    policy = ips or load_ips(session, household_id)
+    if policy is None:
+        raise ValueError(f"No IPS found for household {household_id}")
+    return build_ips_drift_report_from_views(household_id, positions, policy)

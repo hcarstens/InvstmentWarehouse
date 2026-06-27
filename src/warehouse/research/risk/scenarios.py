@@ -1,4 +1,4 @@
-"""Risk-owned scenario catalog — base / high_risk / low_risk with PSD validation."""
+"""Risk-owned scenario catalog — base/high/low with PSD validation."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Live infrastructure health checks — errors bubble to surface, no silent failures."""
+"""Live infrastructure health checks — errors bubble to surface."""
 
 from __future__ import annotations
 
@@ -95,7 +95,10 @@ def check_job_queue(settings: Settings) -> InfraCheck:
         return InfraCheck(
             component="Job queue",
             status="skipped",
-            detail="In-process jobs (no Redis) — Redis queue deferred to Phase 5",
+            detail=(
+                "In-process jobs (no Redis) — "
+                "Redis queue deferred to Phase 5"
+            ),
         )
 
     try:
@@ -142,7 +145,10 @@ def check_object_store(settings: Settings) -> InfraCheck:
     return InfraCheck(
         component="Object store",
         status="skipped",
-        detail="S3 endpoint configured; connectivity check deferred to Phase 5",
+        detail=(
+            "S3 endpoint configured; "
+            "connectivity check deferred to Phase 5"
+        ),
     )
 
 

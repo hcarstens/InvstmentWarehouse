@@ -1,4 +1,4 @@
-"""Sim / backtest harness — historical prices + lot state → after-tax outcomes."""
+"""Sim / backtest harness — prices + lot state → after-tax outcomes."""
 
 from dataclasses import dataclass
 from datetime import date

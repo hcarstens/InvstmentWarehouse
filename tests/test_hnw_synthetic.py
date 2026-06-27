@@ -70,6 +70,7 @@ def test_scenario_card_links_fingerprint() -> None:
     assert card.risk_fingerprint
     assert card.generator_version != "unknown"
     assert card.cohort_id == "general_hnw"
+    assert card.ips_id is not None
 
 
 def test_evaluate_risk_rung4_compositional() -> None:

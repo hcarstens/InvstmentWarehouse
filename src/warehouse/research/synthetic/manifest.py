@@ -39,7 +39,7 @@ def _liquidity_tier(asset_class: AssetClass, *, fermi: bool) -> int:
 
 
 def project_to_asset_portfolio(fixture: HouseholdFixture) -> AssetPortfolio:
-    """Aggregate lot marks + alt NAV into sleeve weights (HNW axiom: Σ lots = NAV)."""
+    """Aggregate lot marks + alt NAV into sleeve weights (Σ lots = NAV)."""
     class_mv: dict[AssetClass, Decimal] = defaultdict(lambda: Decimal("0"))
     liquidity: dict[AssetClass, int] = {}
     fermi_classes: set[AssetClass] = set()

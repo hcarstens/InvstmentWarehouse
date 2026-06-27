@@ -1,4 +1,4 @@
-"""Frozen registry — ensure immutable types reject mutation (no silent failures)."""
+"""Frozen registry — ensure immutable types reject mutation."""
 
 import pytest
 
@@ -13,7 +13,8 @@ from warehouse.integrity.frozen_registry import (
 @pytest.mark.parametrize("cls", FROZEN_TYPES)
 def test_frozen_registry_types_are_marked_frozen(cls: type) -> None:
     assert is_registered_frozen_type(cls), (
-        f"{cls.__name__} is in FROZEN_TYPES but missing frozen=True configuration"
+        f"{cls.__name__} is in FROZEN_TYPES but missing "
+        f"frozen=True configuration"
     )
 
 

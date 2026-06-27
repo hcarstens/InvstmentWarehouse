@@ -1,7 +1,8 @@
 """Combinatorial HNW leaf-type stress harness → ``evaluate_risk``.
 
 Walks subsets of the 15 HNW asset types (size 1, then 2, then 3, …) and records
-a structured outcome per cell. No database required for risk-only falsification.
+a structured outcome per cell. No database required for risk-only
+falsification.
 """
 
 from __future__ import annotations
@@ -47,7 +48,7 @@ def iter_hnw_combinations(
     max_size: int | None = None,
     min_size: int = 1,
 ) -> Iterator[tuple[HnwAssetType, ...]]:
-    """Yield sorted leaf-type tuples from size ``min_size`` up to ``max_size``."""
+    """Yield sorted leaf-type tuples from ``min_size`` up to ``max_size``."""
     upper = max_size if max_size is not None else len(HNW_ASSET_TYPES)
     for k in range(min_size, upper + 1):
         yield from itertools.combinations(HNW_ASSET_TYPES, k)
@@ -57,7 +58,7 @@ def run_harness_cell(
     types: tuple[HnwAssetType, ...],
     request: RiskRequest | None = None,
 ) -> HarnessCell:
-    """Evaluate one combination; never raises — outcome is in ``HarnessCell``."""
+    """Evaluate one combination; never raises — outcome in ``HarnessCell``."""
     type_names = tuple(t.value for t in types)
     req = request or RiskRequest(
         horizon=RiskHorizon.parse("5y"),
@@ -96,7 +97,10 @@ def run_combination_matrix(
     min_size: int = 1,
     request: RiskRequest | None = None,
 ) -> list[HarnessCell]:
-    """Run all combinations in ``[min_size, max_size]`` (default: full 2^15−1 matrix)."""
+    """Run all combinations in ``[min_size, max_size]``.
+
+    Default: full 2^15−1 matrix.
+    """
     return [
         run_harness_cell(combo, request)
         for combo in iter_hnw_combinations(

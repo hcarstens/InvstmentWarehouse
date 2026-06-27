@@ -1,6 +1,7 @@
 """Version-pinned risk priors — vol, correlation, stress, liquidity.
 
-Tune via risk_model_version / risk_stress_pack_version, not per-request overrides.
+Tune via risk_model_version / risk_stress_pack_version,
+not per-request overrides.
 See docs/research/risk_units_measures.md and docs/research/portfolio_risk.md.
 """
 
@@ -32,7 +33,8 @@ CLASS_EXPECTED_RETURN: dict[AssetClass, Decimal] = {
 
 DEFAULT_CLASS_CORRELATION = Decimal("0.25")
 
-# Pairwise correlations — normal-regime priors; stress pack handles crisis separately.
+# Pairwise correlations — normal-regime priors; stress pack handles crisis
+# separately.
 CLASS_CORRELATIONS: dict[frozenset[AssetClass], Decimal] = {
     frozenset({AssetClass.EQUITY, AssetClass.FIXED_INCOME}): Decimal("-0.20"),
     frozenset({AssetClass.EQUITY, AssetClass.COMMODITIES}): Decimal("0.35"),

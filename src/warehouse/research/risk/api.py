@@ -126,7 +126,10 @@ def risk_api_schema() -> dict[str, Any]:
                 "complexity": "optional — synthetic rung tag",
                 "allocations": [
                     {
-                        "asset_class": "equity|fixed_income|commodities|fx|alternatives|cash",
+                        "asset_class": (
+                            "equity|fixed_income|commodities|"
+                            "fx|alternatives|cash"
+                        ),
                         "weight": "0.0-1.0, must sum to 1",
                         "duration_years": "optional — fixed income / alts",
                         "beta": "optional — equity sleeve",
@@ -136,36 +139,69 @@ def risk_api_schema() -> dict[str, Any]:
                 ],
             },
             "horizon": "e.g. 5y or 5 — investment horizon in years",
-            "notional_usd": "optional — enables Level 1 dollar VaR/ES and Level 4 dollar P&L",
-            "run_scenarios": "none | high_risk | low_risk | all — optional assumption regimes",
+            "notional_usd": (
+                "optional — enables Level 1 dollar VaR/ES and "
+                "Level 4 dollar P&L"
+            ),
+            "run_scenarios": (
+                "none | high_risk | low_risk | all — "
+                "optional assumption regimes"
+            ),
             "overlay": {
-                "weight_tilts": "optional dict asset_class → delta weight before renormalize",
+                "weight_tilts": (
+                    "optional dict asset_class → delta weight "
+                    "before renormalize"
+                ),
                 "add_sleeves": "optional AllocationSlot list",
                 "drop_sleeves": "optional asset_class list",
-                "stress_pack": "optional Level 4 scenario name for proposed eval",
+                "stress_pack": (
+                    "optional Level 4 scenario name for proposed eval"
+                ),
                 "label": "optional overlay label for audit",
             },
         },
         "response": {
-            "level_1_portfolio": "sigma, parametric VaR/ES with (alpha, h) metadata",
-            "level_2_contributions": "pct_variance by class and duration bucket",
+            "level_1_portfolio": (
+                "sigma, parametric VaR/ES with (alpha, h) metadata"
+            ),
+            "level_2_contributions": (
+                "pct_variance by class and duration bucket"
+            ),
             "level_3_sensitivities": "native units (beta, duration, fermi)",
             "level_4_stress": "named replay 2008/2020/2022",
             "liquidity": "liquidity-time days by tier",
-            "measurement_summary": "measurable vs fermi weight and risk share",
-            "scenarios": "optional map of regime → full report when run_scenarios ≠ none",
-            "deltas": "optional RiskDeltas when overlay present — headline metric shifts",
+            "measurement_summary": (
+                "measurable vs fermi weight and risk share"
+            ),
+            "scenarios": (
+                "optional map of regime → full report when "
+                "run_scenarios ≠ none"
+            ),
+            "deltas": (
+                "optional RiskDeltas when overlay present — "
+                "headline metric shifts"
+            ),
         },
         "integration": {
-            "in_process": "evaluate_risk(RiskRequest, AssetPortfolio, assumptions=...)",
-            "http_post": "JSON body → parse_risk_request → evaluate_risk_http",
-            "ledger": "build_household_manifest(household_id) → evaluate_risk",
+            "in_process": (
+                "evaluate_risk(RiskRequest, AssetPortfolio, "
+                "assumptions=...)"
+            ),
+            "http_post": (
+                "JSON body → parse_risk_request → evaluate_risk_http"
+            ),
+            "ledger": (
+                "build_household_manifest(household_id) → evaluate_risk"
+            ),
             "synthetic": "rung(0..4) for no-DB regression",
-            "overlay": "request.overlay → apply_overlay → diff baseline vs proposed",
+            "overlay": (
+                "request.overlay → apply_overlay → "
+                "diff baseline vs proposed"
+            ),
         },
         "privacy": (
-            "Allocations and horizons are fingerprinted; raw inputs are not logged "
-            "when risk_log_inputs=false"
+            "Allocations and horizons are fingerprinted; "
+            "raw inputs are not logged when risk_log_inputs=false"
         ),
         "notifications": {
             "risk_notify_on_error": "master switch for failure alerts",
@@ -175,7 +211,11 @@ def risk_api_schema() -> dict[str, Any]:
             "risk_notify_smtp_host": "SMTP host (required to send email)",
             "risk_notify_smtp_port": "SMTP port (default 587)",
             "risk_notify_messaging_enabled": "POST JSON webhook when true",
-            "risk_notify_messaging_webhook_url": "Slack or generic webhook URL",
-            "risk_notify_messaging_channel": "channel label included in payload",
+            "risk_notify_messaging_webhook_url": (
+                "Slack or generic webhook URL"
+            ),
+            "risk_notify_messaging_channel": (
+                "channel label included in payload"
+            ),
         },
     }

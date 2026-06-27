@@ -1,7 +1,7 @@
 """Risk asset test suite — Phase A (singles) and Phase B (combinations).
 
-Walk HNW leaf types through ``evaluate_risk``, write per-cell JSON reports under
-``runs/research/risk_asset_tests/``, return structured suite results.
+Walk HNW leaf types through ``evaluate_risk``, write per-cell JSON
+reports under ``runs/research/risk_asset_tests/``, return suite results.
 """
 
 from __future__ import annotations

@@ -1,8 +1,8 @@
 """HNW leaf asset taxonomy (A–O) — maps to risk ``AssetClass`` sleeves.
 
-See ``docs/research/hnw_asset_types.md``. Risk API consumes Shape A (6 sleeves);
-this catalog drives combinatorial stress via distinct ``AllocationSlot`` metadata
-per leaf type (``label`` = leaf id).
+See ``docs/research/hnw_asset_types.md``. Risk API consumes Shape A
+(6 sleeves); this catalog drives combinatorial stress via distinct
+``AllocationSlot`` metadata per leaf type (``label`` = leaf id).
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from warehouse.research.risk.models import AssetClass, MeasurementMode
 
 
 class HnwAssetType(StrEnum):
-    """Fifteen HNW asset categories — stable ids for harness / scenario cards."""
+    """Fifteen HNW asset categories — stable ids for harness cards."""
 
     OPERATING_BUSINESS = "operating_business"  # A
     PUBLIC_EQUITY = "public_equity"  # B

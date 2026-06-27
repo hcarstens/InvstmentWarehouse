@@ -1,4 +1,4 @@
-"""Versioned contracts — IPS, mandates, fee schedules, alt subscription docs."""
+"""Versioned contracts — IPS, mandates, fee schedules, alt docs."""
 
 from pydantic import BaseModel
 

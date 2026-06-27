@@ -65,7 +65,7 @@ class ProvenanceManifest(BaseModel):
 
 
 class HouseholdFixture(BaseModel):
-    """Shape B — full synthetic household for optimizer / recon / risk projection."""
+    """Shape B — synthetic household for optimizer, recon, and risk."""
 
     household_id: str
     provenance: ProvenanceManifest

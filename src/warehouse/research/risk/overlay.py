@@ -42,7 +42,8 @@ def apply_overlay(
     for asset_class, weight in weights.items():
         if weight < 0:
             raise ValueError(
-                f"overlay produced negative weight for {asset_class.value}: {weight}"
+                f"overlay produced negative weight for "
+                f"{asset_class.value}: {weight}"
             )
 
     total = sum(weights.values(), Decimal("0"))
@@ -91,7 +92,7 @@ def diff_reports(
     *,
     overlay_label: str | None = None,
 ) -> RiskDeltas:
-    """Diff baseline vs proposed Level 1 headline metrics and Level 2 variance shares."""
+    """Diff baseline vs proposed Level 1 metrics and L2 variance shares."""
     b1 = baseline.level_1_portfolio
     p1 = proposed.level_1_portfolio
     headline = [

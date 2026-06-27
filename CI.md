@@ -69,6 +69,11 @@ Tool config: [`pyproject.toml`](pyproject.toml) → `[tool.ruff]`, `[tool.ruff.l
 | `ruff check src tests --fix` | Auto-fix import order and safe rules |
 | `ruff format src tests` | Format (79-char line length) |
 | `ruff format --check src tests` | Format check (not in CI today) |
+| `ruff check --select E501 src tests` | Line length only (79 chars) |
+
+**Line length (E501):** enforced by ruff and Flake8 (`.flake8`). Dashboard HTML
+modules (`render_*.py`, `server.py`, `phases.py`, `status.py`) are exempt per
+`[tool.ruff.lint.per-file-ignores]` — see `CLAUDE.md`.
 
 **Scope note:** CI lints `src` and `tests` only. Alembic migrations under
 `alembic/versions/` are excluded; run `ruff check .` locally if you change migrations.
@@ -110,7 +115,7 @@ Config: `[tool.pytest.ini_options]` — `testpaths = ["tests"]`, `pythonpath = [
 | Phase 4 — OMS & execution | `pytest tests/test_phase4.py` |
 | Risk API | `pytest tests/test_risk_api.py tests/test_risk_service.py tests/test_risk_integration.py tests/test_risk_v1.py tests/test_risk_scenarios.py tests/test_risk_observability.py tests/test_risk_synthetic.py tests/test_risk_dashboard.py` |
 | HNW synthetic | `pytest tests/test_hnw_synthetic.py tests/test_risk_hnw_combinations.py tests/test_risk_asset_test_suite.py` |
-| Synthetic IPS (si0–si2) | `pytest tests/test_ips_sleeves.py tests/test_ips_policy_fields.py tests/test_synthetic_ips.py` |
+| Synthetic IPS (si0–si3) | `pytest tests/test_ips_sleeves.py tests/test_ips_policy_fields.py tests/test_synthetic_ips.py tests/test_synthetic_ips_workflow.py` |
 | Build tracker UI | `pytest tests/test_risk_build_dashboard.py` |
 
 ### Track falsifiers (before marking deliverables shipped)
@@ -123,6 +128,7 @@ have a green `falsifier_test`:
 | si0a — IpsSleeve enum | `pytest tests/test_ips_sleeves.py` |
 | si0b — IPS policy fields | `pytest tests/test_ips_policy_fields.py` |
 | si1 / si2 — emit + validate IPS | `pytest tests/test_synthetic_ips.py` |
+| si3 — workflow smokes | `pytest tests/test_synthetic_ips_workflow.py` |
 
 ---
 

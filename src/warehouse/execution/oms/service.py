@@ -44,11 +44,13 @@ def stage_orders_from_approval(
     if approval is None:
         raise ValueError(f"Approval request not found: {approval_request_id}")
     # Human approval gate — enforce at the OMS boundary, not just the caller.
-    # No order reaches staging without an APPROVED sign-off (CLAUDE.md: gates dominate).
+    # No order reaches staging without an APPROVED sign-off
+    # (CLAUDE.md: gates dominate).
     if approval.status != ApprovalStatus.APPROVED.value:
         raise ValueError(
-            f"Cannot stage orders for {approval_request_id}: approval status is "
-            f"'{approval.status}', expected '{ApprovalStatus.APPROVED.value}'"
+            f"Cannot stage orders for {approval_request_id}: "
+            f"approval status is '{approval.status}', "
+            f"expected '{ApprovalStatus.APPROVED.value}'"
         )
 
     existing = session.scalar(

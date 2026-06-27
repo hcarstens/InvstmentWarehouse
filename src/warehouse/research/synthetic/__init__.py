@@ -48,6 +48,11 @@ from warehouse.research.synthetic.stress_harness import (
     run_harness_cell,
     summarize_matrix,
 )
+from warehouse.research.synthetic.workflow_smoke import (
+    WorkflowSmokeCheck,
+    WorkflowSmokeResult,
+    run_workflow_smoke,
+)
 
 __all__ = [
     "COHORT_IDS",
@@ -77,7 +82,10 @@ __all__ = [
     "run_asset_test_suite",
     "run_combination_matrix",
     "run_harness_cell",
+    "run_workflow_smoke",
     "summarize_matrix",
     "validate_ips",
+    "WorkflowSmokeCheck",
+    "WorkflowSmokeResult",
     "write_scenario_card",
 ]

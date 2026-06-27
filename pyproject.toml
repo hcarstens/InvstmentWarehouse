@@ -52,7 +52,13 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
-ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# HTML-heavy dashboard modules — CLAUDE.md allows >79 in render_*.py / server.py
+"src/warehouse/dashboard/server.py" = ["E501"]
+"src/warehouse/dashboard/render_*.py" = ["E501"]
+"src/warehouse/dashboard/phases.py" = ["E501"]
+"src/warehouse/dashboard/status.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

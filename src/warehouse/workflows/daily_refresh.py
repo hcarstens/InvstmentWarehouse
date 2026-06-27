@@ -1,4 +1,4 @@
-"""Daily refresh workflow — custodian → reconcile → lots → corp actions → exceptions."""
+"""Daily refresh — custodian → reconcile → lots → corp actions → exceptions."""
 
 from __future__ import annotations
 

@@ -1,7 +1,8 @@
 """Tax-aware optimizer v0 — TLH heuristics + greedy rebalance.
 
 Upgrade path: full MIP (Gurobi / CPLEX) for lot-discrete problems.
-Every output includes rationale: lots, binding constraints, tax delta vs baseline.
+Every output includes rationale: lots, binding constraints, tax delta
+vs baseline.
 """
 
 from decimal import Decimal

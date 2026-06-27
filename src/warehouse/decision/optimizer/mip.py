@@ -31,7 +31,7 @@ def run_mip_optimizer(
     settings: Settings | None = None,
     as_of: date | None = None,
 ) -> OptimizationResult:
-    """Discrete lot selection — ranks TLH candidates by tax benefit per dollar sold."""
+    """Discrete lot selection — TLH candidates by tax benefit per dollar."""
     cfg = settings or get_settings()
     today = as_of or date.today()
     trades: list[TradeProposal] = []
@@ -90,7 +90,8 @@ def run_mip_optimizer(
                 quantity=lot.quantity,
                 rationale=(
                     f"MIP discrete lot {lot.lot_id} score {_score:.4f} "
-                    f"loss {lot.unrealized_gain:.2f} tax delta {harvest_tax:.2f}"
+                    f"loss {lot.unrealized_gain:.2f} "
+                    f"tax delta {harvest_tax:.2f}"
                 ),
             )
         )

@@ -30,7 +30,10 @@ def dispatch_risk_alert(
     settings: Settings | None = None,
     extra: dict[str, Any] | None = None,
 ) -> None:
-    """Send configured email / messaging alerts. Logs and re-raises on send failure."""
+    """Send configured email / messaging alerts.
+
+    Logs and re-raises on send failure.
+    """
     cfg = settings or get_settings()
     if not cfg.risk_notify_on_error:
         logger.debug(

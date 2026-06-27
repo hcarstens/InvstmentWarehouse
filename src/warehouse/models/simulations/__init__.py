@@ -1,4 +1,4 @@
-"""Simulation job records — input snapshot, config hash, projected tax ledger."""
+"""Simulation job records — snapshot, config hash, projected tax ledger."""
 
 from pydantic import BaseModel
 

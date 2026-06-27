@@ -97,7 +97,7 @@ def test_approval_stages_orders() -> None:
 
 
 def test_oms_gate_blocks_unapproved_staging() -> None:
-    """OMS must refuse to stage orders for a PENDING approval — gate enforced at boundary."""
+    """OMS must refuse staging for PENDING approval — gate at boundary."""
     from warehouse.execution.oms.service import stage_orders_from_approval
 
     bootstrap_database(seed=True)

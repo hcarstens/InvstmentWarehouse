@@ -26,10 +26,11 @@ def _holding_period_rate(
 
 
 def _tax_on_gain(gain: Decimal, rate: Decimal) -> Decimal:
-    """Tax-liability delta from realizing ``gain`` at ``rate``, vs the do-nothing baseline.
+    """Tax-liability delta from realizing ``gain`` at ``rate``.
 
-    Sign convention: positive = additional tax owed (realized gain), negative = tax
-    reduced (harvested loss, where ``gain < 0``). Harvesting losses therefore lowers
+    Compared to the do-nothing baseline. Sign convention: positive =
+    additional tax owed (realized gain), negative = tax reduced (harvested
+    loss, where ``gain < 0``). Harvesting losses therefore lowers
     ``estimated_tax_delta`` — a negative delta is the after-tax benefit.
     """
     return gain * rate

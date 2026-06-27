@@ -4,6 +4,21 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-27 — Synthetic IPS si3 (workflow smokes + scenario card)
+
+**Shipped:**
+
+- **`build_ips_drift_report_from_views`** — session-less drift path in `decision/ips/monitor.py`
+- **`lot_positions_from_fixture`** — Shape B → `LotPositionView` adapter
+- **`run_workflow_smoke`** — policy monitoring, rebalance/optimizer, scenario fingerprint
+- **`ScenarioCard`** — `ips_id`, `binding_constraints_count`; `build_scenario_card` uses
+  `emit_synthetic_household`
+- **Tests** — `tests/test_synthetic_ips_workflow.py` (cohort matrix + concentrated_stress gates)
+
+**Next:** si4 dashboard binding matrix panel + optional `seed_synthetic_household`.
+
+---
+
 ## 2026-06-27 — Synthetic IPS si2 (validate_ips + bundle)
 
 **Shipped:**

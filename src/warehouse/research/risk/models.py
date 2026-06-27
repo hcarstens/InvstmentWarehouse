@@ -1,4 +1,4 @@
-"""Risk API models — unit hierarchy per docs/research/risk_units_measures.md."""
+"""Risk API models — unit hierarchy per risk_units_measures.md."""
 
 from __future__ import annotations
 

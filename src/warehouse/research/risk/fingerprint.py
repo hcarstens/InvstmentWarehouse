@@ -1,4 +1,4 @@
-"""Input fingerprinting — replay metadata without storing proprietary allocations."""
+"""Input fingerprinting — replay metadata without storing allocations."""
 
 from __future__ import annotations
 

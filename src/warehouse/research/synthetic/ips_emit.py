@@ -97,7 +97,7 @@ def emit_ips_for_cohort(
     ips_id: str | None = None,
     effective_date: str = DEFAULT_IPS_EFFECTIVE_DATE,
 ) -> InvestmentPolicyStatement:
-    """Build IPS allocation bands from sampled sleeve weights + cohort priors."""
+    """Build IPS allocation bands from sleeve weights + cohort priors."""
     priors = cohort_ips_priors(cohort_id)
     concentration = _resolve_concentration_limit(
         cohort_id, priors, seed, weights

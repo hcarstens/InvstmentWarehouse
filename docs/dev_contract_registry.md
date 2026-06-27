@@ -46,7 +46,7 @@ risk_contract v0a–v0c          [shipped]
             └─ si0b             [planned — IPS policy fields]
                  └─ si1         [shipped — emit_ips_for_cohort]
                       └─ si2     [shipped — validate_ips + bundle]
-                           ├─ si3 [planned — workflow smokes]
+                           ├─ si3 [shipped — workflow smokes]
                            └─ si4 [planned — dashboard + DB seed]
 ```
 

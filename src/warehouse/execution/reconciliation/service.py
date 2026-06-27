@@ -91,7 +91,10 @@ def reconcile_ingest(
                 )
             )
             break_id = f"break_{uuid4().hex[:12]}"
-            description = f"{ticker or row.security_id}: custodian={row.quantity}, ledger={ledger_qty}"
+            sid = ticker or row.security_id
+            description = (
+                f"{sid}: custodian={row.quantity}, ledger={ledger_qty}"
+            )
             opened = datetime.now(UTC)
             session.add(
                 ReconciliationBreakRow(

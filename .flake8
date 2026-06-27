@@ -1,2 +1,11 @@
 max-line-length = 79
 extend-ignore = E203
+per-file-ignores =
+    src/warehouse/dashboard/server.py:E501
+    src/warehouse/dashboard/render_phase2.py:E501
+    src/warehouse/dashboard/render_phase3.py:E501
+    src/warehouse/dashboard/render_phase4.py:E501
+    src/warehouse/dashboard/render_risk.py:E501
+    src/warehouse/dashboard/render_risk_build.py:E501
+    src/warehouse/dashboard/phases.py:E501
+    src/warehouse/dashboard/status.py:E501

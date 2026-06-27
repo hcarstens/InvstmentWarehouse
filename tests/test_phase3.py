@@ -98,7 +98,7 @@ def _lot(
 
 
 def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
-    """A loss lot whose substitute group was repurchased within 30d must not be harvested."""
+    """Loss lot with recent substitute repurchase must not be harvested."""
     from warehouse.decision.constraints import evaluate_wash_sale_risk
 
     as_of = date(2026, 6, 26)
@@ -109,7 +109,7 @@ def test_wash_sale_blocks_harvest_with_recent_substitute() -> None:
         unrealized=Decimal("-100"),
         acquired=date(2024, 1, 1),
     )
-    # A substantially-identical replacement (same substitute group) bought 5 days ago.
+    # Substantially-identical replacement (same substitute group) 5 days ago.
     replacement = _lot(
         "repl",
         security_id="itot",

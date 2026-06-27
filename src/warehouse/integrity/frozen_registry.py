@@ -114,7 +114,8 @@ def assert_rejects_mutation(
     except (FrozenInstanceError, ValidationError, TypeError):
         return
     raise AssertionError(
-        f"{type(instance).__name__}.{field} accepted mutation — type must be frozen "
+        f"{type(instance).__name__}.{field} accepted mutation — "
+        f"type must be frozen "
         f"(frozen dataclass or pydantic ConfigDict(frozen=True))"
     )
 

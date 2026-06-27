@@ -94,7 +94,7 @@ def seed_demo_lots(session: Session) -> None:
 
 
 def seed_phase4_extensions(session: Session) -> None:
-    """Fidelity custodian, alt holding, and fidelity lots (idempotent upgrades)."""
+    """Fidelity custodian, alt holding, and lots (idempotent upgrades)."""
     if not session.scalar(
         select(EntityRow.entity_id)
         .where(EntityRow.entity_id == "custodian_fidelity")
@@ -231,7 +231,10 @@ def seed_market_prices(session: Session) -> None:
 
 
 def seed_demo_data(session: Session) -> bool:
-    """Insert demo graph, securities, lots, workflows. Returns True if newly seeded."""
+    """Insert demo graph, securities, lots, workflows.
+
+    Returns True if newly seeded.
+    """
     existing = session.scalar(
         select(EntityRow).where(EntityRow.entity_id == DEMO_HOUSEHOLD_ID)
     )

@@ -1,7 +1,7 @@
 """IPS sleeve taxonomy — six-sleeve rollup aligned with risk ``AssetClass``.
 
-Security master uses finer types (e.g. ``ETF``); IPS and drift monitoring roll up
-to these sleeves for policy targets.
+Security master uses finer types (e.g. ``ETF``); IPS and drift monitoring
+roll up to these sleeves for policy targets.
 """
 
 from __future__ import annotations

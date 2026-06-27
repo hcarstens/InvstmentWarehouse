@@ -15,7 +15,7 @@ from warehouse.research.risk.models import (
 )
 from warehouse.research.risk.service import evaluate_risk
 from warehouse.research.synthetic.cohort import default_cohort_for_rung
-from warehouse.research.synthetic.pipeline import emit_hnw_fixture
+from warehouse.research.synthetic.pipeline import emit_synthetic_household
 
 
 class ScenarioCard(BaseModel):
@@ -27,6 +27,8 @@ class ScenarioCard(BaseModel):
     horizon_years: str = "5"
     run_scenarios: str = ScenarioSet.NONE.value
     risk_fingerprint: str
+    ips_id: str | None = None
+    binding_constraints_count: int = 0
     tension_tags: list[str] = []
 
 
@@ -38,10 +40,12 @@ def build_scenario_card(
     run_scenarios: ScenarioSet = ScenarioSet.NONE,
 ) -> ScenarioCard:
     cohort = cohort_id or default_cohort_for_rung(rung_level)
-    fixture = emit_hnw_fixture(cohort_id=cohort, seed=seed, rung=rung_level)
-    portfolio = fixture.asset_portfolio
+    bundle = emit_synthetic_household(
+        cohort_id=cohort, seed=seed, rung=rung_level
+    )
+    portfolio = bundle.fixture.asset_portfolio
     if portfolio is None:
-        raise RuntimeError("HNW fixture missing Shape A projection")
+        raise RuntimeError("synthetic household missing Shape A projection")
     horizon = RiskHorizon.parse("5y")
     result = evaluate_risk(
         RiskRequest(horizon=horizon, run_scenarios=run_scenarios),
@@ -55,6 +59,8 @@ def build_scenario_card(
         generator_version=portfolio.generator_version or "unknown",
         run_scenarios=run_scenarios.value,
         risk_fingerprint=result.report.input_fingerprint,
+        ips_id=bundle.ips.ips_id,
+        binding_constraints_count=len(bundle.validation.binding_constraints),
         tension_tags=list(portfolio.tension_tags),
     )
 

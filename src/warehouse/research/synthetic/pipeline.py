@@ -1,4 +1,7 @@
-"""Compositional HNW generator pipeline — cohort → graph → lots → alts → seal."""
+"""Compositional HNW generator pipeline.
+
+cohort → graph → lots → alts → seal (Shape B → Shape A).
+"""
 
 from __future__ import annotations
 
@@ -279,7 +282,10 @@ def emit_hnw_fixture(
     household_id: str | None = None,
     nav_usd: Decimal = _DEFAULT_NAV,
 ) -> HouseholdFixture:
-    """Emit Shape B household fixture at rung 3 (sleeve lots) or 4 (concentration + calls)."""
+    """Emit Shape B fixture at rung 3 or 4.
+
+    Rung 3: sleeve lots. Rung 4: concentration + alt calls.
+    """
     if rung not in (3, 4):
         raise ValueError("emit_hnw_fixture supports rung 3 or 4 only")
 

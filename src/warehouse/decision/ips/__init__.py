@@ -17,7 +17,7 @@ class AllocationTarget(BaseModel):
 
 
 class InvestmentPolicyStatement(BaseModel):
-    """Machine-readable IPS on the household graph — versioned, effective-dated."""
+    """Machine-readable IPS on the household graph — versioned, dated."""
 
     ips_id: str
     household_id: str

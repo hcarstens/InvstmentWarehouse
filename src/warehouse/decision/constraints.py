@@ -35,7 +35,7 @@ def evaluate_lot_sell_allowed(
 
 
 def _substantially_identical(a: LotPositionView, b: LotPositionView) -> bool:
-    """Wash-sale identity: same security, or same wash-sale substitute group."""
+    """Wash-sale identity: same security or same substitute group."""
     if a.security_id == b.security_id:
         return True
     group = a.wash_sale_substitute_group
@@ -51,10 +51,11 @@ def evaluate_wash_sale_risk(
 ) -> list[str]:
     """Detect whether harvesting ``lot`` at a loss would trigger a wash sale.
 
-    A wash sale disallows the loss when substantially identical securities (same
-    security or same wash-sale substitute group) are acquired within ``±window_days``
-    of realizing it — in ANY household account. We scan all current lots for such a
-    replacement purchase and return one binding-constraint tag per offending lot.
+    A wash sale disallows the loss when substantially identical securities
+    (same security or same wash-sale substitute group) are acquired within
+    ``±window_days`` of realizing it — in ANY household account. We scan all
+    current lots for such a replacement purchase and return one binding-
+    constraint tag per offending lot.
     An empty list means the harvest is clear to propose.
     """
     triggers: list[str] = []
@@ -111,18 +112,20 @@ def drift_vs_ips(
 ) -> list[str]:
     alerts: list[str] = []
     for target in ips.allocation_targets:
+        cls = target.asset_class.value
         current = weights.get(target.asset_class, Decimal("0"))
         if current < target.min_weight:
             alerts.append(
-                f"{target.asset_class.value} below min ({current:.1%} < {target.min_weight:.1%})"
+                f"{cls} below min ({current:.1%} < {target.min_weight:.1%})"
             )
         if current > target.max_weight:
             alerts.append(
-                f"{target.asset_class.value} above max ({current:.1%} > {target.max_weight:.1%})"
+                f"{cls} above max ({current:.1%} > {target.max_weight:.1%})"
             )
         drift = abs(current - target.target_weight)
         if drift > Decimal("0.05"):
+            tgt = target.target_weight
             alerts.append(
-                f"{target.asset_class.value} drift {drift:.1%} from target {target.target_weight:.1%}"
+                f"{cls} drift {drift:.1%} from target {tgt:.1%}"
             )
     return alerts

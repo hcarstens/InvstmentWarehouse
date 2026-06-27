@@ -68,7 +68,8 @@ def ingest(file: Path, custodian: str, household: str) -> None:
             household_id=household,
         )
     click.echo(
-        f"Ingest {summary.run_id}: {summary.status} ({summary.rows_processed} rows)"
+        f"Ingest {summary.run_id}: {summary.status} "
+        f"({summary.rows_processed} rows)"
     )
 
 
@@ -104,7 +105,8 @@ def optimize(household: str) -> None:
     click.echo(f"  Tax delta: {result.estimated_tax_delta}")
     for trade in result.trades:
         click.echo(
-            f"  {trade.side} {trade.quantity} {trade.security_id} — {trade.rationale}"
+            f"  {trade.side} {trade.quantity} {trade.security_id} — "
+            f"{trade.rationale}"
         )
 
 
@@ -128,7 +130,8 @@ def backtest(household: str, start_date: str, end_date: str) -> None:
             session, household, start_date=start, end_date=end
         )
     click.echo(
-        f"Backtest {result.run_id}: after-tax return {result.after_tax_return:.4f}"
+        f"Backtest {result.run_id}: after-tax return "
+        f"{result.after_tax_return:.4f}"
     )
     click.echo(f"  Tax delta vs baseline: {result.tax_delta:.4f}")
     click.echo(f"  Config hash: {result.config_hash}")
@@ -161,7 +164,10 @@ def approve_list(household: str) -> None:
 @click.option("--reviewer", default="advisor:demo", show_default=True)
 @click.option("--reject", is_flag=True, help="Reject instead of approve.")
 def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
-    """Approve or reject an optimization proposal (approval stages OMS orders)."""
+    """Approve or reject an optimization proposal.
+
+    Approval stages OMS orders.
+    """
     from warehouse.decision.approval import ApprovalStatus
     from warehouse.decision.approval.service import update_approval_status
     from warehouse.infra.db.base import session_scope
@@ -232,7 +238,8 @@ def compare_solvers(household: str) -> None:
         result = run_solver_comparison(session, household)
     click.echo(f"Comparison {result.comparison_id}")
     click.echo(
-        f"  Heuristic: {result.heuristic_trade_count} trades, tax {result.heuristic_tax_delta}"
+        f"  Heuristic: {result.heuristic_trade_count} trades, "
+        f"tax {result.heuristic_tax_delta}"
     )
     click.echo(
         f"  MIP: {result.mip_trade_count} trades, tax {result.mip_tax_delta}"

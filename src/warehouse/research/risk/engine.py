@@ -191,8 +191,10 @@ def evaluate_portfolio_risk(
             fermi_risk_share=fermi_share,
         ),
         aggregation_note=(
-            "Level 1 uses covariance-matrix portfolio sigma with version-pinned correlations; "
-            "Level 2 reports Euler variance shares; Level 4 is linear sleeve shock replay "
+            "Level 1 uses covariance-matrix portfolio sigma with "
+            "version-pinned correlations; "
+            "Level 2 reports Euler variance shares; Level 4 is linear "
+            "sleeve shock replay "
             "(2008/2020/2022) — no cross-gamma or regime correlation shock. "
             "Do not collapse levels without documenting approximation."
         ),

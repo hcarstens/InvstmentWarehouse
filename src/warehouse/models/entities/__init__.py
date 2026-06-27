@@ -1,4 +1,4 @@
-"""Entity graph — Person, Household, Trust, LLC, Account, Custodian relationships.
+"""Entity graph — Person, Household, Trust, LLC, Account, Custodian.
 
 Graph (v0):
   Person ──owns──> Trust ──holds──> Account ──custodied_at──> Custodian

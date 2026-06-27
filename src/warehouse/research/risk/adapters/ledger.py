@@ -33,7 +33,7 @@ class HouseholdRiskManifest(BaseModel):
 
 
 def _ensure_demo_refresh() -> None:
-    """Seed custodian ingest when demo DB has no ingest runs (no phase2 dashboard)."""
+    """Seed custodian ingest when demo DB has no ingest runs."""
     with session_scope() as session:
         if list_ingest_runs(session, limit=1):
             return
@@ -59,7 +59,7 @@ def _household_notional(
 def build_household_manifest(
     household_id: str = DEMO_HOUSEHOLD_ID,
 ) -> HouseholdRiskManifest:
-    """Project ledger lots + alternatives to a sleeve-level ``AssetPortfolio``."""
+    """Project ledger lots + alts to sleeve-level ``AssetPortfolio``."""
     bootstrap_database(seed=True)
     _ensure_demo_refresh()
     with session_scope() as session:

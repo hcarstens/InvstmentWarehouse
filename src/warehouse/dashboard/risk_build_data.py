@@ -1,4 +1,7 @@
-"""Risk build tracker — stakeholder view of contract + HNW synthetic progress."""
+"""Risk build tracker — stakeholder view of contract + HNW synthetic.
+
+Progress panel data for ``warehouse serve --risk``.
+"""
 
 from __future__ import annotations
 
@@ -139,6 +142,17 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
             name="validate_ips + emit_synthetic_household",
             ok=ips_validate_ok,
             detail="research/synthetic/ips_validate.py — si2",
+        )
+    )
+
+    workflow_smoke_ok = _file_exists(
+        "src/warehouse/research/synthetic/workflow_smoke.py"
+    )
+    checks.append(
+        BuildSmokeCheck(
+            name="run_workflow_smoke",
+            ok=workflow_smoke_ok,
+            detail="research/synthetic/workflow_smoke.py — si3",
         )
     )
 

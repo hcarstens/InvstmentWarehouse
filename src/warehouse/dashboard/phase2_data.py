@@ -1,4 +1,4 @@
-"""Phase 2 dashboard data — ingest, positions, reconciliation, refresh, audit."""
+"""Phase 2 dashboard data — ingest, positions, reconciliation, audit."""
 
 from pydantic import BaseModel
 
