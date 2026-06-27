@@ -31,6 +31,7 @@ Runs on **push** and **pull_request** to `main` (Ubuntu, Python 3.12):
 | --- | --- |
 | Install | `pip install -e ".[dev]"` |
 | Lint | `ruff check src tests` |
+| Format | `ruff format --check src tests` |
 | Types | `mypy src/warehouse` |
 | Tests | `pytest` |
 
@@ -41,6 +42,7 @@ From repo root with the venv active:
 ```bash
 pip install -e ".[dev]"
 ruff check src tests
+ruff format --check src tests
 mypy src/warehouse
 pytest
 ```
@@ -48,13 +50,13 @@ pytest
 One-liner:
 
 ```bash
-ruff check src tests && mypy src/warehouse && pytest
+ruff check src tests && ruff format --check src tests && mypy src/warehouse && pytest
 ```
 
 Using venv binaries explicitly:
 
 ```bash
-.venv/bin/ruff check src tests && .venv/bin/mypy src/warehouse && .venv/bin/pytest
+.venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests && .venv/bin/mypy src/warehouse && .venv/bin/pytest
 ```
 
 ---
@@ -68,8 +70,23 @@ Tool config: [`pyproject.toml`](pyproject.toml) → `[tool.ruff]`, `[tool.ruff.l
 | `ruff check src tests` | Lint — **required in CI** |
 | `ruff check src tests --fix` | Auto-fix import order and safe rules |
 | `ruff format src tests` | Format (79-char line length) |
-| `ruff format --check src tests` | Format check (not in CI today) |
+| `ruff format --check src tests` | Format check — **required in CI** |
 | `ruff check --select E501 src tests` | Line length only (79 chars) |
+
+### Fix and format (post-edit)
+
+Run after every edit session — auto-fixes import order (I001) and applies
+formatter layout (E302 blank lines, wraps):
+
+```bash
+ruff check src tests --fix && ruff format src tests
+```
+
+Check-only (matches CI):
+
+```bash
+ruff check src tests && ruff format --check src tests
+```
 
 **Line length (E501):** enforced by ruff and Flake8 (`.flake8`). Dashboard HTML
 modules (`render_*.py`, `server.py`, `phases.py`, `status.py`) are exempt per
@@ -176,13 +193,21 @@ curl -s http://127.0.0.1:8765/api/risk
 Minimum (matches GitHub Actions):
 
 1. `ruff check src tests`
-2. `mypy src/warehouse`
-3. `pytest`
+2. `ruff format --check src tests`
+3. `mypy src/warehouse`
+4. `pytest`
 
-Recommended before a PR that touches immutable types or formatting:
+Recommended before a PR that touches immutable types:
 
-4. `ruff format --check src tests`
 5. `pytest tests/test_frozen.py`
+
+After adding imports or new modules:
+
+```bash
+ruff check src tests --fix && ruff format src tests
+```
+
+(Same as **Fix and format** above.)
 
 ---
 
@@ -192,7 +217,7 @@ Recommended before a PR that touches immutable types or formatting:
 | --- | --- |
 | Docker / docker-compose | Phase 5 prod parity |
 | Postgres / Redis | Phase 5; use `pip install -e ".[infra]"` when needed |
-| `ruff format --check` | Local only — not in `.github/workflows/ci.yml` yet |
+| `ruff format --check` | Enforced in `.github/workflows/ci.yml` |
 | E2E browser tests | Dashboard verified manually or via `tests/test_dashboard.py` |
 | Load / perf benchmarks | Research sandbox under `runs/research/` |
 

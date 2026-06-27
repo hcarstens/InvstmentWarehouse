@@ -1,10 +1,16 @@
 """Phase 3 dashboard data — IPS drift, optimizer, approval, backtest."""
 
+from __future__ import annotations
+
 from datetime import date
 
 from pydantic import BaseModel
 
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
+from warehouse.dashboard.synthetic_ips_data import (
+    SyntheticIpsDashboardData,
+    load_synthetic_ips_matrix,
+)
 from warehouse.data.ledger.views import list_lot_positions
 from warehouse.decision.approval.service import (
     ApprovalRequestView,
@@ -38,6 +44,7 @@ class Phase3DashboardData(BaseModel):
     approval_requests: list[ApprovalRequestView]
     backtest_runs: list[BacktestRunView]
     active_constraints: list[str]
+    synthetic_ips: SyntheticIpsDashboardData | None = None
     error: str | None = None
 
 
@@ -78,6 +85,7 @@ def load_phase3_dashboard() -> Phase3DashboardData:
             )
             backtests = list_backtest_runs(session, DEMO_HOUSEHOLD_ID)
             constraints = active_constraint_summary(ips) if ips else []
+        synthetic_ips = load_synthetic_ips_matrix()
         return Phase3DashboardData(
             household_id=DEMO_HOUSEHOLD_ID,
             ips_drift=drift,
@@ -85,6 +93,7 @@ def load_phase3_dashboard() -> Phase3DashboardData:
             approval_requests=approvals,
             backtest_runs=backtests,
             active_constraints=constraints,
+            synthetic_ips=synthetic_ips,
         )
     except Exception as err:
         return Phase3DashboardData(
@@ -94,5 +103,6 @@ def load_phase3_dashboard() -> Phase3DashboardData:
             approval_requests=[],
             backtest_runs=[],
             active_constraints=[],
+            synthetic_ips=None,
             error=str(err),
         )

@@ -78,6 +78,9 @@ PHASES: list[Phase] = [
             DashboardPanel(
                 name="Constraint binding report", phase=3, status="live"
             ),
+            DashboardPanel(
+                name="Synthetic IPS binding matrix", phase=3, status="live"
+            ),
         ],
     ),
     Phase(

@@ -24,14 +24,6 @@ from warehouse.research.risk.observability import (
 )
 from warehouse.research.risk.service import evaluate_risk
 
-_DEMO_OVERLAY = ManifestOverlay(
-    label="reduce equity 10% → fixed income",
-    weight_tilts={
-        AssetClass.EQUITY: Decimal("-0.10"),
-        AssetClass.FIXED_INCOME: Decimal("0.10"),
-    },
-)
-
 
 class RiskDashboardData(BaseModel):
     household_id: str
@@ -41,6 +33,15 @@ class RiskDashboardData(BaseModel):
     source: str
     deltas: RiskDeltas | None = None
     error: str | None = None
+
+
+_DEMO_OVERLAY = ManifestOverlay(
+    label="reduce equity 10% → fixed income",
+    weight_tilts={
+        AssetClass.EQUITY: Decimal("-0.10"),
+        AssetClass.FIXED_INCOME: Decimal("0.10"),
+    },
+)
 
 
 def load_risk_dashboard(

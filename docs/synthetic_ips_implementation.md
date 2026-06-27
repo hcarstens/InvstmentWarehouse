@@ -1,6 +1,6 @@
 # Synthetic IPS — Implementation Plan
 
-**Status:** si0a–si3 shipped; si4 planned
+**Status:** si0a–si4 shipped
 **Date:** 2026-06-27
 **Owner:** decision plane + research/synthetic
 **Inputs:** [`research/synthetic_ips.md`](research/synthetic_ips.md) (design),

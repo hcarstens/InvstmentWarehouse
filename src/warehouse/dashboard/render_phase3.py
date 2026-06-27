@@ -6,6 +6,9 @@ import html
 from decimal import Decimal
 
 from warehouse.dashboard.phase3_data import Phase3DashboardData
+from warehouse.dashboard.render_synthetic_ips import (
+    render_synthetic_ips_section,
+)
 
 
 def _pct(value: Decimal) -> str:
@@ -75,6 +78,10 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
         for c in phase3.active_constraints
     )
 
+    synthetic_ips_html = ""
+    if phase3.synthetic_ips is not None:
+        synthetic_ips_html = render_synthetic_ips_section(phase3.synthetic_ips)
+
     return f"""{error}
   <section>
     <h2>IPS drift monitor — {html.escape(phase3.household_id)}</h2>
@@ -116,4 +123,5 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
       <thead><tr><th>Constraint</th><th>State</th></tr></thead>
       <tbody>{constraint_rows or '<tr><td colspan="2">No constraints loaded</td></tr>'}</tbody>
     </table>
-  </section>"""
+  </section>
+{synthetic_ips_html}"""

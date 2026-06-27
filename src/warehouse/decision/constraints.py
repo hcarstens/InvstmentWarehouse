@@ -125,7 +125,5 @@ def drift_vs_ips(
         drift = abs(current - target.target_weight)
         if drift > Decimal("0.05"):
             tgt = target.target_weight
-            alerts.append(
-                f"{cls} drift {drift:.1%} from target {tgt:.1%}"
-            )
+            alerts.append(f"{cls} drift {drift:.1%} from target {tgt:.1%}")
     return alerts

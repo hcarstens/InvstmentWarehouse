@@ -158,6 +158,7 @@ shipping product panels.
 ```bash
 pytest                           # full test suite
 pytest tests/test_frozen.py      # immutability registry
+ruff check src tests --fix && ruff format src tests   # fix and format
 ruff check src tests
 ```
 

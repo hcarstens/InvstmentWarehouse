@@ -156,6 +156,26 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
         )
     )
 
+    ips_matrix_ok = _file_exists(
+        "src/warehouse/dashboard/synthetic_ips_data.py"
+    )
+    checks.append(
+        BuildSmokeCheck(
+            name="synthetic IPS binding matrix",
+            ok=ips_matrix_ok,
+            detail="dashboard/synthetic_ips_data.py — si4",
+        )
+    )
+
+    seed_adapter_ok = _file_exists("src/warehouse/infra/db/synthetic_seed.py")
+    checks.append(
+        BuildSmokeCheck(
+            name="seed_synthetic_household",
+            ok=seed_adapter_ok,
+            detail="infra/db/synthetic_seed.py — si4",
+        )
+    )
+
     return checks
 
 

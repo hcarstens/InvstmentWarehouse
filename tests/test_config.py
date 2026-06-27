@@ -1,5 +1,7 @@
 """Configuration loading tests."""
 
+import pytest
+
 from warehouse.config import default_config_path, get_settings, repo_root
 
 
@@ -9,10 +11,10 @@ def test_default_config_path_exists() -> None:
     assert path.name == "development.toml"
 
 
-def test_settings_from_config_file() -> None:
-    import os
-
-    os.environ.pop("DATABASE_URL", None)
+def test_settings_from_config_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     get_settings.cache_clear()
     settings = get_settings()
     assert settings.app_env == "development"

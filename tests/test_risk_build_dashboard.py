@@ -9,9 +9,9 @@ def test_risk_build_report_has_deliverables() -> None:
     assert report.contract_status == "v1.2"
     assert len(report.deliverables) >= 7
     assert len(report.rungs) == 5
-    assert report.shipped_count == 16
-    assert report.planned_count == 1
-    assert report.synthetic_ips_status.startswith("si3")
+    assert report.shipped_count == 17
+    assert report.planned_count == 0
+    assert report.synthetic_ips_status == "si4"
     assert len(report.synthetic_ips_deliverables) == 6
     assert report.deliverables[0].track == "synthetic_ips"
     si0a = next(d for d in report.deliverables if d.id == "si0a-asset-class")
@@ -24,6 +24,8 @@ def test_risk_build_report_has_deliverables() -> None:
     assert si2.status == "shipped"
     si3 = next(d for d in report.deliverables if d.id == "si3-workflow-smoke")
     assert si3.status == "shipped"
+    si4 = next(d for d in report.deliverables if d.id == "si4-dashboard-seed")
+    assert si4.status == "shipped"
     hnw = next(d for d in report.deliverables if d.id == "hnw-generator")
     assert hnw.status == "shipped"
     phase_a = next(

@@ -8,7 +8,7 @@ from warehouse.dashboard.status import build_status_report
 def test_status_report_includes_all_phases() -> None:
     report = build_status_report()
     assert len(report.phases) == len(PHASES)
-    assert report.live_panel_count >= 14
+    assert report.live_panel_count >= 15
     assert report.infra_error_count == 0
     assert len(report.infra_checks) == 6
     assert len(report.workflows) == 6
@@ -31,3 +31,4 @@ def test_render_html_contains_key_sections() -> None:
     assert "Dashboard panels" in html
     assert "Workflow catalog" in html
     assert "after-tax wealth" in html
+    assert "Synthetic IPS binding matrix" in html

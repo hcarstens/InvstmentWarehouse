@@ -106,13 +106,14 @@ SYNTHETIC_IPS_DELIVERABLES: list[BuildDeliverable] = [
         track="synthetic_ips",
         slice="si4",
         name="Synthetic IPS dashboard panel + DB seed adapter",
-        status="planned",
+        status="shipped",
         doc_href=(
             "docs/synthetic_ips_implementation.md"
             "#si4--dashboard--seed-adapter-1-pr"
         ),
-        note="cohort × binding matrix; optional seed_synthetic_household",
+        note="cohort × binding matrix; seed_synthetic_household",
         depends_on=["si2-validate-ips"],
+        falsifier_test="tests/test_synthetic_ips_integration.py",
     ),
 ]
 

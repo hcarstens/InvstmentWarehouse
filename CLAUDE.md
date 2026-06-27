@@ -117,6 +117,7 @@ warehouse db bootstrap        # migrate + seed demo household
 warehouse db upgrade          # Alembic migrations only
 warehouse info                # CLI summary
 warehouse --help
+ruff check src tests --fix && ruff format src tests   # fix and format (post-edit)
 ```
 
 ## Conventions
