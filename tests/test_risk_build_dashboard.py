@@ -45,7 +45,8 @@ def test_render_risk_build_html_sections() -> None:
     assert "si0a → si0b → si1" in html
     assert "All deliverables" in html
     assert "Risk asset test suite" in html
-    assert "Phase A" in html
+    assert "asset-test-busy" in html
+    assert "Run Phase B full" in html
     assert "asset-test-phase-a" not in html
     assert "Synthetic rung ladder" in html
     assert "Smoke checks" in html

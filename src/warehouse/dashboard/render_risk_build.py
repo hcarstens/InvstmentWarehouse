@@ -55,7 +55,9 @@ def render_asset_test_section() -> str:
   <p>
     <a href="/api/risk/asset-tests?phase=a">Run Phase A (JSON)</a> ·
     <a href="/api/risk/asset-tests?phase=b&amp;max_size=2">Run Phase B pairs (JSON)</a> ·
-    <a href="/api/risk/asset-tests?phase=b">Run Phase B full (JSON)</a>
+    <a href="/api/risk/asset-tests?phase=b"
+       onclick="document.documentElement.classList.add('asset-test-busy')"
+       title="32,752 cells — wait cursor until JSON response">Run Phase B full (JSON)</a>
   </p>
   <h3>Phase A — last run (sample)</h3>
   <table>
@@ -150,6 +152,10 @@ def render_risk_build_page(
     nav a {{ margin-right: 1rem; }}
     .stats {{ display: flex; gap: 1.5rem; margin: 1rem 0; }}
     .stat {{ padding: 0.75rem 1rem; background: #f8f9fa; border-radius: 6px; }}
+    html.asset-test-busy,
+    html.asset-test-busy * {{
+      cursor: wait !important;
+    }}
   </style>
 </head>
 <body>
