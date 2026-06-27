@@ -8,6 +8,7 @@ HNW portfolio generator and the six core workflows. Consolidates findings from
 
 **Related:** [hnw_portfolios.md](hnw_portfolios.md),
 [risk_api_contract.md](../risk_api_contract.md),
+[synthetic_ips_implementation.md](../synthetic_ips_implementation.md),
 [Synthetic Data Generation](../heuristics/Synthetic%20Data%20Generation.md),
 [risk_api_implementation_plan.md](../risk_api_implementation_plan.md),
 [ips.md](ips.md)
