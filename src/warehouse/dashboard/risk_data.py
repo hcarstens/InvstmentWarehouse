@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from warehouse.config import get_settings
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
 from warehouse.research.risk.adapters.ledger import build_household_manifest
-from warehouse.research.risk.api import RiskApiError
 from warehouse.research.risk.models import (
     AssetClass,
     ManifestOverlay,
@@ -24,8 +23,6 @@ from warehouse.research.risk.observability import (
     record_risk_failure,
 )
 from warehouse.research.risk.service import evaluate_risk
-
-_DOMAIN_ERRORS = (ValueError, RiskApiError, ValidationError)
 
 _DEMO_OVERLAY = ManifestOverlay(
     label="reduce equity 10% → fixed income",
@@ -81,7 +78,7 @@ def load_risk_dashboard(
             source=manifest.portfolio.source,
             deltas=result.deltas,
         )
-    except _DOMAIN_ERRORS as err:
+    except Exception as err:
         record_risk_failure(
             err,
             surface="dashboard",

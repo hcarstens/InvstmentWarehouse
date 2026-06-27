@@ -47,9 +47,12 @@ def _panel_kind(status: str) -> str:
 
 
 def _infra_kind(status: str) -> str:
-    return {"ok": "ok", "skipped": "muted", "error": "err"}.get(
-        status, "muted"
-    )
+    return {
+        "ok": "ok",
+        "skipped": "muted",
+        "warn": "warn",
+        "error": "err",
+    }.get(status, "muted")
 
 
 def _security_query_from_path(path: str) -> str | None:

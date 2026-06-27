@@ -10,7 +10,7 @@ def test_status_report_includes_all_phases() -> None:
     assert len(report.phases) == len(PHASES)
     assert report.live_panel_count >= 14
     assert report.infra_error_count == 0
-    assert len(report.infra_checks) == 5
+    assert len(report.infra_checks) == 6
     assert len(report.workflows) == 6
 
 

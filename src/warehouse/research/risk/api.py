@@ -106,6 +106,9 @@ def evaluate_risk_json(raw: str | bytes) -> tuple[int, str]:
     except ValueError as err:
         record_risk_failure(err, surface="http", http_status=422)
         return 422, json.dumps({"error": str(err)})
+    except Exception as err:
+        record_risk_failure(err, surface="http", http_status=500)
+        return 500, json.dumps({"error": str(err)})
 
 
 def risk_api_schema() -> dict[str, Any]:
@@ -184,8 +187,7 @@ def risk_api_schema() -> dict[str, Any]:
         },
         "integration": {
             "in_process": (
-                "evaluate_risk(RiskRequest, AssetPortfolio, "
-                "assumptions=...)"
+                "evaluate_risk(RiskRequest, AssetPortfolio, assumptions=...)"
             ),
             "http_post": (
                 "JSON body → parse_risk_request → evaluate_risk_http"
@@ -195,8 +197,7 @@ def risk_api_schema() -> dict[str, Any]:
             ),
             "synthetic": "rung(0..4) for no-DB regression",
             "overlay": (
-                "request.overlay → apply_overlay → "
-                "diff baseline vs proposed"
+                "request.overlay → apply_overlay → diff baseline vs proposed"
             ),
         },
         "privacy": (

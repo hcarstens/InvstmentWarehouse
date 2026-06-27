@@ -88,7 +88,7 @@ def test_http_post_synthetic_rung2_matches_in_process() -> None:
     )
 
 
-def test_load_risk_dashboard_programming_error_bubbles(
+def test_load_risk_dashboard_unexpected_error_surfaces(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def _boom(_household_id: str) -> None:
@@ -98,8 +98,10 @@ def test_load_risk_dashboard_programming_error_bubbles(
         "warehouse.dashboard.risk_data.build_household_manifest",
         _boom,
     )
-    with pytest.raises(KeyError, match="missing_column"):
-        load_risk_dashboard()
+    dashboard = load_risk_dashboard()
+    assert dashboard.error is not None
+    assert "missing_column" in dashboard.error
+    assert dashboard.report is None
 
 
 def test_rung2_post_has_multi_asset_classes() -> None:

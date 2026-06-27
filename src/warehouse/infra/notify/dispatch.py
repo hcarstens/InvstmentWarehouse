@@ -16,6 +16,23 @@ from warehouse.config import Settings, get_settings
 logger = structlog.get_logger(__name__)
 
 
+def notify_config_gaps(settings: Settings) -> list[str]:
+    """Gaps when a notify channel is enabled but cannot deliver."""
+    if not settings.risk_notify_on_error:
+        return []
+
+    gaps: list[str] = []
+    if settings.risk_notify_email_enabled:
+        if not _email_recipients(settings):
+            gaps.append("risk_notify_email_to empty")
+        elif not settings.risk_notify_smtp_host.strip():
+            gaps.append("risk_notify_smtp_host empty")
+    if settings.risk_notify_messaging_enabled:
+        if not settings.risk_notify_messaging_webhook_url.strip():
+            gaps.append("risk_notify_messaging_webhook_url empty")
+    return gaps
+
+
 def _email_recipients(settings: Settings) -> list[str]:
     raw = settings.risk_notify_email_to.strip()
     if not raw:

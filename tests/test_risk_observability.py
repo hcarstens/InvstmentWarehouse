@@ -51,6 +51,37 @@ def test_evaluate_risk_json_records_invalid_json_failure() -> None:
         assert isinstance(err, json.JSONDecodeError)
 
 
+def test_evaluate_risk_json_records_unexpected_failure() -> None:
+    with patch(
+        "warehouse.research.risk.api.evaluate_risk_request",
+        side_effect=RuntimeError("engine bug"),
+    ):
+        with patch(
+            "warehouse.research.risk.api.record_risk_failure"
+        ) as record:
+            status, body = evaluate_risk_json(
+                json.dumps(
+                    {
+                        "asset_portfolio": {
+                            "allocations": [
+                                {
+                                    "asset_class": "equity",
+                                    "weight": 1.0,
+                                }
+                            ]
+                        },
+                        "horizon": "5y",
+                    }
+                )
+            )
+            assert status == 500
+            assert "engine bug" in json.loads(body)["error"]
+            record.assert_called_once()
+            err = record.call_args.args[0]
+            assert isinstance(err, RuntimeError)
+            assert record.call_args.kwargs["http_status"] == 500
+
+
 def test_dispatch_messaging_posts_when_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

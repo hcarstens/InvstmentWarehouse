@@ -10,11 +10,12 @@ from sqlalchemy.engine import make_url
 
 from warehouse.config import Settings, get_settings
 from warehouse.infra.db import create_db_engine
+from warehouse.infra.notify.dispatch import notify_config_gaps
 
 
 class InfraCheck(BaseModel):
     component: str
-    status: str  # ok | skipped | error
+    status: str  # ok | skipped | warn | error
     detail: str
     error: str | None = None
 
@@ -96,8 +97,7 @@ def check_job_queue(settings: Settings) -> InfraCheck:
             component="Job queue",
             status="skipped",
             detail=(
-                "In-process jobs (no Redis) — "
-                "Redis queue deferred to Phase 5"
+                "In-process jobs (no Redis) — Redis queue deferred to Phase 5"
             ),
         )
 
@@ -146,8 +146,45 @@ def check_object_store(settings: Settings) -> InfraCheck:
         component="Object store",
         status="skipped",
         detail=(
-            "S3 endpoint configured; "
-            "connectivity check deferred to Phase 5"
+            "S3 endpoint configured; connectivity check deferred to Phase 5"
+        ),
+    )
+
+
+def check_risk_notify_config(settings: Settings) -> InfraCheck:
+    if not settings.risk_notify_on_error:
+        return InfraCheck(
+            component="Risk alerts",
+            status="skipped",
+            detail="risk_notify_on_error=false — failure alerts disabled",
+        )
+
+    gaps = notify_config_gaps(settings)
+    if gaps:
+        return InfraCheck(
+            component="Risk alerts",
+            status="warn",
+            detail="; ".join(gaps),
+            error="Alerts will not be delivered until configured",
+        )
+
+    channels = []
+    if settings.risk_notify_email_enabled:
+        channels.append("email")
+    if settings.risk_notify_messaging_enabled:
+        channels.append("messaging")
+    if channels:
+        return InfraCheck(
+            component="Risk alerts",
+            status="ok",
+            detail=f"Failure alerts via {', '.join(channels)}",
+        )
+
+    return InfraCheck(
+        component="Risk alerts",
+        status="skipped",
+        detail=(
+            "risk_notify_on_error=true but no email/messaging channels enabled"
         ),
     )
 
@@ -160,6 +197,7 @@ def run_infra_checks(settings: Settings | None = None) -> list[InfraCheck]:
         check_research_sandbox(cfg),
         check_job_queue(cfg),
         check_object_store(cfg),
+        check_risk_notify_config(cfg),
     ]
 
 
