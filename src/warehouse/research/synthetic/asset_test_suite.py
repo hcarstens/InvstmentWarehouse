@@ -6,6 +6,7 @@ reports under ``runs/research/risk_asset_tests/``, return suite results.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -62,8 +63,19 @@ def default_asset_test_dir() -> Path:
     return repo_root() / "runs" / "research" / "risk_asset_tests"
 
 
+# macOS NAME_MAX is 255; keep stem headroom for phase_b/ prefix + ".json".
+_MAX_JOINED_STEM_LEN = 200
+
+
 def _cell_filename(types: tuple[str, ...]) -> str:
-    return "__".join(types) + ".json"
+    """Stable report name — readable for small combos, hashed when too long."""
+    if len(types) == 1:
+        return f"{types[0]}.json"
+    joined = "__".join(types)
+    if len(joined) <= _MAX_JOINED_STEM_LEN:
+        return f"{joined}.json"
+    digest = hashlib.sha256(joined.encode()).hexdigest()[:12]
+    return f"n{len(types)}_{digest}.json"
 
 
 def _evaluate_cell(
