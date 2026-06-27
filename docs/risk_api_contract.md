@@ -4,7 +4,8 @@
 **Owner:** risk API
 **Related:** `docs/research/risk_units_measures.md`, `docs/research/portfolio_risk.md`,
 `docs/research/simple_risk_models.md`, `docs/research/hnw_portfolios.md`,
-`docs/risk_api_implementation_plan.md`, `docs/code_review_claude_2026-06-26.md`
+`docs/research/synthetic_ips.md`, `docs/risk_api_implementation_plan.md`,
+`docs/code_review_claude_2026-06-26.md`
 
 > **North star:** the risk plane becomes a **standalone module** with one pure entry point,
 > plugged into the larger workflow over an API. The project hands it a portfolio + a question;
@@ -154,21 +155,30 @@ from .synthetic import rung
 - **Standalone test path** — `synthetic.rung(n)` produces manifests with no DB, so the whole API
   is exercisable in isolation.
 
-## 5. Synthetic manifests — the ground-truth corpus (v0: rungs 0–2)
+## 5. Synthetic manifests — the ground-truth corpus (rungs 0–4)
 
 `synthetic.py` is the **canonical ground truth the module builds on and iterates over** — a no-DB
-corpus of `AssetPortfolio`s at increasing complexity. Every layer (engine, scenario catalog, later
+corpus of `AssetPortfolio`s at increasing complexity. Every layer (engine, scenario catalog,
 overlays/deltas) is developed and regressed against it, so a failing rung localizes the break
 before any ledger is involved.
 
-| Rung | Shape | Exercises |
-| --- | --- | --- |
-| 0 | single equity sleeve (β=1) | Level 1 σ/VaR smoke test |
-| 1 | 60/40 equity + fixed income | duration bucket, 2×2 covariance |
-| 2 | + commodities + FX | multi-asset aggregation, native sensitivity units |
+**Lineage — one entry point, two layers.** `risk.synthetic.rung()` is the single public entry.
+Rungs 0–2 are hand-built simple manifests (table below). **Rungs 3–4 delegate to the HNW
+compositional generator** (`research.synthetic.emit_hnw_fixture`, 15 leaf types + cohorts +
+Shape B) and project Shape B → Shape A — not a parallel corpus. The HNW generator + its IPS
+counterpart: [research/synthetic_ips.md](research/synthetic_ips.md). Shape B stress pipeline:
+[v1.1](#v11--shape-b--automatic-risk-stress-testing).
 
-The regression surface is the **matrix `rung × run_scenarios`** — each cell carries pinned golden
-values, composed by a test fixture (**not** a wire type):
+| Rung | Shape | Owner | Exercises |
+| --- | --- | --- | --- |
+| 0 | single equity sleeve (β=1) | `risk/synthetic.py` | Level 1 σ/VaR smoke test |
+| 1 | 60/40 equity + fixed income | `risk/synthetic.py` | duration bucket, 2×2 covariance |
+| 2 | + commodities + FX | `risk/synthetic.py` | multi-asset aggregation, native sensitivity units |
+| 3 | HNW 5-sleeve + liquidity tiers | `rung()` → `emit_hnw_fixture` | cohort profiles, IPS min/max |
+| 4 | concentration + fermi alts + lots + calls | `rung()` → `emit_hnw_fixture` | TLH, optimizer, recon, call stress |
+
+The regression surface is the **matrix `rung × run_scenarios`** (rungs 0–4) — each cell carries
+pinned golden values, composed by a test fixture (**not** a wire type):
 
 ```python
 class Scenario(BaseModel):       # tests only — NOT exported from risk/__init__.py
@@ -179,8 +189,7 @@ class Scenario(BaseModel):       # tests only — NOT exported from risk/__init_
 
 This `Scenario` fixture is where the "manifest" ergonomics live — composing a rung with a request
 in the test layer, never bundled into the wire contract (which would force cloning the portfolio
-per regime). Rungs 3–4 (illiquid alts, fermi-tagged / concentrated) land in
-[v1](#v1--overlays--deltas).
+per regime). Overlays and assumption-regime deltas remain in [v1](#v1--overlays--deltas).
 
 ## 6. Boundaries & conventions
 
@@ -226,7 +235,7 @@ Ship in two slices so step 2's size is visible up front.
 | New `PortfolioManifest` type? | **No** — reuse `AssetPortfolio` + `source`/`complexity` |
 | Drop the `RiskResult` envelope? | **No** — keep it; `deltas=null` in v0 (non-breaking) |
 | Frozen results in v0? | **Yes** — convention-mandated, one line |
-| Synthetic ladder in v0? | **Rungs 0–2 only** (no-DB test spine); 3–4 → v1 |
+| Synthetic ladder | **Rungs 0–2** hand-built (v0); **rungs 3–4** via HNW generator (v1 shipped, §5) |
 | Assumptions: injected or risk-owned? | **Risk-owned** version-pinned, PSD-validated catalog; caller picks via `run_scenarios` |
 | `run_scenarios` values | `none` \| `high_risk` \| `low_risk` \| `all` (base always runs) |
 | Arbitrary assumption override? | **v1 escape hatch** — research sweeps / bespoke CMAs only |
@@ -284,8 +293,9 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 
 **Also in v1:**
 
-- **Synthetic rungs 3–4** — illiquid alternatives (liquidity-time units, tier 3) and
-  concentrated / fermi-tagged sleeves (measurement modes, tail/confidence band).
+- **Synthetic rungs 3–4** — *shipped* (§5, v1.1). Illiquid alternatives (liquidity-time
+  units, tier 3) and concentrated / fermi-tagged sleeves (measurement modes,
+  tail/confidence band).
 - **Arbitrary `RiskAssumptions` override** — explicit escape hatch (`assumptions=` on
   `evaluate_risk`) for research sweeps and bespoke client CMAs, defaulting to the catalog. The v0
   catalog already lifts the pinned constants out of `get_settings()`; this just exposes them.
@@ -310,6 +320,7 @@ class RiskDeltas(BaseModel):     # frozen + registered when introduced
 | 2026-06-26 | **v0b shipped:** `RiskAssumptions`, `scenarios.py`, `run_scenarios` → `RiskResult.scenarios`, regime in fingerprint + manifest, `synthetic.rung(0..2)`, golden fixtures. |
 | 2026-06-26 | **v0a shipped:** `RiskRequest`, `RiskResult`, `ScenarioSet`, `evaluate_risk` in `service.py`; `AssetPortfolio.source`/`complexity`; `RiskResult` frozen + registered. |
 | 2026-06-24 | Shape B stress-testing design note added (see [v1.1](#v11--shape-b--automatic-risk-stress-testing)). |
+| 2026-06-27 | Consolidation pass: §5 rungs 0–4 table + lineage unified; §8 synthetic-ladder row updated; cross-link [synthetic_ips.md](research/synthetic_ips.md). |
 
 ---
 
