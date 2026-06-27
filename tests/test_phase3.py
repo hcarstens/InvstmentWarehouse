@@ -9,6 +9,7 @@ import pytest
 
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
+from warehouse.data.security_master import AssetClass as SecurityAssetClass
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.approval.service import (
     list_approval_requests,
@@ -82,6 +83,8 @@ def _lot(
         security_id=security_id,
         ticker=security_id.upper(),
         security_name=security_id,
+        security_asset_class=SecurityAssetClass.EQUITY,
+        liquidity_tier=1,
         quantity=Decimal("10"),
         cost_basis_per_share=Decimal("100"),
         total_cost_basis=Decimal("1000"),

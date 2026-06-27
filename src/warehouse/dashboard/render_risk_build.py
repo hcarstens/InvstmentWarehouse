@@ -6,6 +6,7 @@ import html
 
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.risk_build_data import RiskBuildReport
+from warehouse.dashboard.risk_build_registry import BuildDeliverable
 from warehouse.dashboard.risk_data import RiskDashboardData
 from warehouse.research.synthetic.asset_test_suite import (
     AssetTestSuiteResult,
@@ -77,6 +78,17 @@ def _status_kind(status: str) -> str:
     }.get(status, "muted")
 
 
+def _deliverable_rows(deliverables: list[BuildDeliverable]) -> str:
+    return "".join(
+        f"<tr><td>{_badge(d.slice, 'muted')}</td>"
+        f"<td>{html.escape(d.name)}</td>"
+        f"<td>{_badge(d.status, _status_kind(d.status))}</td>"
+        f"<td><code>{html.escape(d.track)}</code></td>"
+        f"<td>{html.escape(d.note)}</td></tr>"
+        for d in deliverables
+    )
+
+
 def render_risk_build_page(
     build: RiskBuildReport,
     risk: RiskDashboardData | None = None,
@@ -84,14 +96,17 @@ def render_risk_build_page(
     contract_badge = _badge(
         build.contract_status, _status_kind(build.contract_status)
     )
-    deliverable_rows = "".join(
-        f"<tr><td>{_badge(d.slice, 'muted')}</td>"
-        f"<td>{html.escape(d.name)}</td>"
-        f"<td>{_badge(d.status, _status_kind(d.status))}</td>"
-        f"<td><code>{html.escape(d.track)}</code></td>"
-        f"<td>{html.escape(d.note)}</td></tr>"
-        for d in build.deliverables
+    ips_badge = _badge(
+        build.synthetic_ips_status,
+        _status_kind(
+            "shipped"
+            if build.synthetic_ips_status.startswith("si")
+            and "next" not in build.synthetic_ips_status
+            else "planned"
+        ),
     )
+    synthetic_ips_rows = _deliverable_rows(build.synthetic_ips_deliverables)
+    deliverable_rows = _deliverable_rows(build.deliverables)
     rung_rows = "".join(
         f"<tr><td>{r.rung}</td>"
         f"<td><code>{html.escape(r.owner)}</code></td>"
@@ -145,15 +160,25 @@ def render_risk_build_page(
     <a href="/api/status">status JSON</a>
   </nav>
   <h1>Risk &amp; synthetic build tracker</h1>
-  <p class="sub">Contract {contract_badge} · {build.shipped_count} shipped ·
-  {build.planned_count} planned · auto-refresh 60s</p>
+  <p class="sub">Risk contract {contract_badge} · Synthetic IPS {ips_badge} ·
+  {build.shipped_count} shipped · {build.planned_count} planned · auto-refresh 60s</p>
   <div class="stats">
     <div class="stat"><strong>North star</strong><br>Standalone risk module —
     <code>evaluate_risk(request, manifest)</code></div>
+    <div class="stat"><strong>Synthetic IPS</strong><br>
+    Paired Shape B + IPS — caller composes risk + drift</div>
     <div class="stat"><strong>Update registry</strong><br>
     <code>dashboard/risk_build_registry.py</code> when PRs land</div>
   </div>
-  <h2>Deliverables</h2>
+  <h2>Synthetic IPS implementation</h2>
+  <p class="sub">Plan: <a href="/docs/synthetic_ips_implementation.md">synthetic_ips_implementation.md</a>
+  · Design: <a href="/docs/research/synthetic_ips.md">synthetic_ips.md</a></p>
+  <p><code>{html.escape(build.synthetic_ips_pipeline)}</code></p>
+  <table>
+    <tr><th>Slice</th><th>Name</th><th>Status</th><th>Track</th><th>Note</th></tr>
+    {synthetic_ips_rows}
+  </table>
+  <h2>All deliverables</h2>
   <table>
     <tr><th>Slice</th><th>Name</th><th>Status</th><th>Track</th><th>Note</th></tr>
     {deliverable_rows}

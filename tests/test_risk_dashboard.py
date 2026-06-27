@@ -46,6 +46,7 @@ def test_portfolio_builder_maps_bnd_and_alts() -> None:
 
     from warehouse.data.alternatives.service import AlternativeHoldingView
     from warehouse.data.ledger.views import LotPositionView
+    from warehouse.data.security_master import AssetClass as SecurityAssetClass
     from warehouse.research.risk.models import AssetClass
 
     positions = [
@@ -56,6 +57,8 @@ def test_portfolio_builder_maps_bnd_and_alts() -> None:
             security_id="s1",
             ticker="VTI",
             security_name="VTI",
+            security_asset_class=SecurityAssetClass.ETF,
+            liquidity_tier=1,
             quantity=Decimal("10"),
             cost_basis_per_share=Decimal("100"),
             total_cost_basis=Decimal("1000"),
@@ -73,6 +76,8 @@ def test_portfolio_builder_maps_bnd_and_alts() -> None:
             security_id="s2",
             ticker="BND",
             security_name="BND",
+            security_asset_class=SecurityAssetClass.ETF,
+            liquidity_tier=1,
             quantity=Decimal("10"),
             cost_basis_per_share=Decimal("50"),
             total_cost_basis=Decimal("500"),

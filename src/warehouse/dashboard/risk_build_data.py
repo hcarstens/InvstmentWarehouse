@@ -10,6 +10,8 @@ from warehouse.config import repo_root
 from warehouse.dashboard.risk_build_registry import (
     BUILD_DOC_LINKS,
     RISK_BUILD_DELIVERABLES,
+    SYNTHETIC_IPS_DELIVERABLES,
+    SYNTHETIC_IPS_PIPELINE,
     SYNTHETIC_RUNGS,
     BuildDeliverable,
     BuildRung,
@@ -23,7 +25,10 @@ class BuildSmokeCheck(BaseModel):
 
 
 class RiskBuildReport(BaseModel):
-    contract_status: str  # proposed | v0a | v0b | v0c | v1
+    contract_status: str  # proposed | v0a | … | v1.2 | si0b | …
+    synthetic_ips_status: str  # latest shipped si slice or planned next
+    synthetic_ips_pipeline: str
+    synthetic_ips_deliverables: list[BuildDeliverable]
     deliverables: list[BuildDeliverable]
     rungs: list[BuildRung]
     doc_links: list[tuple[str, str]]
@@ -108,6 +113,15 @@ def _run_smoke_checks() -> list[BuildSmokeCheck]:
         )
     )
 
+    ips_ok = _file_exists("src/warehouse/decision/ips/sleeves.py")
+    checks.append(
+        BuildSmokeCheck(
+            name="IpsSleeve + policy fields",
+            ok=ips_ok,
+            detail="decision/ips/sleeves.py — si0a/si0b",
+        )
+    )
+
     return checks
 
 
@@ -128,12 +142,30 @@ def _contract_status(deliverables: list[BuildDeliverable]) -> str:
     return "proposed"
 
 
+def _synthetic_ips_status(slices: list[BuildDeliverable]) -> str:
+    shipped = [d for d in slices if d.status == "shipped"]
+    if not shipped:
+        return "planned"
+    latest = max(shipped, key=lambda d: d.slice)
+    in_progress = next((d for d in slices if d.status == "in_progress"), None)
+    if in_progress:
+        return in_progress.slice
+    next_planned = next((d for d in slices if d.status == "planned"), None)
+    if next_planned:
+        return f"{latest.slice} · next {next_planned.slice}"
+    return latest.slice
+
+
 def load_risk_build_report() -> RiskBuildReport:
     deliverables = list(RISK_BUILD_DELIVERABLES)
+    synthetic_ips = list(SYNTHETIC_IPS_DELIVERABLES)
     shipped = sum(1 for d in deliverables if d.status == "shipped")
     planned = sum(1 for d in deliverables if d.status == "planned")
     return RiskBuildReport(
         contract_status=_contract_status(deliverables),
+        synthetic_ips_status=_synthetic_ips_status(synthetic_ips),
+        synthetic_ips_pipeline=SYNTHETIC_IPS_PIPELINE,
+        synthetic_ips_deliverables=synthetic_ips,
         deliverables=deliverables,
         rungs=list(SYNTHETIC_RUNGS),
         doc_links=list(BUILD_DOC_LINKS),

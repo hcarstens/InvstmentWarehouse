@@ -244,6 +244,9 @@ class IpsPolicyRow(Base):
     restricted_json: Mapped[str] = mapped_column(
         Text, nullable=False, default="[]"
     )
+    constraints_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="{}"
+    )
 
 
 class OptimizationRunRow(Base):

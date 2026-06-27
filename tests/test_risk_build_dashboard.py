@@ -9,7 +9,15 @@ def test_risk_build_report_has_deliverables() -> None:
     assert report.contract_status == "v1.2"
     assert len(report.deliverables) >= 7
     assert len(report.rungs) == 5
-    assert report.shipped_count == 11
+    assert report.shipped_count == 13
+    assert report.planned_count == 4
+    assert report.synthetic_ips_status.startswith("si0b")
+    assert len(report.synthetic_ips_deliverables) == 6
+    assert report.deliverables[0].track == "synthetic_ips"
+    si0a = next(d for d in report.deliverables if d.id == "si0a-asset-class")
+    assert si0a.status == "shipped"
+    si0b = next(d for d in report.deliverables if d.id == "si0b-ips-fields")
+    assert si0b.status == "shipped"
     hnw = next(d for d in report.deliverables if d.id == "hnw-generator")
     assert hnw.status == "shipped"
     phase_a = next(
@@ -25,7 +33,9 @@ def test_risk_build_report_has_deliverables() -> None:
 def test_render_risk_build_html_sections() -> None:
     html = render_risk_build_html()
     assert "Risk &amp; synthetic build tracker" in html
-    assert "Deliverables" in html
+    assert "Synthetic IPS implementation" in html
+    assert "si0a → si0b → si1" in html
+    assert "All deliverables" in html
     assert "Risk asset test suite" in html
     assert "Phase A" in html
     assert "asset-test-phase-a" not in html

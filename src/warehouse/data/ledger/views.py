@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from warehouse.data.security_master import AssetClass as SecurityAssetClass
 from warehouse.infra.db.models import (
     EntityRow,
     LotRow,
@@ -24,6 +25,8 @@ class LotPositionView(BaseModel):
     security_id: str
     ticker: str | None
     security_name: str
+    security_asset_class: SecurityAssetClass
+    liquidity_tier: int = Field(default=1, ge=1, le=5)
     quantity: Decimal
     cost_basis_per_share: Decimal
     total_cost_basis: Decimal
@@ -78,6 +81,8 @@ def list_lot_positions(
                 security_id=lot.security_id,
                 ticker=security.ticker,
                 security_name=security.name,
+                security_asset_class=SecurityAssetClass(security.asset_class),
+                liquidity_tier=security.liquidity_tier,
                 quantity=lot.quantity,
                 cost_basis_per_share=lot.cost_basis_per_share,
                 total_cost_basis=total_cost,

@@ -4,6 +4,35 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-27 — Synthetic IPS si0a–si0b + contract registry
+
+**Context:** HNW portfolio generator (Shape B, rungs 3–4) shipped without a paired
+machine-readable IPS. Research brief and implementation plan defined the gap; risk build
+dashboard needed a dedicated track so woven scopes do not drift.
+
+**Shipped:**
+
+- **si0a** — `IpsSleeve` six-sleeve enum; security-master → IPS rollup; drift monitor and
+  optimizer use `ips_sleeve_for_position` (no ticker hacks)
+- **si0b** — `concentration_limit_pct`, `liquidity_tier_min_pct`, `turnover_budget_pct` on
+  `InvestmentPolicyStatement`; migration `005_ips_constraints` (`constraints_json`);
+  policy-driven concentration in monitor; `liquidity_vs_ips` in drift alerts
+- **Docs** — `docs/research/synthetic_ips.md`, `docs/synthetic_ips_implementation.md`,
+  `docs/dev_contract_registry.md`; Cursor rule `.cursor/rules/dev-contract-registry.mdc`
+- **Dashboard** — risk build tracker prepends Synthetic IPS pipeline (`si0a → si4`);
+  registry rows `si0a`/`si0b` shipped, `si1`–`si4` planned
+- **Tests** — `tests/test_ips_sleeves.py`, `tests/test_ips_policy_fields.py`
+
+**Decisions:**
+
+- `IpsSleeve` lives in `decision/ips` (not `research.risk`) — avoids decision→research import;
+  string values align with risk `AssetClass` for Shape A composition later
+- Risk API boundary unchanged: caller composes `evaluate_risk(manifest)` + IPS drift separately
+
+**Next:** si1 `emit_ips_for_cohort`; si2 `validate_ips` + `emit_synthetic_household` bundle.
+
+---
+
 ## 2026-06-24 — Risk API v1.1 HNW compositional generator
 
 **Shipped:**

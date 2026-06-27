@@ -1,6 +1,7 @@
 """Risk API + HNW synthetic build tracker — keep in sync with implementation plan.
 
 Update deliverable status when a PR lands: planned | in_progress | shipped.
+Synthetic IPS slices (si0a–si4) are listed first — see render_risk_build.py.
 """
 
 from __future__ import annotations
@@ -10,12 +11,14 @@ from pydantic import BaseModel
 
 class BuildDeliverable(BaseModel):
     id: str
-    track: str  # risk_contract | hnw_synthetic
-    slice: str  # v0a | v0b | v0c | v1 | v1.1
+    track: str  # risk_contract | hnw_synthetic | synthetic_ips
+    slice: str  # v0a | v0b | si0a | ...
     name: str
-    status: str  # planned | in_progress | shipped
+    status: str  # planned | in_progress | shipped | deferred | retired
     doc_href: str
     note: str
+    depends_on: list[str] = []
+    falsifier_test: str | None = None
 
 
 class BuildRung(BaseModel):
@@ -26,7 +29,72 @@ class BuildRung(BaseModel):
     exercises: str
 
 
-RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = [
+# Synthetic IPS track — prepended on risk build dashboard (si0a → si4).
+SYNTHETIC_IPS_DELIVERABLES: list[BuildDeliverable] = [
+    BuildDeliverable(
+        id="si0a-asset-class",
+        track="synthetic_ips",
+        slice="si0a",
+        name="AllocationTarget → IpsSleeve enum + security rollup",
+        status="shipped",
+        doc_href="docs/synthetic_ips_implementation.md#si0a--asset-class-vocabulary--ips-schema-1-pr",
+        note="IpsSleeve six-sleeve enum; monitor/optimizer use security rollup",
+        falsifier_test="tests/test_ips_sleeves.py",
+    ),
+    BuildDeliverable(
+        id="si0b-ips-fields",
+        track="synthetic_ips",
+        slice="si0b",
+        name="IPS concentration / liquidity / turnover fields",
+        status="shipped",
+        doc_href="docs/synthetic_ips_implementation.md#si0b--policy-fields--monitor-wiring-1-pr",
+        note="Policy-driven concentration; constraints_json persistence",
+        depends_on=["si0a-asset-class"],
+        falsifier_test="tests/test_ips_policy_fields.py",
+    ),
+    BuildDeliverable(
+        id="si1-emit-ips",
+        track="synthetic_ips",
+        slice="si1",
+        name="emit_ips_for_cohort",
+        status="planned",
+        doc_href="docs/synthetic_ips_implementation.md#si1--synthetic-ips-generator-1-pr",
+        note="Cohort-conditioned IPS co-generated with fixture weights",
+        depends_on=["si0b-ips-fields"],
+    ),
+    BuildDeliverable(
+        id="si2-validate-ips",
+        track="synthetic_ips",
+        slice="si2",
+        name="validate_ips + emit_synthetic_household bundle",
+        status="planned",
+        doc_href="docs/synthetic_ips_implementation.md#si2--validate_ips--pipeline-integration-1-pr",
+        note="SDG1 gate; binding_constraints before fixture sealed",
+        depends_on=["si1-emit-ips"],
+    ),
+    BuildDeliverable(
+        id="si3-workflow-smoke",
+        track="synthetic_ips",
+        slice="si3",
+        name="In-process workflow smokes + scenario card IPS",
+        status="planned",
+        doc_href="docs/synthetic_ips_implementation.md#si3--workflow-smokes--scenario-card-1-pr",
+        note="Drift + optimizer smoke; concentrated_stress must bind",
+        depends_on=["si2-validate-ips"],
+    ),
+    BuildDeliverable(
+        id="si4-dashboard-seed",
+        track="synthetic_ips",
+        slice="si4",
+        name="Synthetic IPS dashboard panel + DB seed adapter",
+        status="planned",
+        doc_href="docs/synthetic_ips_implementation.md#si4--dashboard--seed-adapter-1-pr",
+        note="cohort × binding matrix; optional seed_synthetic_household",
+        depends_on=["si2-validate-ips"],
+    ),
+]
+
+RISK_HNW_DELIVERABLES: list[BuildDeliverable] = [
     BuildDeliverable(
         id="v0a-envelope",
         track="risk_contract",
@@ -128,6 +196,12 @@ RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = [
     ),
 ]
 
+RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (
+    SYNTHETIC_IPS_DELIVERABLES + RISK_HNW_DELIVERABLES
+)
+
+SYNTHETIC_IPS_PIPELINE = "si0a → si0b → si1 → si2 → si3 → si4"
+
 SYNTHETIC_RUNGS: list[BuildRung] = [
     BuildRung(
         rung=0,
@@ -168,6 +242,8 @@ SYNTHETIC_RUNGS: list[BuildRung] = [
 
 BUILD_DOC_LINKS: list[tuple[str, str]] = [
     ("Dev contract registry", "docs/dev_contract_registry.md"),
+    ("Synthetic IPS plan", "docs/synthetic_ips_implementation.md"),
+    ("Synthetic IPS design", "docs/research/synthetic_ips.md"),
     ("Risk API contract", "docs/risk_api_contract.md"),
     ("Implementation plan", "docs/risk_api_implementation_plan.md"),
     ("HNW portfolios research", "docs/research/hnw_portfolios.md"),

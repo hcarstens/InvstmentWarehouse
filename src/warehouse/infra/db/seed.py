@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from warehouse.data.security_master import AssetClass, TaxCharacter
 from warehouse.decision.ips import AllocationTarget, InvestmentPolicyStatement
+from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.ips.store import save_ips
 from warehouse.infra.db.models import (
     AlternativeEventRow,
@@ -29,37 +30,50 @@ from warehouse.workflows.catalog import WORKFLOW_CATALOG
 DEMO_HOUSEHOLD_ID = "hh_smith"
 
 
+def _demo_ips_statement() -> InvestmentPolicyStatement:
+    return InvestmentPolicyStatement(
+        ips_id="ips_smith_v1",
+        household_id=DEMO_HOUSEHOLD_ID,
+        version=1,
+        effective_date="2026-01-01",
+        allocation_targets=[
+            AllocationTarget(
+                asset_class=IpsSleeve.EQUITY,
+                min_weight=Decimal("0.70"),
+                max_weight=Decimal("0.80"),
+                target_weight=Decimal("0.75"),
+            ),
+            AllocationTarget(
+                asset_class=IpsSleeve.FIXED_INCOME,
+                min_weight=Decimal("0.20"),
+                max_weight=Decimal("0.30"),
+                target_weight=Decimal("0.25"),
+            ),
+        ],
+        restricted_securities=[],
+        concentration_limit_pct=Decimal("0.25"),
+        liquidity_tier_min_pct=Decimal("0.50"),
+        turnover_budget_pct=Decimal("0.15"),
+    )
+
+
 def seed_ips_policy(session: Session) -> None:
     existing = session.scalar(
         select(IpsPolicyRow)
         .where(IpsPolicyRow.household_id == DEMO_HOUSEHOLD_ID)
         .limit(1)
     )
+    demo = _demo_ips_statement()
     if existing:
-        return
+        from warehouse.decision.ips.store import row_to_ips
+
+        current = row_to_ips(existing)
+        if current.turnover_budget_pct is not None:
+            return
+        session.delete(existing)
     save_ips(
         session,
-        InvestmentPolicyStatement(
-            ips_id="ips_smith_v1",
-            household_id=DEMO_HOUSEHOLD_ID,
-            version=1,
-            effective_date="2026-01-01",
-            allocation_targets=[
-                AllocationTarget(
-                    asset_class="etf",
-                    min_weight=Decimal("0.50"),
-                    max_weight=Decimal("0.70"),
-                    target_weight=Decimal("0.60"),
-                ),
-                AllocationTarget(
-                    asset_class="equity",
-                    min_weight=Decimal("0.30"),
-                    max_weight=Decimal("0.50"),
-                    target_weight=Decimal("0.40"),
-                ),
-            ],
-            restricted_securities=[],
-        ),
+        demo,
     )
 
 

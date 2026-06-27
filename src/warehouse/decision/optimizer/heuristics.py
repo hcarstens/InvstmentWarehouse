@@ -12,6 +12,8 @@ from warehouse.decision.constraints import (
     evaluate_wash_sale_risk,
 )
 from warehouse.decision.ips import InvestmentPolicyStatement
+from warehouse.decision.ips.rollup import ips_sleeve_for_position
+from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer import OptimizationResult, TradeProposal
 
 
@@ -52,13 +54,14 @@ def run_tax_aware_optimizer(
     if total_mv <= 0:
         raise ValueError("Cannot optimize — portfolio has no market value")
 
-    class_weights: dict[str, Decimal] = {}
+    class_weights: dict[IpsSleeve, Decimal] = {}
     for pos in positions:
         if pos.market_value is None:
             continue
-        ac = _asset_class_for_position(pos)
-        class_weights[ac] = (
-            class_weights.get(ac, Decimal("0")) + pos.market_value / total_mv
+        sleeve = ips_sleeve_for_position(pos)
+        class_weights[sleeve] = (
+            class_weights.get(sleeve, Decimal("0"))
+            + pos.market_value / total_mv
         )
 
     loss_lots = sorted(
@@ -115,10 +118,3 @@ def run_tax_aware_optimizer(
         estimated_tax_delta=tax_delta,
         binding_constraints=sorted(binding),
     )
-
-
-def _asset_class_for_position(pos: LotPositionView) -> str:
-    ticker = pos.ticker or ""
-    if ticker in {"VTI", "BND"}:
-        return "etf"
-    return "equity"
