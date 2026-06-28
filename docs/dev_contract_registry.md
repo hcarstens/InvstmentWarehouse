@@ -37,8 +37,8 @@ decision (contract §8-style tables) without an explicit **contract amendment** 
 | `synthetic_ips` | Decision + synthetic | [research/synthetic_ips.md](research/synthetic_ips.md) · [synthetic_ips_implementation.md](synthetic_ips_implementation.md) | *Add rows when si0a starts* |
 | `decision_plane` | Decision | Phase 3 panels · `decision/` package | `TODO.md` Phase 3 ✓ |
 | `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | m0a–m1 **shipped** (plan iteration log) |
-
-### Track dependency DAG (current)
+| `portfolio_manager` | Decision (`warehouse.decision.pm`) | [portfolio_manager_implementation.md](portfolio_manager_implementation.md) | pm0–pm2 **shipped** (plan iteration log) |
+| `portfolio_analyst` | Decision (`warehouse.decision.analyst`) | [portfolio_analyst_implementation.md](portfolio_analyst_implementation.md) · [heuristics/Mental Model of The Portfolio Analyst.md](heuristics/Mental%20Model%20of%20The%20Portfolio%20Analyst.md) | pa0 **planned** — next milestone |
 
 ```text
 risk_contract v0a–v0c          [shipped]
@@ -55,7 +55,16 @@ messaging m0a (core, plane-free)   [shipped]
        ├─ m0c (decouple ⚠)         [shipped — approval/staging decoupled]
        └─ m0d (daily_refresh + events) [shipped — phase-2 event panel]
             └─ m1 (pm.advise + tax.scenario) [shipped — protocol complete]
+                 └─ pm0 (narrative + 7-axiom checklist)      [shipped]
+                      └─ pm1 (working set + rebalance advisory) [shipped]
+                           └─ pm2 (dashboard + registry)        [shipped]
+                                └─ portfolio_analyst pa0+        [planned — next milestone]
+                                     └─ portfolio_optimization v1 [planned — hard problem]
 ```
+
+Tax leg held at `$0` stub on purpose (`evaluate_tax_scenario → 0`): a deterministic tax leg
+lets synthetic portfolios + IPS stress-test the whole PM flow. Tax estimate engine is a
+parallel, non-blocking track — flipping it stub→live does not change the `pm.advise` contract.
 
 `messaging` is a new root — m0a depends on no other track; m0c/m0d/m1 touch the decision,
 workflow, and dashboard owners, so coordinate those cells (§3) when they land.
@@ -76,6 +85,7 @@ Cross-track work must land in **one owner cell**. If none fit, amend this matrix
 | `warehouse.decision.ips` | Policy model, drift monitor, store | Generate synthetic fixtures |
 | `warehouse.decision.constraints` | Lot-level wash-sale, restricted, do-not-sell | Magic constants divorced from IPS (e.g. hardcoded concentration cap) |
 | `warehouse.decision.optimizer` | Trades inside IPS bounds; explainable output | Autonomous execution |
+| `warehouse.decision.pm` | `score_pm_axioms` (7-axiom narrative), `build_working_set`; advisory-only composite | Mutate state; persist; import plane cores — reach specialists via `dispatch_message` only |
 | `warehouse.messaging.core` | `Message`/`Kind`/`DispatchContext`, `dispatch_message`/`emit_event`, `REGISTRY` | Import any plane (`data`/`decision`/`execution`/`research`/`reporting`) |
 | `warehouse.messaging.handlers` | Composition root — register thin `(ctx, payload)` plane wrappers | Move plane logic into wrappers; leak `ctx.session` into an EVALUATE core |
 | **Caller** (dashboard, workflow, HTTP adapter) | Compose manifest + IPS + present errors; dispatch cross-plane via `dispatch_message` | Swallow failures; import risk internals bypassing `evaluate_risk` |
@@ -98,7 +108,7 @@ Each row in `risk_build_registry.py` (`BuildDeliverable`):
 | Field | Required | Values / notes |
 | --- | --- | --- |
 | `id` | yes | Stable slug, e.g. `si0a-asset-class` |
-| `track` | yes | `risk_contract` \| `hnw_synthetic` \| `synthetic_ips` \| `decision_plane` |
+| `track` | yes | `risk_contract` \| `hnw_synthetic` \| `synthetic_ips` \| `decision_plane` \| `messaging` \| `portfolio_manager` \| `portfolio_analyst` |
 | `slice` | yes | Plan slice, e.g. `v0a`, `si2` |
 | `name` | yes | Short human label |
 | `status` | yes | `planned` \| `in_progress` \| `shipped` \| `deferred` \| `retired` |

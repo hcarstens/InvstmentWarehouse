@@ -1,6 +1,6 @@
 # Portfolio Manager — Implementation Plan
 
-**Status:** pm0 planned (review folded — ports cut, axiom checklist promoted, 3 slices)
+**Status:** pm0–pm2 **shipped** (narrative + axiom checklist, rebalance advisory workflow, dashboard panel; tax leg stays an intentional $0 stub — see §next)
 **Date:** 2026-06-28
 **Owner:** decision plane / orchestrator
 **Inputs:** [`heuristics/Mental Model of The Portfolio Manager.md`](heuristics/Mental%20Model%20of%20The%20Portfolio%20Manager.md) (ℍ_Allocation — north star),
@@ -321,9 +321,43 @@ Demo household uses DB bootstrap.
 
 ---
 
+## 12. Next milestone — Portfolio Analyst (§next)
+
+PM v0 is shipped. The next milestone is **not** the tax estimate engine — it is the
+**Portfolio Analyst** leg. Rationale:
+
+- **Keep tax at `$0` deliberately.** `evaluate_tax_scenario → 0` is a *feature* for now, not a
+  gap: a deterministic, side-effect-free tax leg lets us generate synthetic portfolios + IPS
+  (`emit_synthetic_household`, cohort/rung matrix §9) and stress-test the **entire** advisory
+  flow — working set → 4 legs → 7-axiom narrative → dashboard — without coupling to unfinished
+  tax math. The `specialist_status.tax = stub` badge and `test_tax_scenario_stub_zero` keep this
+  honest. Tax engine remains a parallel, non-blocking track (§8).
+- **Analyst depth unlocks optimization.** Today the analyst leg ships drift + concentration
+  (`policy.check`, live). The deferred half — **attribution (P&L residual), kill criteria,
+  non-performing-asset flags** — is what gives the optimizer a defensible objective and
+  constraint set. Portfolio optimization is the genuinely **hard problem** (multi-period,
+  tax-aware, lot-discrete, IPS-constrained); it is only as good as the analyst signal feeding it.
+
+**Build order for the milestone:**
+
+```text
+synthetic portfolios + IPS (shipped)  ──►  Portfolio Analyst depth
+  (tax leg held at $0 — flow-test enabler)      (attribution, kill criteria, NPA flags)
+                                                      └─►  Portfolio Optimization (hard)
+                                                            multi-period, tax-aware, lot-discrete
+```
+
+Acceptance for the analyst milestone will be drafted in a `portfolio_analyst_implementation.md`
+plan (mirror this doc's structure); the PM contract (`pm.advise`, `AdviceBundle` shape) does
+**not** change — the analyst leg enriches the function behind `policy.check`, same as §3.
+
+---
+
 ## Review / iteration log
 
 | Date | Note |
 | --- | --- |
 | 2026-06-28 | Initial plan: specialist *ports* + stub envelopes, `PortfolioWorkingSet`, 4 PRs. |
 | 2026-06-28 | **Review folded (Claude).** Cut the port layer (double abstraction over the messaging registry); collapsed three stub envelopes to one honest `specialist_status` (only tax is a stub); consolidated `PortfolioWorkingSet` into the existing `PmAdvisePayload`; promoted the 7-axiom checklist to pm0 with a `not_computed` honesty rule (axiom 5 = no valuation engine — Goodhart guard); added `lot_positions_from_fixture` reuse for in-process HNW; froze `AdviceBundle`; single `decision/pm.py` not a 6-file package; **4 PRs → 3**. Grounded against shipped code (`evaluate_tax_scenario` zeros, `policy.check` concentration live, `fixture_views.py`). |
+| 2026-06-28 | **pm0–pm2 shipped + code review folded (Claude).** Implemented all three slices. Review fixes: (1) axiom-2 effective-bets scale bug — `pct_variance_contribution` is a [0,1] fraction, the `/100` made the diversification axiom always PASS (the exact Goodhart trap §4 warns of); removed it, demo book now correctly scores axiom 2 `breach` (~1.3 effective bets). (2) Dashboard `load_advisory_dashboard` now reuses `build_working_set` (single assembly path, no divergent manifest). (3) Axiom thresholds pinned to `Settings.pm_axiom_config_version` (audit replay). (4) Added `test_policy_check_concentration_live` + HNW rung-3 concentration assertion (§6 invariants now covered). |
+| 2026-06-28 | **Next milestone re-pointed: Portfolio Analyst (not tax engine).** Tax leg stays an intentional `$0` stub — keeping `evaluate_tax_scenario → 0` lets synthetic portfolios + IPS stress-test the *whole* PM flow without waiting on the tax estimate engine. The analyst depth (attribution, kill criteria, NPA flags) feeds the harder downstream problem: **portfolio optimization**. See §next. |

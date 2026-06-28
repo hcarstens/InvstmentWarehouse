@@ -108,12 +108,29 @@ Backend:
 ## Loose threads (post-messaging)
 
 - [x] **Reconcile `as_of_date` gate** — `reconcile_ingest` opens a break when custodian file `as_of_date` ≠ ledger market-price `as_of_date` (stale file no longer reconciles clean).
-- [ ] **Tax scenario engine (estimate)** — Replace the zero-stub in `evaluate_tax_scenario` with threshold-aware after-tax math (Tax Analyst heuristic: cliff-effect navigation, not flat additive NIIT/AMT). Sub-notes:
+- [ ] **Tax scenario engine (estimate)** — Replace the zero-stub in `evaluate_tax_scenario` with threshold-aware after-tax math (Tax Analyst heuristic: cliff-effect navigation, not flat additive NIIT/AMT). **Parallel / non-blocking** — deliberately held while we stress-test the PM flow with `tax → $0` (see Portfolio Manager block). Sub-notes:
   - [ ] Pin NIIT/AMT phase-outs and income thresholds to `tax_config_version`
   - [ ] Model income character and entity splits (not a single rate × unrealized gains)
   - [ ] Falsifier tests against known household fixtures
-- [x] **Advisory bundle panel (stub)** — `pm.advise` dispatches on dashboard load; summary table for risk / propose / tax / drift legs.
-- [ ] **Advisory bundle panel (full)** — Upgrade stub to full `AdviceBundle` presentation keyed by `correlation_id`.
+
+### Portfolio Manager (pm0–pm2) ✓ — `docs/portfolio_manager_implementation.md`
+
+- [x] **pm0 — narrative + 7-axiom checklist** — `score_pm_axioms → PmNarrative` over the 4 legs; `axiom_5` honest `not_computed`; `AdviceBundle`/`PmNarrative` frozen + registered.
+- [x] **pm1 — working set + rebalance advisory** — `build_working_set`, `run_rebalance_advisory` (`ledger.positions → pm.advise`, advisory-only); HNW rung-3 smoke.
+- [x] **pm2 — dashboard + registry** — advisory panel (axiom strip + specialist badges + `tax: stub`); `portfolio_manager` track + `warehouse.decision.pm` boundary registered.
+- [x] **Advisory bundle panel (full)** — `AdviceBundle` presentation keyed by `correlation_id`: headline, ℍ_Allocation axiom strip, specialist liveness badges.
+- [ ] **Tax leg stub → live** — flips `evaluate_tax_scenario` to real numbers; **does not change the `pm.advise` contract**. Gated on the tax estimate engine above, *not* on PM. Kept at `$0` on purpose so synthetic portfolios + IPS can exercise the whole flow.
+
+### Portfolio Analyst (pa0+) — NEXT MILESTONE — `docs/portfolio_analyst_implementation.md`
+
+Analyst leg is **live** today for drift + concentration (`policy.check`). The deferred depth is
+the next build, and it feeds the genuinely hard downstream problem (optimization). Keep tax at
+`$0` throughout so the analyst → optimizer signal can be stress-tested on synthetic books.
+
+- [ ] **pa0 — attribution** — P&L residual vs benchmark / policy; explainable per-sleeve contribution (Portfolio Analyst heuristic: Goodhart vigilance, no faked scores).
+- [ ] **pa1 — kill criteria** — pre-committed exit rules per thesis; surface breaches as alerts (not autonomous sells).
+- [ ] **pa2 — non-performing-asset flags** — sustained drawdown vs cost, stale alt marks, missed capital calls, IPS liquidity breach (cross-ref open question #13).
+- [ ] **Unlocks → Portfolio Optimization v1** — multi-period, tax-aware, lot-discrete, IPS-constrained. The hard problem; only as good as the analyst signal feeding it.
 - [ ] **Review all portfolios** — Household-book review workflow (PM orchestrator): run across every household when material inputs change. Triggers and scope:
   - [ ] **Tax change** — `tax_config_version` bump, overlay rule change, or lot realization event → re-run `tax.scenario` / after-tax compare per book (`docs/portfolio_manager_implementation.md`).
   - [ ] **Month-end reporting** — positions reconciled, marks fresh, period close → `report.build` (when reporting plane ships) + IPS drift + exception queue snapshot per household.
