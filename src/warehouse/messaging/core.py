@@ -8,6 +8,7 @@ reporting). Plane wrappers register from ``warehouse.messaging.handlers``
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import structlog
 from pydantic import BaseModel
@@ -16,8 +17,10 @@ from warehouse.messaging.models import DispatchContext, Kind, Message
 
 logger = structlog.get_logger(__name__)
 
-Handler = Callable[[DispatchContext, BaseModel], BaseModel]
-Subscriber = Callable[[DispatchContext, BaseModel], None]
+# Payload typed ``Any`` so concrete-payload wrappers register cleanly; the
+# runtime isinstance check in dispatch enforces the declared payload type.
+Handler = Callable[[DispatchContext, Any], BaseModel]
+Subscriber = Callable[[DispatchContext, Any], None]
 
 # op -> (payload_type, handler, kind). One handler per op (S2); typed at the
 # boundary (S5).

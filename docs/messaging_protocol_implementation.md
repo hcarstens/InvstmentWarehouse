@@ -1,6 +1,6 @@
 # Messaging Protocol — Implementation Plan
 
-**Status:** m0a shipped; m0b–m1 pending
+**Status:** m0a, m0b shipped; m0c–m1 pending
 **Date:** 2026-06-28
 **Owner:** platform / orchestrator
 **Inputs:** [`messaging_protocol.md`](messaging_protocol.md) (contract — wins on conflict),
@@ -91,9 +91,16 @@ raises), not by "the module looks done."
 - `message_id` auto-stamped (uuid4 hex) when empty; `add_note` carries `op`/`correlation_id`/`household_id`.
 - `pytest tests/test_frozen.py` green; **no plane imports in `core.py`** (assert in `tests/test_architecture.py`).
 
-### m0b — handler wrappers + payloads *(~1 PR)*
+### m0b — handler wrappers + payloads *(~1 PR)* — ✅ shipped
 
 **Goal:** every atomic catalog `op` round-trips through dispatch identically to a direct call.
+
+> **Deviation (deliberate):** `__init__.py` does **not** import `handlers` — it stays light so
+> that importing `messaging.models` (e.g. from `frozen_registry`) does not transitively drag in
+> every plane (S3 isolation). `handlers.py` self-registers on import; composition roots (tests,
+> and m0d's `daily_refresh`/dashboard startup) `import warehouse.messaging.handlers` explicitly.
+> Result wrappers (`PositionSet`, `TradeValidation`, `ReconcileResult`, `StagedOrders`) added
+> because the boundary returns `BaseModel` while some backers return bare `list`/`tuple`.
 
 | Task | File(s) |
 | --- | --- |
@@ -290,3 +297,4 @@ Critical path: **m0a → m0b → m0d**; m0c can overlap after m0b; m1 last.
 | --- | --- |
 | 2026-06-28 | Initial plan from `messaging_protocol.md` (decisions closed §10). Five slices m0a–m1; grounded against `run_daily_refresh`, `infra/notify` collision, phase-2 exception panel, `FROZEN_TYPES`, `dev_contract_registry`. Self-review §8 appended before publish. |
 | 2026-06-28 | **m0a shipped.** `warehouse/messaging/{models,core}.py` (plane-free), `__init__` public surface; `Message`/`DispatchContext` frozen + registered. `tests/test_messaging_core.py` (9 tests: unknown-op KeyError, payload-mismatch TypeError, payload type preserved, `add_note` context, event isolation, dup-register, message_id stamp); `test_architecture.py` plane-free assertion. 207 pass, ruff + mypy strict clean. |
+| 2026-06-28 | **m0b shipped.** `payloads.py` (11 request bodies + 4 result wrappers), `handlers.py` composition root registering all 11 atomic ops; `Handler` payload typed `Any` for clean wrapper registration. `tests/test_messaging_handlers.py` (8 tests: round-trip == direct for the 5 QUERY/EVALUATE ops, EVALUATE purity via poisoned session, `ingest.run` COMMAND, `orders.stage` gate). Deliberate deviation: `__init__` stays light, handlers self-register on import. 215 pass, ruff + mypy strict clean. |
