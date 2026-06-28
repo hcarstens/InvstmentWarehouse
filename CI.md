@@ -176,14 +176,26 @@ curl -s http://127.0.0.1:8765/api/risk/build | python -m json.tool
 warehouse risk evaluate tests/fixtures/sample_portfolio.json --horizon 5y
 ```
 
-Phase API JSON endpoints (while `warehouse serve` is running):
+Plane page JSON (preferred while `warehouse serve` is running):
 
 ```bash
-curl -s http://127.0.0.1:8765/api/phase1
+curl -s http://127.0.0.1:8765/api/pages/data
+curl -s http://127.0.0.1:8765/api/pages/decision
+curl -s http://127.0.0.1:8765/api/pages/research
+curl -s http://127.0.0.1:8765/api/pages/execution
+curl -s http://127.0.0.1:8765/api/pages/reporting
+curl -s http://127.0.0.1:8765/api/pages/infra
+curl -s http://127.0.0.1:8765/api/risk
+```
+
+Legacy phase JSON (deprecated — responses include `Deprecation: true` and
+`X-Deprecation-Notice: use /api/pages/…`):
+
+```bash
+curl -s -D - http://127.0.0.1:8765/api/phase1 -o /dev/null
 curl -s http://127.0.0.1:8765/api/phase2
 curl -s http://127.0.0.1:8765/api/phase3
 curl -s http://127.0.0.1:8765/api/phase4
-curl -s http://127.0.0.1:8765/api/risk
 ```
 
 ---

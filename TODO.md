@@ -4,8 +4,10 @@ Phased deliverables aligned with Sharpe founding investment engineer priorities.
 See `docs/research/sharpe_founding_engineer_brief.md` for full context.
 
 **Dashboard-first rule:** Every phase ships a runnable dashboard view. No phase closes
-without something new visible at `warehouse serve`. The dashboard is the living status
-report — it reflects real system state (data, jobs, breaks, proposals), not static docs.
+without something new visible at `warehouse serve`. The catalog at `/` is the entry point;
+operational panels live on plane pages (`/data`, `/research`, `/decision`, `/execution`,
+`/reporting`, `/infra`). The dashboard is the living status report — it reflects real
+system state (data, jobs, breaks, proposals), not static docs.
 
 **Early dev (public repo):** No Docker through Phase 4. Use SQLite + local filesystem +
 in-process jobs so `warehouse serve` and `pytest` run with zero external services.
@@ -17,7 +19,7 @@ product work). Non-secret settings live in **`configs/`** (committed); use
 
 ## Phase 0 — Shell + dashboard foundation ✓
 
-**Dashboard at run:** Platform overview, phase roadmap, plane readiness, workflow catalog, infra health.
+**Dashboard at run:** Catalog (`/`) — platform overview, phase roadmap, plane readiness, workflow catalog, infra summary, orchestrator gate.
 
 - [x] Repository architecture and package layout
 - [x] `configs/`, `requirements.txt`, `tests/`, `CLAUDE.md`, `.claude/`
@@ -29,7 +31,7 @@ product work). Non-secret settings live in **`configs/`** (committed); use
 
 ## Phase 1 — Weeks 1–4: Discovery, schema & data model views ✓
 
-**Dashboard at run:** Entity graph explorer, security master table, schema/migration status.
+**Dashboard at run:** `/data` — entity graph explorer, security master table, schema/migration status.
 
 Backend:
 - [x] **Workflow catalog** — owner, inputs, outputs, SLA (onboarding through reporting)
@@ -47,7 +49,7 @@ Dashboard panels (each phase item maps to a visible panel):
 
 ## Phase 2 — Weeks 5–12: Vertical slice & positions dashboard ✓
 
-**Dashboard at run:** Live positions, ingest pipeline, reconciliation exceptions, daily P&L.
+**Dashboard at run:** `/data` (ingest, positions) · `/execution` (recon, refresh) · `/infra` (audit log).
 
 Backend:
 - [x] **Single custodian ingest** — file parser → normalized positions
@@ -67,7 +69,7 @@ Dashboard panels:
 
 ## Phase 3 — Weeks 13–26: Decision plane & optimizer dashboard ✓
 
-**Dashboard at run:** IPS drift, optimizer proposals, approval queue, backtest outcomes.
+**Dashboard at run:** `/decision` (IPS, optimizer, approval) · `/research` (backtests).
 
 Backend:
 - [x] **Tax-aware optimizer v0** — TLH heuristics + greedy rebalance on sample portfolios
@@ -89,8 +91,7 @@ Dashboard panels:
 
 ## Phase 4 — Execution, alternatives & tax depth ✓
 
-**Dashboard at run:** Staged orders, solver comparison, multi-custodian ingest, alternatives
-sub-ledger, tax scenario panel.
+**Dashboard at run:** `/execution` (staged orders, solver) · `/data` (custodian, alts) · `/reporting` (tax scenarios).
 
 **Architecture note:** Phase 4 product work ships on the same stack as Phases 0–3 — SQLite,
 local filesystem, in-process jobs. Docker-compose and Postgres are **not** prerequisites;
@@ -180,8 +181,7 @@ Dashboard panels:
 
 ## Phase 5 — Prod infra: docker-compose & Postgres upgrade
 
-**Dashboard at run:** Infra health shows Postgres, Redis, and object store live (replacing
-skipped stubs); schema status reflects Postgres migration path.
+**Dashboard at run:** `/infra` — Postgres, Redis, object store health (replacing skipped stubs).
 
 **When to pull this forward:** multi-advisor concurrency, household RLS, background jobs
 for long MIP/backtest runs, or pilot deployment — not before product panels in Phase 4 ship.

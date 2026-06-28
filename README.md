@@ -41,19 +41,28 @@ The dashboard auto-refreshes every 30s. On first load it runs migrate + seed if 
 
 | URL | Description |
 | --- | --- |
-| `/` | Full dashboard (entity graph, securities, schema status) |
-| `/risk` | Risk API + HNW synthetic build tracker (deliverables, rungs, smoke checks) |
-| `/api/risk/build` | Build tracker JSON (for CI / automation) |
-| `/docs/risk_api_contract.md` | Serve contract doc as plain text from repo |
-| `/?q=VTI` | Security master filter by ticker, name, or CUSIP |
+| `/` | Catalog — roadmap, plane cards, panel registry |
+| `/data` | Data plane (entity graph, securities, positions, custodian, alts) |
+| `/research` | Research plane (risk manifest, backtests) |
+| `/decision` | Decision plane (IPS, optimizer, PM/advisory, analyst) |
+| `/execution` | Execution plane (recon, refresh, staged orders, solver) |
+| `/reporting` | Reporting plane (tax scenarios) |
+| `/infra` | Infrastructure (health checks, audit log) |
+| `/risk` | Risk API + HNW synthetic build tracker |
+| `/data?q=VTI` | Security master filter by ticker, name, or CUSIP |
+| `/data?custodian=custodian_fidelity` | Custodian selector filter |
 | `/api/status` | Platform status JSON |
 | `/api/health` | Infrastructure checks (503 if any fail) |
-| `/api/phase1` | Entity graph, securities, schema JSON |
-| `/api/phase2` | Ingest, positions, reconciliation, refresh, audit JSON |
-| `/api/phase3` | IPS drift, optimizer, approval queue, backtest JSON |
-| `/api/phase4` | Staged orders, solver comparison, custodian, alts, tax JSON |
+| `/api/pages/data` | Data plane JSON bundle (preferred) |
+| `/api/pages/decision` | Decision plane JSON bundle |
+| `/api/pages/research` | Research plane JSON bundle |
+| `/api/pages/execution` | Execution plane JSON bundle |
+| `/api/pages/reporting` | Reporting plane JSON bundle |
+| `/api/pages/infra` | Infra plane JSON bundle |
+| `/api/phase1` … `/api/phase4` | **Deprecated** — use `/api/pages/*` (see `Deprecation` response headers) |
+| `/api/risk/build` | Build tracker JSON (for CI / automation) |
 | `/api/risk` | Portfolio risk schema (GET) and evaluation (POST) |
-| `/?custodian=custodian_fidelity` | Filter Phase 4 custodian panel |
+| `/docs/risk_api_contract.md` | Serve contract doc as plain text from repo |
 
 ### Execution plane (Phase 4)
 

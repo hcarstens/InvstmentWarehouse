@@ -1,6 +1,6 @@
 # Dev Dashboard — Multi-Page Implementation Plan
 
-**Status:** dd4 shipped (execution, reporting, infra pages); dd5 pending
+**Status:** dd6 shipped (legacy phase API deprecation); multi-page split complete
 **Date:** 2026-06-28
 **Owner:** platform / `warehouse.dashboard`
 **Purpose:** Break the thin dashboard into plane-scoped pages that mirror repo structure,
@@ -14,8 +14,7 @@ report — not a slide deck.
 - [`heuristics/Cartography.md`](heuristics/Cartography.md) (C1–C8)
 - [`dev_contract_registry.md`](dev_contract_registry.md) (Lib6 entry point, Lib2 fixed URLs)
 - [`TODO.md`](../TODO.md) (phase ↔ panel registry — keep `phases.py` in sync)
-- Current implementation: `src/warehouse/dashboard/server.py` (`render_html` ≈ 500 lines, 30+
-  sections on one scroll)
+- Current implementation: `src/warehouse/dashboard/` — catalog at `/`, plane pages at `/data` … `/infra`, thin router in `server.py`
 
 ---
 
@@ -189,12 +188,38 @@ render call in the page module — three fixed locations (Lib2).
 | GET | `/` | Catalog HTML |
 | GET | `/data` … `/infra` | Plane HTML |
 | GET | `/risk`, `/risk/` | Risk build HTML (unchanged) |
-| GET | `/api/status` | Full `StatusReport` JSON (unchanged — automation entry) |
-| GET | `/api/pages/{page_id}` | **New** — JSON mirror of one plane page’s data bundle |
-| GET | `/api/phase1` … `/api/phase4` | Keep through dd5; deprecate in favor of `/api/pages/*` in dd6 |
-| GET | `/api/health` | Unchanged |
+| GET | `/api/status` | Full `StatusReport` JSON (automation entry) |
+| GET | `/api/pages/{page_id}` | JSON mirror of one plane page’s data bundle |
+| GET | `/api/phase1` … `/api/phase4` | **Deprecated** — same bodies as before; see migration table |
+| GET | `/api/health` | Infra checks JSON |
+| GET | `/api/risk`, `/api/risk/build` | Risk API schema / build registry |
 
 `/dashboard` → **301 to `/`** (Lib2 — one catalog URL).
+
+**Plane page JSON (`/api/pages/*`)**
+
+| Path | Model | Query params |
+| --- | --- | --- |
+| `/api/pages/data` | `DataPageData` (`phase1`, `phase2`, `phase4` subsets) | `?q=` security search · `?custodian=` |
+| `/api/pages/research` | `ResearchPageData` (`risk`, `backtests`, `build`) | — |
+| `/api/pages/decision` | `DecisionPageData` (`phase3`, `optimizer`, `advisory`, …) | — |
+| `/api/pages/execution` | `ExecutionPageData` (`phase2` recon/refresh, `phase4` OMS/solver) | — |
+| `/api/pages/reporting` | `ReportingPageData` (`phase4.tax_scenarios`) | — |
+| `/api/pages/infra` | `InfraPageData` (`infra_checks`, `phase2.audit_entries`) | — |
+
+503 when the page bundle’s `error` field is set (same as legacy phase APIs).
+
+**Legacy phase JSON migration (dd6)**
+
+Responses include `Deprecation: true`, `Link: …; rel="successor-version"`, and
+`X-Deprecation-Notice: use …`. Bodies are unchanged for backward compatibility.
+
+| Legacy | Successor page JSON | Notes |
+| --- | --- | --- |
+| `/api/phase1` | `/api/pages/data` | `phase1` field in bundle |
+| `/api/phase2` | `/api/pages/data`, `/api/pages/execution`, `/api/pages/infra` | Split by plane |
+| `/api/phase3` | `/api/pages/decision`, `/api/pages/research` | Backtests on research |
+| `/api/phase4` | `/api/pages/data`, `/api/pages/execution`, `/api/pages/reporting` | Custodian/alts · OMS/solver · tax |
 
 Query params stay page-local:
 

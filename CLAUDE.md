@@ -12,10 +12,23 @@ Derived from the Sharpe founding investment engineer brief — see
 is the living functional status report — not a separate doc or slide deck.
 
 ```bash
-warehouse serve          # http://127.0.0.1:8765/ — auto-refreshes every 30s
+warehouse serve          # catalog → http://127.0.0.1:8765/
 warehouse serve --port 9000
 curl localhost:8765/api/status   # JSON status for automation
 ```
+
+**Plane pages** (linked from catalog nav):
+
+| Path | Plane |
+| --- | --- |
+| `/` | Catalog — roadmap, plane cards, panel registry |
+| `/data` | Data — entity graph, security master, positions, custodian, alts |
+| `/research` | Research — risk manifest, backtests (+ link to `/risk` build tracker) |
+| `/decision` | Decision — IPS, optimizer, PM/advisory, analyst panels |
+| `/execution` | Execution — recon, refresh, staged orders, solver |
+| `/reporting` | Reporting — tax scenarios |
+| `/infra` | Infrastructure — health checks, audit log |
+| `/risk` | Risk build tracker (also `warehouse serve --risk` landing) |
 
 Rules:
 
@@ -23,11 +36,11 @@ Rules:
 - Panels show data from the running system (positions, breaks, proposals) — use demo/sample
   data only until ingest is live, but the panel must exist and be wired
 - `warehouse.dashboard.phases` tracks panel status (`live` | `stub` | `planned`); keep aligned
-  with `TODO.md`
+  with `TODO.md` and `navigation.py` panel ownership
 - Prefer adding a panel over adding hidden backend-only code
+- New panels: register in `phases.py`, `navigation.py`, the owning `pages/*.py`, and catalog registry link column
 
-Current live panels (Phase 0, complete): platform overview, phase roadmap, plane readiness,
-workflow catalog, infra health. See `TODO.md` for per-phase panel deliverables.
+Current live panels: see catalog at `/` or `TODO.md` per-phase deliverables.
 
 ## Public repository & early dev
 
