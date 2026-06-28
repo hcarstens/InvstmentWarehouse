@@ -36,6 +36,7 @@ decision (contract §8-style tables) without an explicit **contract amendment** 
 | `hnw_synthetic` | Research (synthetic) | [research/hnw_portfolios.md](research/hnw_portfolios.md) · risk plan §HNW | `RISK_BUILD_DELIVERABLES` |
 | `synthetic_ips` | Decision + synthetic | [research/synthetic_ips.md](research/synthetic_ips.md) · [synthetic_ips_implementation.md](synthetic_ips_implementation.md) | *Add rows when si0a starts* |
 | `decision_plane` | Decision | Phase 3 panels · `decision/` package | `TODO.md` Phase 3 ✓ |
+| `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | *Add rows when m0a starts* |
 
 ### Track dependency DAG (current)
 
@@ -48,7 +49,16 @@ risk_contract v0a–v0c          [shipped]
                       └─ si2     [shipped — validate_ips + bundle]
                            ├─ si3 [shipped — workflow smokes]
                            └─ si4 [planned — dashboard + DB seed]
+
+messaging m0a (core, plane-free)   [proposed — independent of plane work]
+  └─ m0b (handlers + payloads)     [proposed — wraps risk.evaluate etc.]
+       ├─ m0c (decouple ⚠)         [proposed — touches decision approval/staging]
+       └─ m0d (daily_refresh + events) [proposed — touches workflows + phase-2 dashboard]
+            └─ m1 (pm.advise + tax.scenario) [proposed]
 ```
+
+`messaging` is a new root — m0a depends on no other track; m0c/m0d/m1 touch the decision,
+workflow, and dashboard owners, so coordinate those cells (§3) when they land.
 
 Do not start a slice until `depends_on` slices show `shipped` in the build registry.
 
@@ -66,7 +76,9 @@ Cross-track work must land in **one owner cell**. If none fit, amend this matrix
 | `warehouse.decision.ips` | Policy model, drift monitor, store | Generate synthetic fixtures |
 | `warehouse.decision.constraints` | Lot-level wash-sale, restricted, do-not-sell | Magic constants divorced from IPS (e.g. hardcoded concentration cap) |
 | `warehouse.decision.optimizer` | Trades inside IPS bounds; explainable output | Autonomous execution |
-| **Caller** (dashboard, workflow, HTTP adapter) | Compose manifest + IPS + present errors | Swallow failures; import risk internals bypassing `evaluate_risk` |
+| `warehouse.messaging.core` | `Message`/`Kind`/`DispatchContext`, `dispatch_message`/`emit_event`, `REGISTRY` | Import any plane (`data`/`decision`/`execution`/`research`/`reporting`) |
+| `warehouse.messaging.handlers` | Composition root — register thin `(ctx, payload)` plane wrappers | Move plane logic into wrappers; leak `ctx.session` into an EVALUATE core |
+| **Caller** (dashboard, workflow, HTTP adapter) | Compose manifest + IPS + present errors; dispatch cross-plane via `dispatch_message` | Swallow failures; import risk internals bypassing `evaluate_risk` |
 
 **Composition pattern (risk + IPS):**
 
