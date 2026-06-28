@@ -16,6 +16,10 @@ from warehouse.dashboard.catalog import render_catalog
 from warehouse.dashboard.npa_data import load_npa_dashboard
 from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
 from warehouse.dashboard.pages.data import load_data_page, render_data_page
+from warehouse.dashboard.pages.decision import (
+    load_decision_page,
+    render_decision_page,
+)
 from warehouse.dashboard.pages.research import (
     load_research_page,
     render_research_page,
@@ -393,6 +397,23 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path_only == "/decision":
+            body = render_decision_page().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        elif path_only == "/api/pages/decision":
+            data = load_decision_page()
+            body = data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not data.error else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         elif path_only == "/api/pages/research":
             data = load_research_page()
             body = data.model_dump_json(indent=2).encode()
@@ -549,6 +570,7 @@ def serve(
         print(f"Catalog:    http://{host}:{port}/")
         print(f"Data plane: http://{host}:{port}/data")
         print(f"Research:   http://{host}:{port}/research")
+        print(f"Decision:   http://{host}:{port}/decision")
     print(f"Risk build: http://{host}:{port}/risk")
     print(f"Build API:  http://{host}:{port}/api/risk/build")
     print(f"Status API: http://{host}:{port}/api/status")

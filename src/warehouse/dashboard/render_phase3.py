@@ -114,7 +114,8 @@ def render_backtest_section(
   </section>"""
 
 
-def render_phase3_sections(phase3: Phase3DashboardData) -> str:
+def render_phase3_decision_sections(phase3: Phase3DashboardData) -> str:
+    """IPS, optimizer, approval, constraints, synthetic IPS — no backtests."""
     error = ""
     if phase3.error:
         error = (
@@ -198,8 +199,6 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
     </table>
   </section>
 
-{render_backtest_section(phase3.backtest_runs)}
-
   <section>
     <h2>Constraint binding report</h2>
     <table>
@@ -208,3 +207,9 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
     </table>
   </section>
 {synthetic_ips_html}"""
+
+
+def render_phase3_sections(phase3: Phase3DashboardData) -> str:
+    return render_phase3_decision_sections(phase3) + render_backtest_section(
+        phase3.backtest_runs
+    )

@@ -79,6 +79,46 @@ def test_api_pages_research() -> None:
     assert data.error is None
 
 
+def test_decision_page_loads() -> None:
+    from warehouse.dashboard.pages.decision import render_decision_page
+
+    html = render_decision_page()
+    assert "IPS drift monitor" in html
+    assert "Optimizer proposals" in html
+    assert "MV rebalance" in html
+    assert "Target w*" in html
+    assert "Synthetic IPS binding matrix" in html
+    assert "Advisory bundle" in html
+    assert "pm.advise" in html
+    assert "axiom checklist" in html
+    assert "tax: stub" in html
+    assert "not_computed" in html
+    assert "attribution.evaluate" in html
+    assert "active return vs ex-ante class assumption" in html
+    assert "Kill-criteria watch" in html
+    assert "Alerts only" in html
+    assert "Backtest results" not in html
+    assert "Risk manifest" not in html
+    assert "Parametric VaR" not in html
+
+
+def test_catalog_omits_decision_detail() -> None:
+    html = render_catalog()
+    assert "axiom checklist" not in html
+    assert "<h2>Advisory bundle" not in html
+    assert "<h2>Synthetic IPS binding matrix</h2>" not in html
+    assert "<h2>IPS drift monitor" not in html
+
+
+def test_api_pages_decision() -> None:
+    from warehouse.dashboard.pages.decision import load_decision_page
+
+    data = load_decision_page()
+    assert data.phase3.household_id
+    assert data.advisory.correlation_id
+    assert data.error is None
+
+
 def test_catalog_omits_operational_detail() -> None:
     html = render_catalog()
     assert "<h2>Entity graph" not in html
