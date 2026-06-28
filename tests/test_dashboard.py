@@ -22,6 +22,34 @@ def test_catalog_nav_contains_all_pages() -> None:
         assert page.nav_label in html
 
 
+def test_catalog_does_not_contain_entity_graph() -> None:
+    html = render_catalog()
+    assert "<h2>Entity graph" not in html
+
+
+def test_data_page_loads() -> None:
+    from warehouse.dashboard.pages.data import render_data_page
+
+    html = render_data_page()
+    assert "<h2>Entity graph" in html
+    assert "<h2>Security master</h2>" in html
+    assert "Schema status" in html
+    assert "Ingest status" in html
+    assert "Positions" in html and "lots" in html
+    assert "Custodian selector" in html
+    assert "Alternatives sub-ledger" in html
+    assert 'href="/data"' in html or 'action="/data"' in html
+    assert "Parametric VaR" not in html
+
+
+def test_api_pages_data() -> None:
+    from warehouse.dashboard.pages.data import load_data_page
+
+    data = load_data_page()
+    assert data.phase1.household_id
+    assert data.error is None
+
+
 def test_catalog_omits_operational_detail() -> None:
     html = render_catalog()
     assert "<h2>Entity graph" not in html

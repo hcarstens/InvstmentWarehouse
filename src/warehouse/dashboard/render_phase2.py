@@ -21,6 +21,64 @@ def _status_badge(status: str) -> str:
     return f'<span class="badge badge-{kind}">{html.escape(status)}</span>'
 
 
+def render_phase2_data_sections(phase2: Phase2DashboardData) -> str:
+    """Ingest + positions only — data plane page."""
+    ingest_rows = "".join(
+        f"<tr><td>{html.escape(r.run_id)}</td>"
+        f"<td>{html.escape(r.file_name)}</td>"
+        f"<td>{_status_badge(r.status)}</td>"
+        f"<td>{r.rows_processed}</td>"
+        f"<td>{html.escape(r.error_message or '—')}</td></tr>"
+        for r in phase2.ingest_runs
+    )
+    position_rows = "".join(
+        f"<tr><td>{html.escape(p.account_name)}</td>"
+        f"<td>{html.escape(p.ticker or '—')}</td>"
+        f"<td>{p.quantity}</td>"
+        f"<td>{_money(p.total_cost_basis)}</td>"
+        f"<td>{_money(p.market_value)}</td>"
+        f"<td>{_money(p.unrealized_gain)}</td>"
+        f"<td>{'yes' if p.is_restricted else 'no'}</td></tr>"
+        for p in phase2.positions
+    )
+    pnl = phase2.household_pnl
+    pnl_summary = ""
+    if pnl:
+        pnl_summary = (
+            f"<p><strong>{html.escape(pnl.household_id)}</strong> · "
+            f"as of {pnl.as_of_date} · "
+            f"market {_money(pnl.total_market_value)} · "
+            f"cost {_money(pnl.total_cost_basis)} · "
+            f"unrealized {_money(pnl.unrealized_gain)} · "
+            f"{pnl.lot_count} lots</p>"
+        )
+
+    error = ""
+    if phase2.error:
+        error = (
+            f'<section class="error-banner"><strong>Phase 2 error:</strong> '
+            f"{html.escape(phase2.error)}</section>"
+        )
+
+    return f"""{error}
+  <section>
+    <h2>Ingest status</h2>
+    <table>
+      <thead><tr><th>Run</th><th>File</th><th>Status</th><th>Rows</th><th>Error</th></tr></thead>
+      <tbody>{ingest_rows or '<tr><td colspan="5">No ingest runs</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Positions &amp; lots — {html.escape(phase2.household_id)}</h2>
+    {pnl_summary}
+    <table>
+      <thead><tr><th>Account</th><th>Ticker</th><th>Qty</th><th>Cost</th><th>Market</th><th>Unrealized</th><th>Restricted</th></tr></thead>
+      <tbody>{position_rows or '<tr><td colspan="7">No lots</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
 def render_phase2_sections(
     phase2: Phase2DashboardData, *, risk_html: str = ""
 ) -> str:

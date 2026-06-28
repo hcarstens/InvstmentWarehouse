@@ -66,6 +66,7 @@ _STYLES = """
       padding: 0.75rem 1rem; border-radius: 8px; margin: 1rem 0;
     }
     footer { color: #666; font-size: 0.85rem; margin-top: 1.5rem; }
+    .search { margin-bottom: 0.75rem; }
 """
 
 

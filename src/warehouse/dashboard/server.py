@@ -15,6 +15,7 @@ from warehouse.dashboard.analyst_data import load_kill_criteria_dashboard
 from warehouse.dashboard.catalog import render_catalog
 from warehouse.dashboard.npa_data import load_npa_dashboard
 from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
+from warehouse.dashboard.pages.data import load_data_page, render_data_page
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
@@ -369,6 +370,29 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
+        if path_only == "/data":
+            body = render_data_page(
+                security_query=_security_query_from_path(self.path),
+                custodian_id=_custodian_from_path(self.path),
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        elif path_only == "/api/pages/data":
+            data = load_data_page(
+                security_query=_security_query_from_path(self.path),
+                custodian_id=_custodian_from_path(self.path),
+            )
+            body = data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not data.error else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         elif self.path.startswith("/api/phase4"):
             custodian = _custodian_from_path(self.path)
             phase4 = load_phase4_dashboard(custodian_id=custodian)
@@ -502,6 +526,7 @@ def serve(
         print(f"Risk build: http://{host}:{port}/")
     else:
         print(f"Catalog:    http://{host}:{port}/")
+        print(f"Data plane: http://{host}:{port}/data")
     print(f"Risk build: http://{host}:{port}/risk")
     print(f"Build API:  http://{host}:{port}/api/risk/build")
     print(f"Status API: http://{host}:{port}/api/status")

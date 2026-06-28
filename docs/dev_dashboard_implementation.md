@@ -1,6 +1,6 @@
 # Dev Dashboard — Multi-Page Implementation Plan
 
-**Status:** dd0 shipped (catalog + shell); plane pages dd1–dd4 pending
+**Status:** dd1 shipped (data plane page); dd2–dd4 pending
 **Date:** 2026-06-28
 **Owner:** platform / `warehouse.dashboard`
 **Purpose:** Break the thin dashboard into plane-scoped pages that mirror repo structure,

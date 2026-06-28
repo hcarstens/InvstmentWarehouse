@@ -7,6 +7,98 @@ import html
 from warehouse.dashboard.phase4_data import Phase4DashboardData
 
 
+def render_phase4_data_sections(
+    phase4: Phase4DashboardData,
+    *,
+    form_action: str = "/data",
+) -> str:
+    """Custodian selector + alternatives — data plane page."""
+    error = ""
+    if phase4.error:
+        error = (
+            f'<section class="error-banner"><strong>Phase 4 error:</strong> '
+            f"{html.escape(phase4.error)}</section>"
+        )
+
+    custodian_options = "".join(
+        f'<option value="{html.escape(c.custodian_id)}"'
+        f"{' selected' if c.custodian_id == phase4.selected_custodian_id else ''}>"
+        f"{html.escape(c.name)}</option>"
+        for c in phase4.custodians
+    )
+
+    pos_rows = "".join(
+        f"<tr><td>{html.escape(p.account_name)}</td>"
+        f"<td>{html.escape(p.ticker or '—')}</td>"
+        f"<td>{p.quantity}</td>"
+        f"<td>{p.market_value or '—'}</td></tr>"
+        for p in phase4.custodian_positions
+    )
+
+    ingest_rows = "".join(
+        f"<tr><td>{html.escape(r.run_id)}</td>"
+        f"<td>{html.escape(r.file_name)}</td>"
+        f"<td>{html.escape(r.status)}</td>"
+        f"<td>{r.rows_processed}</td></tr>"
+        for r in phase4.custodian_ingest_runs
+    )
+
+    alt_rows = "".join(
+        f"<tr><td>{html.escape(h.name)}</td>"
+        f"<td>{html.escape(h.asset_type)}</td>"
+        f"<td>{h.committed_capital:,.0f}</td>"
+        f"<td>{h.called_capital:,.0f}</td>"
+        f"<td>{h.current_nav:,.0f}</td>"
+        f"<td>{h.last_mark_date}</td></tr>"
+        for h in phase4.alternative_holdings
+    )
+
+    evt_rows = "".join(
+        f"<tr><td>{html.escape(e.event_type)}</td>"
+        f"<td>{html.escape(e.holding_id)}</td>"
+        f"<td>{e.amount:,.0f}</td>"
+        f"<td>{e.event_date}</td>"
+        f"<td>{html.escape(e.notes)}</td></tr>"
+        for e in phase4.alternative_events
+    )
+    action = html.escape(form_action)
+    custodian_id = html.escape(phase4.selected_custodian_id)
+
+    return f"""{error}
+  <section>
+    <h2>Custodian selector</h2>
+    <form class="search" method="get" action="{action}">
+      <label>Custodian
+        <select name="custodian">{custodian_options}</select>
+      </label>
+      <button type="submit">Filter</button>
+    </form>
+    <h3>Positions ({custodian_id})</h3>
+    <table>
+      <thead><tr><th>Account</th><th>Ticker</th><th>Qty</th><th>Market value</th></tr></thead>
+      <tbody>{pos_rows or '<tr><td colspan="4">No positions</td></tr>'}</tbody>
+    </table>
+    <h3>Ingest runs</h3>
+    <table>
+      <thead><tr><th>Run</th><th>File</th><th>Status</th><th>Rows</th></tr></thead>
+      <tbody>{ingest_rows or '<tr><td colspan="4">No ingest runs</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Alternatives sub-ledger</h2>
+    <table>
+      <thead><tr><th>Name</th><th>Type</th><th>Committed</th><th>Called</th><th>NAV</th><th>Last mark</th></tr></thead>
+      <tbody>{alt_rows or '<tr><td colspan="6">No alternative holdings</td></tr>'}</tbody>
+    </table>
+    <h3>Events</h3>
+    <table>
+      <thead><tr><th>Type</th><th>Holding</th><th>Amount</th><th>Date</th><th>Notes</th></tr></thead>
+      <tbody>{evt_rows or '<tr><td colspan="5">No events</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
 def render_phase4_sections(phase4: Phase4DashboardData) -> str:
     error = ""
     if phase4.error:
