@@ -119,6 +119,87 @@ def test_api_pages_decision() -> None:
     assert data.error is None
 
 
+def test_execution_page_loads() -> None:
+    from warehouse.dashboard.pages.execution import render_execution_page
+
+    html = render_execution_page()
+    assert "Reconciliation queue" in html
+    assert "Daily refresh timeline" in html
+    assert "Staged orders" in html
+    assert "Solver comparison" in html
+    assert "Entity graph" not in html
+    assert "Tax scenario panel" not in html
+    assert "Audit log stream" not in html
+
+
+def test_catalog_omits_execution_detail() -> None:
+    html = render_catalog()
+    assert "<h2>Reconciliation queue</h2>" not in html
+    assert "<h2>Staged orders" not in html
+    assert "<h2>Solver comparison</h2>" not in html
+
+
+def test_api_pages_execution() -> None:
+    from warehouse.dashboard.pages.execution import load_execution_page
+
+    data = load_execution_page()
+    assert data.phase2.household_id
+    assert data.error is None
+
+
+def test_reporting_page_loads() -> None:
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+
+    html = render_reporting_page()
+    assert "Tax scenario panel" in html
+    assert "partial" in html
+    assert "Reconciliation queue" not in html
+    assert "Staged orders" not in html
+
+
+def test_catalog_omits_reporting_detail() -> None:
+    html = render_catalog()
+    assert "<h2>Tax scenario panel</h2>" not in html
+
+
+def test_api_pages_reporting() -> None:
+    from warehouse.dashboard.pages.reporting import load_reporting_page
+
+    data = load_reporting_page()
+    assert data.phase4.household_id
+    assert data.error is None
+
+
+def test_infra_page_loads() -> None:
+    from warehouse.dashboard.pages.infra import render_infra_page
+
+    html = render_infra_page()
+    assert "Infrastructure health" in html
+    assert "Audit log stream" in html
+    assert "Phase 5 infra (planned)" in html
+    assert "Postgres migration status" in html
+    assert "Reconciliation queue" not in html
+
+
+def test_catalog_links_to_infra_detail() -> None:
+    html = render_catalog()
+    assert 'href="/infra"' in html
+    assert "Full infra detail" in html
+
+
+def test_catalog_includes_orchestrator_gate() -> None:
+    html = render_catalog()
+    assert "Office Manager gate" in html
+
+
+def test_api_pages_infra() -> None:
+    from warehouse.dashboard.pages.infra import load_infra_page
+
+    data = load_infra_page()
+    assert len(data.infra_checks) == 6
+    assert data.error is None
+
+
 def test_catalog_omits_operational_detail() -> None:
     html = render_catalog()
     assert "<h2>Entity graph" not in html

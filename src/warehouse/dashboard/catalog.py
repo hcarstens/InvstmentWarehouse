@@ -16,7 +16,9 @@ from warehouse.dashboard.navigation import (
     page_for_panel,
     plane_pages_for_catalog,
 )
+from warehouse.dashboard.render_orchestrator import render_orchestrator_section
 from warehouse.dashboard.status import StatusReport, build_status_report
+from warehouse.orchestrator import recent_in_flight
 
 
 def render_catalog(report: StatusReport | None = None) -> str:
@@ -37,6 +39,7 @@ def render_catalog(report: StatusReport | None = None) -> str:
     body_parts.append(_panel_registry_section(report))
     body_parts.append(_infra_summary_section(report))
     body_parts.append(_workflow_section(report))
+    body_parts.append(render_orchestrator_section(recent_in_flight(limit=10)))
 
     subtitle = (
         f"Living status report · v{report.version} · "

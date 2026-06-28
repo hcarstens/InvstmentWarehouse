@@ -79,6 +79,47 @@ def render_phase2_data_sections(phase2: Phase2DashboardData) -> str:
   </section>"""
 
 
+def render_phase2_execution_sections(phase2: Phase2DashboardData) -> str:
+    """Reconciliation + daily refresh — execution plane page."""
+    break_rows = "".join(
+        f"<tr><td>{html.escape(b.break_id)}</td>"
+        f"<td>{html.escape(b.account_id)}</td>"
+        f"<td>{html.escape(b.description)}</td>"
+        f"<td>{html.escape(b.opened_at.isoformat())}</td>"
+        f"<td>{'open' if not b.resolved else 'resolved'}</td></tr>"
+        for b in phase2.reconciliation_breaks
+    )
+    step_rows = "".join(
+        f"<tr><td>{html.escape(s.step_name)}</td>"
+        f"<td>{_status_badge(s.status)}</td>"
+        f"<td>{html.escape(s.detail or '—')}</td>"
+        f"<td>{html.escape(s.error_message or '—')}</td></tr>"
+        for s in phase2.refresh_steps
+    )
+    error = ""
+    if phase2.error:
+        error = (
+            f'<section class="error-banner"><strong>Phase 2 error:</strong> '
+            f"{html.escape(phase2.error)}</section>"
+        )
+    return f"""{error}
+  <section>
+    <h2>Reconciliation queue</h2>
+    <table>
+      <thead><tr><th>Break</th><th>Account</th><th>Description</th><th>Opened</th><th>Status</th></tr></thead>
+      <tbody>{break_rows or '<tr><td colspan="5">No open breaks</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Daily refresh timeline</h2>
+    <table>
+      <thead><tr><th>Step</th><th>Status</th><th>Detail</th><th>Error</th></tr></thead>
+      <tbody>{step_rows or '<tr><td colspan="4">No refresh run — use warehouse refresh</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
 def render_phase2_sections(
     phase2: Phase2DashboardData, *, risk_html: str = ""
 ) -> str:

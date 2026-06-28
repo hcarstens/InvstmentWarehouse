@@ -99,6 +99,80 @@ def render_phase4_data_sections(
   </section>"""
 
 
+def render_phase4_execution_sections(phase4: Phase4DashboardData) -> str:
+    """Staged orders + solver comparison — execution plane page."""
+    error = ""
+    if phase4.error:
+        error = (
+            f'<section class="error-banner"><strong>Phase 4 error:</strong> '
+            f"{html.escape(phase4.error)}</section>"
+        )
+
+    order_rows = "".join(
+        f"<tr><td>{html.escape(o.order_id)}</td>"
+        f"<td>{html.escape(o.approval_request_id)}</td>"
+        f"<td>{html.escape(o.side)} {o.quantity} {html.escape(o.security_id)}</td>"
+        f"<td>{html.escape(o.status)}</td>"
+        f"<td>{o.updated_at.isoformat()}</td></tr>"
+        for o in phase4.staged_orders
+    )
+
+    cmp_rows = "".join(
+        f"<tr><td>{html.escape(c.comparison_id)}</td>"
+        f"<td>{c.heuristic_trade_count}</td><td>{c.mip_trade_count}</td>"
+        f"<td>{c.heuristic_tax_delta:.2f}</td><td>{c.mip_tax_delta:.2f}</td>"
+        f"<td>{c.heuristic_runtime_ms}ms</td><td>{c.mip_runtime_ms}ms</td></tr>"
+        for c in phase4.solver_comparisons
+    )
+
+    return f"""{error}
+  <section>
+    <h2>Staged orders — {html.escape(phase4.household_id)}</h2>
+    <table>
+      <thead><tr><th>Order</th><th>Approval</th><th>Trade</th><th>Status</th><th>Updated</th></tr></thead>
+      <tbody>{order_rows or '<tr><td colspan="5">No staged orders</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Solver comparison</h2>
+    <table>
+      <thead><tr><th>Run</th><th>H trades</th><th>MIP trades</th><th>H tax Δ</th><th>MIP tax Δ</th><th>H ms</th><th>MIP ms</th></tr></thead>
+      <tbody>{cmp_rows or '<tr><td colspan="7">No comparisons</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
+def render_tax_scenario_section(phase4: Phase4DashboardData) -> str:
+    """Tax scenario panel — reporting plane page."""
+    error = ""
+    if phase4.error:
+        error = (
+            f'<section class="error-banner"><strong>Load error:</strong> '
+            f"{html.escape(phase4.error)}</section>"
+        )
+
+    tax_rows = "".join(
+        f"<tr><td>{html.escape(t.scenario_name)}</td>"
+        f"<td>{t.baseline_tax:,.2f}</td>"
+        f"<td>{t.scenario_tax:,.2f}</td>"
+        f"<td>{t.tax_delta:,.2f}</td>"
+        f"<td>{t.created_at.isoformat()}</td></tr>"
+        for t in phase4.tax_scenarios
+    )
+
+    return f"""{error}
+  <section>
+    <h2>Tax scenario panel</h2>
+    <p><span class="badge badge-warn">partial</span>
+       Reporting plane — tax scenarios live; performance and risk reporting planned.</p>
+    <table>
+      <thead><tr><th>Scenario</th><th>Baseline tax</th><th>Scenario tax</th><th>Delta</th><th>Run at</th></tr></thead>
+      <tbody>{tax_rows or '<tr><td colspan="5">No tax scenarios</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
 def render_phase4_sections(phase4: Phase4DashboardData) -> str:
     error = ""
     if phase4.error:

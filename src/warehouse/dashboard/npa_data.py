@@ -10,13 +10,16 @@ surface in the panel's ``error`` field rather than disappearing (CLAUDE.md).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
+from typing import cast
 
 from pydantic import BaseModel
 
 from warehouse.config import get_settings
 from warehouse.decision.analyst import NpaFlag, flag_non_performing
+from warehouse.decision.analyst.npa import AltHoldingLike
 from warehouse.research.synthetic import emit_synthetic_household
 from warehouse.research.synthetic.fixture_views import (
     lot_positions_from_fixture,
@@ -58,7 +61,7 @@ def load_npa_dashboard() -> NpaPanelData:
         settings = get_settings()
         result = flag_non_performing(
             positions,
-            alts,
+            cast(Sequence[AltHoldingLike], alts),
             bundle.ips,
             household_id=fixture.household_id,
             as_of=as_of,

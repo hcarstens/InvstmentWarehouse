@@ -20,6 +20,15 @@ from warehouse.dashboard.pages.decision import (
     load_decision_page,
     render_decision_page,
 )
+from warehouse.dashboard.pages.execution import (
+    load_execution_page,
+    render_execution_page,
+)
+from warehouse.dashboard.pages.infra import load_infra_page, render_infra_page
+from warehouse.dashboard.pages.reporting import (
+    load_reporting_page,
+    render_reporting_page,
+)
 from warehouse.dashboard.pages.research import (
     load_research_page,
     render_research_page,
@@ -405,31 +414,82 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        elif path_only == "/api/pages/decision":
-            data = load_decision_page()
-            body = data.model_dump_json(indent=2).encode()
-            self.send_response(200 if not data.error else 503)
+        if path_only == "/execution":
+            body = render_execution_page().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/reporting":
+            body = render_reporting_page().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/infra":
+            body = render_infra_page().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/api/pages/infra":
+            infra_data = load_infra_page()
+            body = infra_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not infra_data.error else 503)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
-        elif path_only == "/api/pages/research":
-            data = load_research_page()
-            body = data.model_dump_json(indent=2).encode()
-            self.send_response(200 if not data.error else 503)
+        if path_only == "/api/pages/reporting":
+            reporting_data = load_reporting_page()
+            body = reporting_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not reporting_data.error else 503)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
             return
-        elif path_only == "/api/pages/data":
-            data = load_data_page(
+        if path_only == "/api/pages/execution":
+            execution_data = load_execution_page()
+            body = execution_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not execution_data.error else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/api/pages/decision":
+            decision_data = load_decision_page()
+            body = decision_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not decision_data.error else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/api/pages/research":
+            research_data = load_research_page()
+            body = research_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not research_data.error else 503)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only == "/api/pages/data":
+            page_data = load_data_page(
                 security_query=_security_query_from_path(self.path),
                 custodian_id=_custodian_from_path(self.path),
             )
-            body = data.model_dump_json(indent=2).encode()
-            self.send_response(200 if not data.error else 503)
+            body = page_data.model_dump_json(indent=2).encode()
+            self.send_response(200 if not page_data.error else 503)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -571,6 +631,9 @@ def serve(
         print(f"Data plane: http://{host}:{port}/data")
         print(f"Research:   http://{host}:{port}/research")
         print(f"Decision:   http://{host}:{port}/decision")
+        print(f"Execution:  http://{host}:{port}/execution")
+        print(f"Reporting:  http://{host}:{port}/reporting")
+        print(f"Infra:      http://{host}:{port}/infra")
     print(f"Risk build: http://{host}:{port}/risk")
     print(f"Build API:  http://{host}:{port}/api/risk/build")
     print(f"Status API: http://{host}:{port}/api/status")
