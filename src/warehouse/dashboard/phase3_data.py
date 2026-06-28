@@ -48,6 +48,12 @@ class Phase3DashboardData(BaseModel):
     error: str | None = None
 
 
+class ResearchBacktestData(BaseModel):
+    household_id: str
+    backtest_runs: list[BacktestRunView]
+    error: str | None = None
+
+
 def _ensure_demo_decision_runs() -> None:
     with session_scope() as session:
         if list_optimization_runs(session, DEMO_HOUSEHOLD_ID, limit=1):
@@ -104,5 +110,23 @@ def load_phase3_dashboard() -> Phase3DashboardData:
             backtest_runs=[],
             active_constraints=[],
             synthetic_ips=None,
+            error=str(err),
+        )
+
+
+def load_research_backtest_data() -> ResearchBacktestData:
+    try:
+        bootstrap_database(seed=True)
+        _ensure_demo_decision_runs()
+        with session_scope() as session:
+            backtests = list_backtest_runs(session, DEMO_HOUSEHOLD_ID)
+        return ResearchBacktestData(
+            household_id=DEMO_HOUSEHOLD_ID,
+            backtest_runs=backtests,
+        )
+    except Exception as err:
+        return ResearchBacktestData(
+            household_id=DEMO_HOUSEHOLD_ID,
+            backtest_runs=[],
             error=str(err),
         )

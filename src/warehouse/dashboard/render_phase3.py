@@ -10,6 +10,7 @@ from warehouse.dashboard.phase3_data import Phase3DashboardData
 from warehouse.dashboard.render_synthetic_ips import (
     render_synthetic_ips_section,
 )
+from warehouse.research.backtest.harness import BacktestRunView
 
 
 def _pct(value: Decimal) -> str:
@@ -83,6 +84,36 @@ def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
   </section>"""
 
 
+def render_backtest_section(
+    backtest_runs: list[BacktestRunView],
+    *,
+    error: str | None = None,
+) -> str:
+    error_html = ""
+    if error:
+        error_html = (
+            f'<section class="error-banner"><strong>Backtest error:</strong> '
+            f"{html.escape(error)}</section>"
+        )
+    backtest_rows = "".join(
+        f"<tr><td>{html.escape(b.run_id)}</td>"
+        f"<td>{b.start_date}</td><td>{b.end_date}</td>"
+        f"<td>{b.after_tax_return:.4f}</td>"
+        f"<td>{b.tax_delta:.4f}</td>"
+        f"<td><code>{html.escape(b.config_hash)}</code></td>"
+        f"<td>{html.escape(b.input_snapshot_id)}</td></tr>"
+        for b in backtest_runs
+    )
+    return f"""{error_html}
+  <section>
+    <h2>Backtest results</h2>
+    <table>
+      <thead><tr><th>Run</th><th>Start</th><th>End</th><th>After-tax</th><th>Tax delta</th><th>Config</th><th>Snapshot</th></tr></thead>
+      <tbody>{backtest_rows or '<tr><td colspan="7">No backtests</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
 def render_phase3_sections(phase3: Phase3DashboardData) -> str:
     error = ""
     if phase3.error:
@@ -131,16 +162,6 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
         for a in phase3.approval_requests
     )
 
-    backtest_rows = "".join(
-        f"<tr><td>{html.escape(b.run_id)}</td>"
-        f"<td>{b.start_date}</td><td>{b.end_date}</td>"
-        f"<td>{b.after_tax_return:.4f}</td>"
-        f"<td>{b.tax_delta:.4f}</td>"
-        f"<td><code>{html.escape(b.config_hash)}</code></td>"
-        f"<td>{html.escape(b.input_snapshot_id)}</td></tr>"
-        for b in phase3.backtest_runs
-    )
-
     constraint_rows = "".join(
         f"<tr><td>{html.escape(c)}</td><td>active</td></tr>"
         for c in phase3.active_constraints
@@ -177,13 +198,7 @@ def render_phase3_sections(phase3: Phase3DashboardData) -> str:
     </table>
   </section>
 
-  <section>
-    <h2>Backtest results</h2>
-    <table>
-      <thead><tr><th>Run</th><th>Start</th><th>End</th><th>After-tax</th><th>Tax delta</th><th>Config</th><th>Snapshot</th></tr></thead>
-      <tbody>{backtest_rows or '<tr><td colspan="7">No backtests</td></tr>'}</tbody>
-    </table>
-  </section>
+{render_backtest_section(phase3.backtest_runs)}
 
   <section>
     <h2>Constraint binding report</h2>

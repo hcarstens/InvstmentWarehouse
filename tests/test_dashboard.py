@@ -50,6 +50,35 @@ def test_api_pages_data() -> None:
     assert data.error is None
 
 
+def test_research_page_loads() -> None:
+    from warehouse.dashboard.pages.research import render_research_page
+
+    html = render_research_page()
+    assert "Risk manifest" in html
+    assert "Level 1" in html
+    assert "Parametric VaR" in html
+    assert "2008_liquidity" in html
+    assert "Backtest results" in html
+    assert 'href="/risk"' in html
+    assert "Risk build tracker" in html
+    assert "IPS drift" not in html
+    assert "axiom checklist" not in html
+
+
+def test_catalog_omits_risk_manifest_detail() -> None:
+    html = render_catalog()
+    assert "Parametric VaR" not in html
+    assert "Level 1" not in html
+
+
+def test_api_pages_research() -> None:
+    from warehouse.dashboard.pages.research import load_research_page
+
+    data = load_research_page()
+    assert data.risk.report is not None
+    assert data.error is None
+
+
 def test_catalog_omits_operational_detail() -> None:
     html = render_catalog()
     assert "<h2>Entity graph" not in html

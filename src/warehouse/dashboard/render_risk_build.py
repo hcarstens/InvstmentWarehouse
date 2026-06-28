@@ -91,6 +91,23 @@ def _deliverable_rows(deliverables: list[BuildDeliverable]) -> str:
     )
 
 
+def render_risk_build_link_card(build: RiskBuildReport) -> str:
+    """Summary card on the research plane — full tracker at ``/risk``."""
+    contract = html.escape(build.contract_status)
+    shipped = build.shipped_count
+    planned = build.planned_count
+    return f"""
+  <section>
+    <h2>Risk build tracker</h2>
+    <p>Contract slice <code>{contract}</code> · {shipped} shipped · """
+    f"""{planned} planned</p>
+    <p>Different map from the live manifest above — dev-track progress, rung """
+    """ladder, and deliverable registry.</p>
+    <p><a href="/risk">Open full risk build tracker →</a> · """
+    """<a href="/api/risk/build">build JSON</a></p>
+  </section>"""
+
+
 def render_risk_build_page(
     build: RiskBuildReport,
     risk: RiskDashboardData | None = None,
