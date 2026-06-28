@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, urlparse
 from warehouse.config import repo_root
 from warehouse.dashboard.advisory_data import load_advisory_dashboard
 from warehouse.dashboard.analyst_data import load_kill_criteria_dashboard
+from warehouse.dashboard.catalog import render_catalog
 from warehouse.dashboard.npa_data import load_npa_dashboard
 from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
@@ -352,19 +353,22 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(body)
             return
-        if path_only in ("/", "/dashboard"):
+        if path_only == "/dashboard":
+            self.send_response(301)
+            self.send_header("Location", "/")
+            self.end_headers()
+            return
+        if path_only == "/":
             if self.risk_landing:
                 body = render_risk_build_html().encode()
             else:
-                body = render_html(
-                    security_query=_security_query_from_path(self.path),
-                    custodian_id=_custodian_from_path(self.path),
-                ).encode()
+                body = render_catalog().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+            return
         elif self.path.startswith("/api/phase4"):
             custodian = _custodian_from_path(self.path)
             phase4 = load_phase4_dashboard(custodian_id=custodian)
@@ -497,7 +501,7 @@ def serve(
     if risk:
         print(f"Risk build: http://{host}:{port}/")
     else:
-        print(f"Dashboard: http://{host}:{port}/")
+        print(f"Catalog:    http://{host}:{port}/")
     print(f"Risk build: http://{host}:{port}/risk")
     print(f"Build API:  http://{host}:{port}/api/risk/build")
     print(f"Status API: http://{host}:{port}/api/status")

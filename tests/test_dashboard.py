@@ -1,8 +1,54 @@
 """Dashboard status report tests."""
 
+import threading
+from http.server import HTTPServer
+
+from warehouse.dashboard.catalog import render_catalog
+from warehouse.dashboard.navigation import PAGES
 from warehouse.dashboard.phases import PHASES
-from warehouse.dashboard.server import render_html
+from warehouse.dashboard.server import DashboardHandler, render_html
 from warehouse.dashboard.status import build_status_report
+
+
+def test_catalog_renders_plane_links() -> None:
+    html = render_catalog()
+    for page in PAGES:
+        assert f'href="{page.path}"' in html
+
+
+def test_catalog_nav_contains_all_pages() -> None:
+    html = render_catalog()
+    for page in PAGES:
+        assert page.nav_label in html
+
+
+def test_catalog_omits_operational_detail() -> None:
+    html = render_catalog()
+    assert "<h2>Entity graph" not in html
+    assert "<h2>Security master</h2>" not in html
+    assert "Parametric VaR" not in html
+    assert "axiom checklist" not in html
+    assert "Phase roadmap" in html
+    assert "Dashboard panels" in html
+
+
+def test_dashboard_redirects_to_catalog() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import urllib.request
+
+        response = urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/dashboard",
+            timeout=5,
+        )
+        assert response.geturl().endswith("/")
+        assert "Operational planes" in response.read().decode()
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
 
 
 def test_status_report_includes_all_phases() -> None:
