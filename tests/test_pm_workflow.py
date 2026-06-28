@@ -1,0 +1,77 @@
+"""pm1 — rebalance advisory workflow + HNW rung-3 smoke."""
+
+from collections.abc import Iterator
+
+import pytest
+
+import warehouse.messaging.handlers  # noqa: F401 — register catalog ops
+from warehouse.decision.pm import build_working_set_from_bundle
+from warehouse.infra.db.base import session_scope
+from warehouse.infra.db.bootstrap import bootstrap_database
+from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
+from warehouse.messaging import (
+    REGISTRY,
+    DispatchContext,
+    Kind,
+    Message,
+    dispatch_message,
+    observability,
+)
+from warehouse.messaging.payloads import AdviceBundle, PmAdvisePayload
+from warehouse.research.synthetic import emit_synthetic_household
+from warehouse.workflows.rebalance_advisory import run_rebalance_advisory
+
+DEMO = DEMO_HOUSEHOLD_ID
+
+
+@pytest.fixture
+def seeded() -> Iterator[None]:
+    bootstrap_database(seed=True)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _restore_registry() -> Iterator[None]:
+    snapshot = dict(REGISTRY)
+    observability.clear()
+    yield
+    REGISTRY.clear()
+    REGISTRY.update(snapshot)
+    observability.clear()
+
+
+def test_rebalance_advisory_correlation(seeded: None) -> None:
+    with session_scope() as session:
+        bundle = run_rebalance_advisory(
+            session, DEMO, correlation_id="rebalance-adv-1"
+        )
+    assert bundle.narrative is not None
+    assert bundle.narrative.correlation_id == "rebalance-adv-1"
+    assert bundle.drift.household_id == DEMO
+
+
+def test_pm_workflow_hnw_rung3() -> None:
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="hnw-rung3",
+            household_id=payload.household_id,
+        ),
+    )
+    assert isinstance(out, AdviceBundle)
+    assert out.narrative is not None
+    assert out.risk.report is not None
+
+
+def test_pm_no_new_ops() -> None:
+    """PM reaches specialists only via the shipped catalog."""
+    from warehouse.messaging import REGISTRY as catalog
+
+    pm_ops = {op for op in catalog if op.startswith("pm.")}
+    assert pm_ops == {"pm.advise"}

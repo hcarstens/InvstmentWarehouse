@@ -82,6 +82,7 @@ def load_advisory_dashboard(
             household_id=household_id,
             correlation_id=correlation_id,
             bundle=bundle,
+            panel_status="live",
         )
     except Exception as err:
         return AdvisoryDashboardData(

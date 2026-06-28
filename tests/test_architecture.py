@@ -14,13 +14,14 @@ from warehouse.models.entities import (
 from warehouse.workflows.catalog import WORKFLOW_CATALOG
 
 
-def test_workflow_catalog_has_six_core_workflows() -> None:
+def test_workflow_catalog_has_core_workflows() -> None:
     names = {w.name for w in WORKFLOW_CATALOG}
     assert names == {
         "onboarding",
         "daily_refresh",
         "policy_monitoring",
         "research_scenario",
+        "rebalance_advisory",
         "rebalance_tax_overlay",
         "alternatives",
     }

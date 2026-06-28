@@ -32,6 +32,7 @@ from warehouse.decision.optimizer.runner import (
     OptimizationRunView,
     persist_optimization,
 )
+from warehouse.decision.pm import score_pm_axioms
 from warehouse.decision.tax.scenarios import (
     TaxScenarioResult,
     evaluate_tax_scenario,
@@ -150,12 +151,14 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
         "tax.scenario",
         TaxScenarioPayload(positions=p.positions, overlays=p.tax_overlays),
     )
-    return AdviceBundle(
+    bundle = AdviceBundle(
         risk=cast(RiskResult, risk),
         proposal=cast(OptimizationResult, proposal),
         tax=cast(TaxScenarioResult, tax),
         drift=cast(IpsDriftReport, drift),
     )
+    narrative = score_pm_axioms(bundle, p, correlation_id=cid)
+    return bundle.model_copy(update={"narrative": narrative})
 
 
 # --- COMMAND (gated + audited; uses ctx.session + ctx.actor_id) -------------

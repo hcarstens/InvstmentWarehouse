@@ -40,6 +40,13 @@ WORKFLOW_CATALOG: list[WorkflowDefinition] = [
         outputs=["scenario_narrative", "optimizer_inputs"],
     ),
     WorkflowDefinition(
+        name="rebalance_advisory",
+        owner="investments",
+        inputs=["household_positions", "ips", "risk_manifest"],
+        outputs=["advice_bundle", "pm_narrative"],
+        sla_hours=24,
+    ),
+    WorkflowDefinition(
         name="rebalance_tax_overlay",
         owner="investments",
         inputs=["target_weights", "lot_ledger", "tax_state"],

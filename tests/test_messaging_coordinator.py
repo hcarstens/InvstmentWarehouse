@@ -100,6 +100,8 @@ def test_pm_advise_pure_and_propagates_correlation(seeded: None) -> None:
     assert out.proposal.config_version
     assert out.tax.baseline_tax is not None
     assert out.drift.household_id == DEMO
+    assert out.narrative is not None
+    assert out.narrative.specialist_status["tax"] == "stub"
     # The nested op saw the inbound trace.
     assert seen == ["trace-1"]
 

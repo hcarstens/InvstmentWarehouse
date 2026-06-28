@@ -82,7 +82,7 @@ PHASES: list[Phase] = [
                 name="Synthetic IPS binding matrix", phase=3, status="live"
             ),
             DashboardPanel(
-                name="Advisory bundle (pm.advise)", phase=3, status="stub"
+                name="Advisory bundle (pm.advise)", phase=3, status="live"
             ),
         ],
     ),

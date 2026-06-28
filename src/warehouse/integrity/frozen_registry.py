@@ -10,7 +10,14 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import Settings
+from warehouse.decision.ips.monitor import IpsDriftReport
+from warehouse.decision.optimizer import OptimizationResult
+from warehouse.decision.tax.scenarios import (
+    TaxScenarioOverlays,
+    TaxScenarioResult,
+)
 from warehouse.messaging.models import DispatchContext, Kind, Message
+from warehouse.messaging.payloads import AdviceBundle, AxiomScore, PmNarrative
 from warehouse.models.events import Event, EventType
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
@@ -28,10 +35,12 @@ from warehouse.research.risk.models import (
 
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
+    AdviceBundle,
     BacktestResult,
     DispatchContext,
     Event,
     Message,
+    PmNarrative,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -101,6 +110,51 @@ def _sample_instance(cls: type[Any]) -> Any:
             ],
             by_class_variance_delta={"equity": Decimal("0.02")},
         )
+    if cls is PmNarrative:
+        return PmNarrative(
+            correlation_id="corr_test",
+            axioms_scored={"axiom_1": AxiomScore.PASS},
+            headline="test headline",
+            specialist_status={"risk": "live", "tax": "stub"},
+        )
+    if cls is AdviceBundle:
+        portfolio = AssetPortfolio(
+            allocations=[
+                AllocationSlot(
+                    asset_class=AssetClass.EQUITY,
+                    weight=Decimal("1"),
+                )
+            ],
+        )
+        request = RiskRequest(
+            horizon=RiskHorizon(years=Decimal("5")),
+            run_scenarios=ScenarioSet.NONE,
+        )
+        report = evaluate_portfolio_risk(portfolio, request.horizon)
+        risk = RiskResult(report=report, scenarios={}, deltas=None)
+        zero = Decimal("0")
+        return AdviceBundle(
+            risk=risk,
+            proposal=OptimizationResult(
+                household_id="hh_test",
+                config_version="test",
+                trades=[],
+                estimated_tax_delta=zero,
+            ),
+            tax=TaxScenarioResult(
+                overlays=TaxScenarioOverlays(),
+                baseline_tax=zero,
+                scenario_tax=zero,
+                tax_delta=zero,
+            ),
+            drift=IpsDriftReport(
+                household_id="hh_test",
+                rows=[],
+                alerts=[],
+                concentration_alerts=[],
+            ),
+            narrative=None,
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -115,6 +169,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "deltas"
     if isinstance(instance, RiskDeltas):
         return "overlay_label"
+    if isinstance(instance, PmNarrative):
+        return "headline"
+    if isinstance(instance, AdviceBundle):
+        return "narrative"
     if isinstance(instance, Message):
         return "op"
     if isinstance(instance, DispatchContext):

@@ -7,7 +7,10 @@ backing functions return bare ``list``/``tuple``.
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from datetime import date
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict
 
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.approval import ApprovalStatus
@@ -100,6 +103,26 @@ class PmAdvisePayload(BaseModel):
     manifest: AssetPortfolio
     request: RiskRequest
     tax_overlays: TaxScenarioOverlays = TaxScenarioOverlays()
+    cohort_id: str | None = None
+    as_of_date: date | None = None
+
+
+class AxiomScore(StrEnum):
+    PASS = "pass"
+    WARN = "warn"
+    BREACH = "breach"
+    NOT_COMPUTED = "not_computed"
+
+
+class PmNarrative(BaseModel):
+    """7-axiom ℍ_Allocation diagnostic — audit snapshot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    correlation_id: str
+    axioms_scored: dict[str, AxiomScore]
+    headline: str
+    specialist_status: dict[str, str]
 
 
 # --- result wrappers (boundary returns must be BaseModel) -------------------
@@ -125,7 +148,10 @@ class StagedOrders(BaseModel):
 class AdviceBundle(BaseModel):
     """Portfolio-Manager advisory output — mutates nothing (§4.1)."""
 
+    model_config = ConfigDict(frozen=True)
+
     risk: RiskResult
     proposal: OptimizationResult
     tax: TaxScenarioResult
     drift: IpsDriftReport
+    narrative: PmNarrative | None = None

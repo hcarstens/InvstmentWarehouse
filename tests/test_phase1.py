@@ -8,6 +8,7 @@ from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.migrate import current_revision, upgrade_head
 from warehouse.infra.db.schema_status import HEAD_REVISION, build_schema_status
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
+from warehouse.workflows.catalog import WORKFLOW_CATALOG
 
 
 def test_migration_at_head() -> None:
@@ -60,4 +61,4 @@ def test_workflow_definitions_seeded() -> None:
     workflows = next(
         t for t in status.tables if t.name == "workflow_definitions"
     )
-    assert workflows.row_count == 6
+    assert workflows.row_count == len(WORKFLOW_CATALOG)

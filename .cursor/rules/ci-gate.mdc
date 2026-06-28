@@ -1,0 +1,54 @@
+---
+description: Run the canonical CI gate (ruff, mypy, pytest) after Python changes — match GitHub Actions
+globs: src/**/*.py,tests/**/*.py,pyproject.toml
+alwaysApply: true
+---
+
+# CI gate — run before finishing Python work
+
+Mirror [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and [`CI.md`](CI.md).
+Do not report a task complete until this gate passes with zero errors.
+
+## When to run
+
+After any edit to `src/`, `tests/`, or `pyproject.toml` — including refactors,
+new modules, and test-only changes.
+
+## Canonical one-liner (repo root, venv active)
+
+```bash
+ruff check src tests && ruff format --check src tests && mypy src/warehouse && pytest
+```
+
+Explicit venv binaries:
+
+```bash
+.venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests && .venv/bin/mypy src/warehouse && .venv/bin/pytest
+```
+
+## Fix loop (required on failure)
+
+1. `ruff check src tests --fix`
+2. `ruff format src tests`
+3. Re-run the full one-liner above — all four steps, in order.
+
+Do not skip `mypy` or `pytest` because lint is clean.
+
+## What each step enforces
+
+| Step | Tool | Catches |
+| --- | --- | --- |
+| Lint | `ruff check` | **E**, F, I, UP (line-length 79; see `pyproject.toml`) |
+| Format | `ruff format --check` | Unformatted Python |
+| Types | `mypy src/warehouse` | Strict typing (`strict = true`) |
+| Tests | `pytest` | Regressions |
+
+**E501:** allowed only in `dashboard/server.py`, `dashboard/render_*.py`,
+`phases.py`, `status.py` — nowhere else. No `# noqa: E501` elsewhere.
+
+## Agent obligations
+
+- **Run** the gate yourself; do not tell the user to run it unless blocked
+  (missing venv, sandbox).
+- **Fix** failures in the same turn when possible.
+- **Report** only after all four steps pass (e.g. "234 passed, mypy clean").

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
-
-from collections.abc import Sequence
 
 from pydantic import BaseModel
 from sqlalchemy import func, select

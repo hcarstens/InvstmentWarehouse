@@ -230,6 +230,23 @@ def seed_market_prices(session: Session) -> None:
     )
 
 
+def _sync_workflow_definitions(session: Session) -> None:
+    """Add catalog workflows missing from an existing demo DB."""
+    existing = set(session.scalars(select(WorkflowDefinitionRow.name)).all())
+    for workflow in WORKFLOW_CATALOG:
+        if workflow.name in existing:
+            continue
+        session.add(
+            WorkflowDefinitionRow(
+                name=workflow.name,
+                owner=workflow.owner,
+                inputs=json.dumps(workflow.inputs),
+                outputs=json.dumps(workflow.outputs),
+                sla_hours=workflow.sla_hours,
+            )
+        )
+
+
 def seed_demo_data(session: Session) -> bool:
     """Insert demo graph, securities, lots, workflows.
 
@@ -243,6 +260,7 @@ def seed_demo_data(session: Session) -> bool:
         seed_ips_policy(session)
         seed_demo_lots(session)
         seed_phase4_extensions(session)
+        _sync_workflow_definitions(session)
         return False
 
     entities = [

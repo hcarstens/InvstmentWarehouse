@@ -114,6 +114,11 @@ Backend:
   - [ ] Falsifier tests against known household fixtures
 - [x] **Advisory bundle panel (stub)** — `pm.advise` dispatches on dashboard load; summary table for risk / propose / tax / drift legs.
 - [ ] **Advisory bundle panel (full)** — Upgrade stub to full `AdviceBundle` presentation keyed by `correlation_id`.
+- [ ] **Review all portfolios** — Household-book review workflow (PM orchestrator): run across every household when material inputs change. Triggers and scope:
+  - [ ] **Tax change** — `tax_config_version` bump, overlay rule change, or lot realization event → re-run `tax.scenario` / after-tax compare per book (`docs/portfolio_manager_implementation.md`).
+  - [ ] **Month-end reporting** — positions reconciled, marks fresh, period close → `report.build` (when reporting plane ships) + IPS drift + exception queue snapshot per household.
+  - [ ] **Risk changes** — manifest or assumption regime change, new stress pack, material position move → `risk.evaluate` + delta vs prior snapshot; surface on dashboard with `correlation_id`.
+  - [ ] Batch orchestration: `ledger.positions` → `pm.advise` per household; failures propagate (no silent skip); advisor queue for books that fail any leg.
 
 ---
 

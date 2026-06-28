@@ -11,7 +11,7 @@ def test_status_report_includes_all_phases() -> None:
     assert report.live_panel_count >= 15
     assert report.infra_error_count == 0
     assert len(report.infra_checks) == 6
-    assert len(report.workflows) == 6
+    assert len(report.workflows) == 7
 
 
 def test_render_html_contains_key_sections() -> None:
@@ -34,3 +34,6 @@ def test_render_html_contains_key_sections() -> None:
     assert "Synthetic IPS binding matrix" in html
     assert "Advisory bundle" in html
     assert "pm.advise" in html
+    assert "axiom checklist" in html
+    assert "tax: stub" in html
+    assert "not_computed" in html
