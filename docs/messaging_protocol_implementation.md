@@ -1,6 +1,6 @@
 # Messaging Protocol — Implementation Plan
 
-**Status:** m0a–m0c shipped; m0d–m1 pending
+**Status:** m0a–m0d shipped; m1 pending
 **Date:** 2026-06-28
 **Owner:** platform / orchestrator
 **Inputs:** [`messaging_protocol.md`](messaging_protocol.md) (contract — wins on conflict),
@@ -138,9 +138,18 @@ raises), not by "the module looks done."
 - `orders.stage` on a non-`APPROVED` request still raises (gate intact).
 - `pytest tests/test_phase4.py` green with the updated chain.
 
-### m0d — first client + events + dashboard *(~1 PR)*
+### m0d — first client + events + dashboard *(~1 PR)* — ✅ shipped
 
 **Goal:** a real workflow runs through dispatch; events surface on the dashboard.
+
+> **Note:** event payloads (`IngestCompleted`/`BreakOpened`/`OrderFilled`) live in plane-free
+> `models.py`, not `payloads.py` — `payloads.py` imports plane types (incl. `oms.service`), so the
+> OMS would have a cycle importing event payloads from there. Added a plane-free
+> `observability.py` (capped in-process event + subscriber-failure log) that `emit_event` /
+> `record_exception_panel` write and the phase-2 panel reads. `run_daily_refresh` gained a
+> `custodian_id` param (default `custodian_schwab`, preserving prior behavior); dispatch results
+> are `cast` to their concrete type at the call site (the documented cost of the `BaseModel`
+> boundary).
 
 | Task | File(s) |
 | --- | --- |
@@ -299,3 +308,4 @@ Critical path: **m0a → m0b → m0d**; m0c can overlap after m0b; m1 last.
 | 2026-06-28 | **m0a shipped.** `warehouse/messaging/{models,core}.py` (plane-free), `__init__` public surface; `Message`/`DispatchContext` frozen + registered. `tests/test_messaging_core.py` (9 tests: unknown-op KeyError, payload-mismatch TypeError, payload type preserved, `add_note` context, event isolation, dup-register, message_id stamp); `test_architecture.py` plane-free assertion. 207 pass, ruff + mypy strict clean. |
 | 2026-06-28 | **m0b shipped.** `payloads.py` (11 request bodies + 4 result wrappers), `handlers.py` composition root registering all 11 atomic ops; `Handler` payload typed `Any` for clean wrapper registration. `tests/test_messaging_handlers.py` (8 tests: round-trip == direct for the 5 QUERY/EVALUATE ops, EVALUATE purity via poisoned session, `ingest.run` COMMAND, `orders.stage` gate). Deliberate deviation: `__init__` stays light, handlers self-register on import. 215 pass, ruff + mypy strict clean. |
 | 2026-06-28 | **m0c shipped (decouple).** Removed the internal `stage_orders_from_approval` call + import from `update_approval_status`; chained explicit staging in the two callers (`cli.py approve`, `dashboard/phase4_data.py` demo) and reworked `test_phase4.py` (`test_approval_decoupled_then_stage_dispatched` chains `orders.stage` via dispatch; `test_order_state_machine` stages explicitly). Gate test (`test_oms_gate_blocks_unapproved_staging`) unchanged + green. Side benefit: broke the `approval.service → oms.service` import edge. 215 pass, ruff + mypy clean. |
+| 2026-06-28 | **m0d shipped.** `observability.py` (plane-free in-process event + subscriber-failure log); `emit_event`/`record_exception_panel` write it. `run_daily_refresh` routes `ingest.run` + `ledger.reconcile` through `dispatch_message` (one `correlation_id` = run_id) and emits `ingest.completed`/`break.opened`; `update_order_status` emits `order.filled`. Phase-2 dashboard gained an Event-stream + subscriber-failures panel. `tests/test_messaging_events.py` (3: emit records to log, subscriber failure recorded+isolated, daily_refresh emits traced events). No import cycle. 218 pass, ruff + mypy clean. |

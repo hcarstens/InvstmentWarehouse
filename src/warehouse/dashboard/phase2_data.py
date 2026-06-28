@@ -21,6 +21,12 @@ from warehouse.infra.audit.store import list_audit_entries
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
+from warehouse.messaging.observability import (
+    EventLogEntry,
+    SubscriberFailureEntry,
+    recent_events,
+    recent_failures,
+)
 from warehouse.workflows.daily_refresh import (
     RefreshStepView,
     latest_refresh_steps,
@@ -36,6 +42,8 @@ class Phase2DashboardData(BaseModel):
     reconciliation_breaks: list[ReconciliationBreak]
     refresh_steps: list[RefreshStepView]
     audit_entries: list[AuditEntry]
+    events: list[EventLogEntry] = []
+    event_failures: list[SubscriberFailureEntry] = []
     error: str | None = None
 
 
@@ -75,6 +83,8 @@ def load_phase2_dashboard() -> Phase2DashboardData:
             reconciliation_breaks=breaks,
             refresh_steps=steps,
             audit_entries=audit,
+            events=recent_events(),
+            event_failures=recent_failures(),
         )
     except Exception as err:
         return Phase2DashboardData(

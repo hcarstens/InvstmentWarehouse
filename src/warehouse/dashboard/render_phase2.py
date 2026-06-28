@@ -65,6 +65,20 @@ def render_phase2_sections(
         f"<td>{html.escape(a.resource_id)}</td></tr>"
         for a in phase2.audit_entries
     )
+    event_rows = "".join(
+        f"<tr><td>{html.escape(e.occurred_at.isoformat())}</td>"
+        f"<td>{html.escape(e.op)}</td>"
+        f"<td>{html.escape(e.household_id or '—')}</td>"
+        f"<td>{html.escape(e.correlation_id)}</td></tr>"
+        for e in phase2.events
+    )
+    failure_rows = "".join(
+        f"<tr><td>{html.escape(f.occurred_at.isoformat())}</td>"
+        f"<td>{html.escape(f.op)}</td>"
+        f"<td>{html.escape(f.error_type)}</td>"
+        f"<td>{html.escape(f.error)}</td></tr>"
+        for f in phase2.event_failures
+    )
     pnl = phase2.household_pnl
     pnl_summary = ""
     if pnl:
@@ -125,5 +139,18 @@ def render_phase2_sections(
     <table>
       <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Resource</th><th>ID</th></tr></thead>
       <tbody>{audit_rows or '<tr><td colspan="5">No audit entries</td></tr>'}</tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Event stream</h2>
+    <table>
+      <thead><tr><th>Time</th><th>Event</th><th>Household</th><th>Correlation</th></tr></thead>
+      <tbody>{event_rows or '<tr><td colspan="4">No events emitted</td></tr>'}</tbody>
+    </table>
+    <h3>Subscriber failures (isolated — emitter still committed)</h3>
+    <table>
+      <thead><tr><th>Time</th><th>Event</th><th>Error</th><th>Detail</th></tr></thead>
+      <tbody>{failure_rows or '<tr><td colspan="4">No subscriber failures</td></tr>'}</tbody>
     </table>
   </section>"""

@@ -4,16 +4,30 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from warehouse.data.ingest.runner import run_custodian_ingest
-from warehouse.execution.reconciliation.service import reconcile_ingest
+import warehouse.messaging.handlers  # noqa: F401 — register catalog ops
+from warehouse.data.ingest.runner import IngestRunSummary
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import DailyRefreshRunRow, DailyRefreshStepRow
+from warehouse.messaging import (
+    DispatchContext,
+    Kind,
+    Message,
+    dispatch_message,
+    emit_event,
+)
+from warehouse.messaging.models import BreakOpened, IngestCompleted
+from warehouse.messaging.payloads import (
+    IngestRunPayload,
+    ReconcilePayload,
+    ReconcileResult,
+)
 from warehouse.research.sandbox import copy_to_research_sandbox
 
 DAILY_REFRESH_STEPS = (
@@ -76,10 +90,14 @@ def run_daily_refresh(
     custodian_file: Path,
     *,
     household_id: str,
+    custodian_id: str = "custodian_schwab",
     actor_id: str = "system:daily_refresh",
     use_research_sandbox: bool = True,
 ) -> DailyRefreshResult:
     run_id = f"refresh_{uuid4().hex[:12]}"
+    # One DispatchContext + correlation_id per refresh = one unit of work,
+    # one workflow trace across planes (contract §4.1).
+    ctx = DispatchContext(session=session, actor_id=actor_id)
     started = datetime.now(UTC)
     refresh = DailyRefreshRunRow(
         run_id=run_id,
@@ -99,13 +117,38 @@ def run_daily_refresh(
 
     try:
         step = _start_step(session, run_id, "custodian_ingest")
-        ingest = run_custodian_ingest(
-            session,
-            ingest_path,
-            household_id=household_id,
-            actor_id=actor_id,
+        ingest = cast(
+            IngestRunSummary,
+            dispatch_message(
+                ctx,
+                Message(
+                    op="ingest.run",
+                    kind=Kind.COMMAND,
+                    payload=IngestRunPayload(
+                        household_id=household_id,
+                        custodian_id=custodian_id,
+                        path=str(ingest_path),
+                    ),
+                    correlation_id=run_id,
+                    household_id=household_id,
+                ),
+            ),
         )
         ingest_run_id = ingest.run_id
+        emit_event(
+            ctx,
+            Message(
+                op="ingest.completed",
+                kind=Kind.EVENT,
+                payload=IngestCompleted(
+                    household_id=household_id,
+                    run_id=ingest_run_id,
+                    rows=ingest.rows_processed,
+                ),
+                correlation_id=run_id,
+                household_id=household_id,
+            ),
+        )
         _finish_step(
             step,
             detail=f"{ingest.rows_processed} rows from {ingest.file_name}",
@@ -122,12 +165,36 @@ def run_daily_refresh(
         )
 
         step = _start_step(session, run_id, "reconcile")
-        breaks = reconcile_ingest(
-            session,
-            ingest_run_id,
-            household_id=household_id,
-            actor_id=actor_id,
+        recon = cast(
+            ReconcileResult,
+            dispatch_message(
+                ctx,
+                Message(
+                    op="ledger.reconcile",
+                    kind=Kind.COMMAND,
+                    payload=ReconcilePayload(
+                        household_id=household_id,
+                        ingest_run_id=ingest_run_id,
+                    ),
+                    correlation_id=run_id,
+                    household_id=household_id,
+                ),
+            ),
         )
+        breaks = recon.breaks
+        for brk in breaks:
+            emit_event(
+                ctx,
+                Message(
+                    op="break.opened",
+                    kind=Kind.EVENT,
+                    payload=BreakOpened(
+                        household_id=household_id, break_id=brk.break_id
+                    ),
+                    correlation_id=run_id,
+                    household_id=household_id,
+                ),
+            )
         _finish_step(step, detail=f"{len(breaks)} break(s)")
         steps_out.append(
             RefreshStepView(

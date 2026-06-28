@@ -13,6 +13,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel
 
+from warehouse.messaging import observability
 from warehouse.messaging.models import DispatchContext, Kind, Message
 
 logger = structlog.get_logger(__name__)
@@ -75,6 +76,9 @@ def emit_event(ctx: DispatchContext, event: Message) -> None:
     Isolation (S3): a reacting subscriber must not fail the committed emitter,
     so its exception is surfaced (``record_exception_panel``), never raised.
     """
+    observability.record_event(
+        event.op, event.correlation_id, event.household_id
+    )
     for subscriber in SUBSCRIBERS.get(event.op, ()):
         try:
             subscriber(ctx, event.payload)
@@ -87,9 +91,10 @@ def record_exception_panel(
 ) -> None:
     """Surface an event-subscriber failure without failing the emitter.
 
-    v0: structured log. m0d wires this to the phase-2 exception panel so the
-    failure is visible on the dashboard (dashboard-first), not silenced.
+    Surfaced to the in-process log (phase-2 panel reads it) and structlog —
+    visible on the dashboard (dashboard-first), never silenced.
     """
+    observability.record_subscriber_failure(op, err)
     logger.warning(
         "event_subscriber_failed",
         op=op,

@@ -17,6 +17,8 @@ from warehouse.infra.db.models import (
     OptimizationTradeRow,
     StagedOrderRow,
 )
+from warehouse.messaging import DispatchContext, Kind, Message, emit_event
+from warehouse.messaging.models import OrderFilled
 
 
 class StagedOrderView(BaseModel):
@@ -156,6 +158,19 @@ def update_order_status(
         household_id=row.household_id,
         details={"approval_request_id": row.approval_request_id},
     )
+    if status is OrderStatus.FILLED:
+        emit_event(
+            DispatchContext(session=session, actor_id=actor_id),
+            Message(
+                op="order.filled",
+                kind=Kind.EVENT,
+                payload=OrderFilled(
+                    household_id=row.household_id, order_id=order_id
+                ),
+                correlation_id=row.approval_request_id,
+                household_id=row.household_id,
+            ),
+        )
     return _row_to_view(row)
 
 

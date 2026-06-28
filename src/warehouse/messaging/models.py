@@ -56,3 +56,23 @@ class DispatchContext:
     session: Session
     actor_id: str = "system:messaging"
     settings: Settings | None = None  # resolved by handler/dispatch if None
+
+
+# --- EVENT payloads (plane-free — primitive fields only, no cycle with the
+# plane-typed request bodies in payloads.py) ---
+
+
+class IngestCompleted(BaseModel):
+    household_id: str
+    run_id: str
+    rows: int
+
+
+class BreakOpened(BaseModel):
+    household_id: str
+    break_id: str
+
+
+class OrderFilled(BaseModel):
+    household_id: str
+    order_id: str
