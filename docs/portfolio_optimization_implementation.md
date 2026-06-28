@@ -13,6 +13,8 @@ window. The existing suite stays green (`pytest`, no behavior change).
 [`research/hnw_portfolios.md`](research/hnw_portfolios.md) (rung ladder, cohorts),
 [`dev_contract_registry.md`](dev_contract_registry.md) (new `portfolio_optimization` track)
 
+**Addenda:** §12 Addendum A (enum-join + Σ build spec); §13 Addendum B (pre-implementation review deltas — **authoritative for po0 fields/acceptance**).
+
 ---
 
 ## 1. Principle — propose a defensible target weight vector, never trade
@@ -33,8 +35,8 @@ constraint** (§6 invariant; resolves open question #13 the analyst way).
 | Layer | Package / `op` | Role | Kind |
 | --- | --- | --- | --- |
 | **Portfolio Manager** | `decision.pm` → `pm.advise` | Whole-book coordinator; nest-dispatches the optimizer leg | EVALUATE composite |
-| **Optimizer (v0, live)** | `decision.optimizer` → `optimizer.propose` | TLH ranking + IPS min/max **breach flags** on class weights | EVALUATE |
-| **Optimizer (v1, this plan)** | `decision.optimizer` → `optimizer.propose` (**same op**) | **Constrained MV QP** → target w\* + Δw + risk contributions | EVALUATE |
+| **Optimizer (v0, live)** | `decision.optimizer` → `optimizer.propose` | TLH **`TradeProposal`** sells + IPS min/max breach flags on class weights | EVALUATE |
+| **Optimizer (v1, this plan)** | `decision.optimizer` → `optimizer.propose` (**same op**) | **Constrained MV QP** → additive `rebalance` (w\*/Δw/RC); v0 TLH **unchanged** | EVALUATE |
 
 ```text
 PORTFOLIO MANAGER                          OPTIMIZER (sleeve-weight, pure, advisory)
@@ -69,7 +71,7 @@ never faked. μ is labelled an **ex-ante class assumption**, never a forecast or
 | 3 | **Risk-contribution shares** `RC_i` | `portfolio_covariance(...).pct_variance_contributions` at w\* | **po0 — computable** |
 | 4 | **Binding IPS bounds** at w\* | `AllocationTarget.min_weight/max_weight` | **po0 — computable** |
 | 5 | After-tax effective μ (TLH / asset-location / gain-deferral) | no tax engine — tax leg held at `$0` | **`not_computed`** (deferred po1) |
-| 6 | Turnover-cost penalty `‖Δw‖₁ ≤ τ` | `turnover_budget_pct` exists; **not enforced in po0** | **reported, not constrained** (po1) |
+| 6 | Turnover `‖Δw‖₁` / budget `τ` | `RebalanceProposal.turnover_l1` in po0; `turnover_budget_pct` constrains in po1 | **reported po0, constrained po1** (§B.3) |
 | 7 | Lot-discrete sell/hold binaries `x_l` + wash-sale graph | MIQP, no external solver allowed | **`not_computed`** (deferred po3) |
 | 8 | Regime-conditional / scenario-robust Σ | only base-regime Σ; stress is a separate overlay | **`not_computed`** (deferred po2) |
 | 9 | Factor-model Σ (n > 50 sleeves) | class-block Σ only (6 sleeves) | **`not_computed`** (out of scope) |
@@ -89,8 +91,13 @@ never faked. μ is labelled an **ex-ante class assumption**, never a forecast or
   `RC_i`. po0 therefore reports `RC_i` next to w\*, so the advisor reads risk space, not just
   weight space.
 - **Illiquids sit outside daily Δw** (research #5): alternatives are a sleeve in **w** but cannot
-  be traded daily. po0's Δw on the alternatives sleeve is **advisory-only and flagged**; po0 does
-  not assume it is executable (failure mode "illiquids treated as daily-rebalance assets").
+  be traded daily. po0's Δw on the alternatives sleeve is **advisory-only and flagged** via
+  `illiquid_advisory_sleeves` (§B.5); po0 does not assume it is executable (failure mode
+  "illiquids treated as daily-rebalance assets").
+- **Sleeve-native sensitivity units** (research #3: beta, DV01, greeks): class-block Σ aggregates
+  approximately; po0 does not bridge to a unified dollar-greek stack — **`not_computed`** (§B.7).
+- **Alternative objectives** (tracking error, ERC): out of scope for po0–po2; constrained MV only
+  (§B.7). Policy drift vs IPS target is **reported** on `RebalanceProposal`, not optimized (§B.4).
 
 ---
 
@@ -134,7 +141,7 @@ algorithm + the enum mapping live in **§A (Addendum)** — read that as the po0
 | Item | Rationale |
 | --- | --- |
 | `run_mv_rebalance(w_current, ips, assumptions, *, settings) → RebalanceProposal` (constrained MV QP) | The optimizer value-add — efficient w\* on real Σ inside IPS bounds (PO2) |
-| Additive `OptimizationResult.rebalance: RebalanceProposal \| None` | Upgrade **behind** `optimizer.propose`; **no new op** (S1) |
+| Additive `OptimizationResult.rebalance: RebalanceProposal \| None` | Upgrade **behind** `optimizer.propose`; fields per §B.2; **no new op** (S1) |
 | Explicit total `_SLEEVE_TO_RISK` map that **raises** on an unmapped sleeve (§A.1) | No silent zero-μ; errors bubble (CLAUDE.md) |
 | Pure-Python QP solver (projected-gradient + capped-simplex projection) | No external solver (CLAUDE.md Phases 0–4) |
 | `optimizer_config_version` + `risk_aversion_lambda` + QP tolerances in `config.py` | Audit replay (mirrors `analyst_config_version` / `pm_axiom_config_version`) |
@@ -167,19 +174,22 @@ No package sprawl: the upgrade lands **in** `warehouse.decision.optimizer` — n
 ### po0 — constrained mean-variance QP *(~1 PR)*
 
 **Goal:** `optimizer.propose` returns a target sleeve-weight vector + Δw + risk contributions, on
-real Σ inside IPS bounds; PM carries it. Advisory — no trades staged.
+real Σ inside IPS bounds; PM carries it. Rebalance is advisory — **no trades from the QP path**
+(v0 TLH `trades` unchanged; §B.1).
 
 | Task | File(s) |
 | --- | --- |
-| `RebalanceProposal` (frozen): `target_weights`, `current_weights`, `delta_w` (per `IpsSleeve`), `binding_bounds`, `risk_contributions`, `objective_value`, `config_version` | `decision/optimizer/models.py` *(new)* |
+| `RebalanceProposal` (frozen): canonical field set §B.2 | `decision/optimizer/models.py` *(new)* |
 | `solve_qp(mu, sigma, w_min, w_max, *, lam, tol, max_iters)` — projected-gradient + capped-simplex projection; feasibility guard raises | `decision/optimizer/qp.py` *(new)* |
 | `run_mv_rebalance(...)`: assemble universe, `_SLEEVE_TO_RISK` (raises on unmapped, §A.1), build Σ once (§A.2), solve, roll up `RC_i` via `portfolio_covariance` at w\* | `decision/optimizer/rebalance.py` *(new)* |
-| Additive `OptimizationResult.rebalance`; `_optimizer_propose` calls `run_mv_rebalance` and attaches it | `decision/optimizer/__init__.py`, `messaging/handlers.py` |
+| Additive `OptimizationResult.rebalance`; `_optimizer_propose` calls `run_mv_rebalance` and **constructs** the result with it (or `model_copy(update=...)` — frozen forbids post-hoc set; §B.1) | `decision/optimizer/__init__.py`, `messaging/handlers.py` |
 | `optimizer_config_version`, `risk_aversion_lambda`, `qp_tolerance`, `qp_max_iters` | `config.py` |
 | Freeze + register `RebalanceProposal` **and** `OptimizationResult` | `integrity/frozen_registry.py`, `tests/test_frozen.py` |
-| Rebalance panel (target-vs-current w, Δw, binding bounds, `RC_i`) + loader | `dashboard/optimizer_data.py` *(new)*, `dashboard/render_phase3.py`, `dashboard/phases.py` |
+| Rebalance panel (target-vs-current w, Δw, policy drift, binding bounds, `RC_i`, illiquid flags,
+  μ source label) + loader | `dashboard/optimizer_data.py` *(new)*, `dashboard/render_phase3.py`,
+  `dashboard/phases.py` |
 
-**Acceptance:**
+**Acceptance:** §B.9 (includes items below).
 
 - **Zero-Δ probe** (PASS falsifier): a household already at the unconstrained interior optimum →
   `‖Δw‖∞ ≈ 0`, `binding_bounds == []` (current == optimum; §9).
@@ -189,7 +199,8 @@ real Σ inside IPS bounds; PM carries it. Advisory — no trades staged.
   portfolio variance) — a property test, no magic numbers.
 - **Unmapped sleeve raises** `OptimizerMappingError` — never a silent zero-μ (§A.1).
 - **Infeasible bounds raise** (`Σ w_min > 1` or `Σ w_max < 1`) — never a silent clip.
-- `result.rebalance is not None`; **no `TradeProposal` is emitted from the rebalance path** (advisory).
+- `result.rebalance is not None`; **no `TradeProposal` from the rebalance path**; v0 TLH trades
+  coexist (`test_rebalance_coexists_with_tlh_trades`; §B.1).
 - `test_pm_no_new_ops` still green (`pm.* == {pm.advise}`; `optimizer.*` unchanged).
 - `pytest tests/test_frozen.py` green (`OptimizationResult`, `RebalanceProposal` immutable).
 
@@ -237,9 +248,12 @@ target, not code, until a solver is sanctioned.
 | Analyst flags (NPA/kill/residual) are **never hard constraints** — advisory μ tilt at most | analyst open-Q#13 v0 | `test_analyst_flags_not_optimizer_constraints` (mirrors `test_npa_no_persist`) |
 | Unmapped sleeve → **raise**, never silent zero-μ | CLAUDE.md errors-bubble | `test_sleeve_mapping_raises` |
 | Infeasible box∩simplex → **raise**, never silent clip | CLAUDE.md no-default-on-failure | `test_qp_infeasible_raises` |
-| μ labelled **ex-ante class assumption**, never "forecast"/"alpha" | PO6 + analyst A.3 | `test_mu_not_named_forecast` |
+| μ never labelled "forecast"/"alpha" — **test scans rendered copy**, not just the `mu_source` Literal (trivially safe by typing) | PO6 + analyst A.3 | `test_mu_not_named_forecast` |
 | `risk_aversion_lambda` + QP tolerances **pinned** to `optimizer_config_version` | audit replay | `test_optimizer_config_pinned` |
 | Binding-constraint set stays **legible/few** (PM axiom 6) | PM mental model 6 | `test_binding_bounds_legible` |
+| Illiquid sleeves flagged in `illiquid_advisory_sleeves` (sleeve-level, not magnitude-gated) | research #5, PM Addendum C | `test_illiquid_sleeve_flagged` (§B.5) |
+| v0 TLH `trades` unchanged; rebalance path emits no trades | §B.1 | `test_rebalance_coexists_with_tlh_trades` |
+| μ labelled **ex-ante class assumption** on dashboard | PO6 + §B.9 | `test_mu_source_label_on_panel` |
 | Walk-forward — Σ/μ as-of, base regime, no lookahead | CLAUDE.md | `test_rebalance_walk_forward` |
 | PM op surface unchanged (`pm.* == {pm.advise}`) | PM §6 | `test_pm_no_new_ops` (existing) |
 
@@ -255,7 +269,7 @@ must be justified here first — none is justified through po3.
 | File | Covers |
 | --- | --- |
 | `tests/test_optimizer_qp.py` | solver correctness: zero-Δ probe, binding bounds, λ-monotonicity, infeasibility raise, feasibility of `1ᵀw=1` |
-| `tests/test_optimizer_rebalance.py` | universe union, `_SLEEVE_TO_RISK` raise, Σ built once, `RC_i` rollup, advisory (no trade staged) |
+| `tests/test_optimizer_rebalance.py` | universe union, `_SLEEVE_TO_RISK` raise, Σ built once, `RC_i` rollup, advisory (no trade staged), TLH coexistence, illiquid flags, `turnover_l1` + `policy_drift` |
 | `tests/test_optimizer_mapping.py` | explicit sleeve→risk map total + raises; **regression for the silent-success trap** (§A.1) |
 | `tests/test_pm_workflow.py` | *(extend)* `AdviceBundle.proposal.rebalance` present on demo + HNW rung 3 |
 | `tests/test_synthetic_ips_workflow.py` | *(extend)* concentrated_stress binding bounds via QP (alongside the existing v0 assertion) |
@@ -263,7 +277,8 @@ must be justified here first — none is justified through po3.
 | `tests/test_frozen.py` | `OptimizationResult`, `RebalanceProposal` immutable (+ falsifier) |
 
 **CI gate:** QP correctness (zero-Δ + binding + monotone) + mapping raises + advisory no-persist +
-config pinned + PM op-surface unchanged.
+config pinned + PM op-surface unchanged + §B.9 acceptance (turnover, policy drift, illiquid flags,
+TLH coexistence, μ source label).
 
 ---
 
@@ -341,8 +356,8 @@ panel loader (mirrors `analyst_data.py` / `npa_data.py`).
 | Reusing `portfolio_covariance` for the QP gradient (it returns variance, **not** Σ) | Build Σ once from `class_annual_vol` + `pairwise_correlation`; use `portfolio_covariance` only to report `RC_i` at w\* (§A.2) |
 | QP overweights high-μ noise (PO6) | Box constraints as diversification floors/caps; μ-shrinkage deferred + labelled, not silently applied |
 | Base-regime Σ misleads in crisis (PO7) | Limitation surfaced in report + dashboard; scenario-robust overlay scoped as po2 |
-| Freezing `OptimizationResult` breaks an existing mutator | po0 audits `runner.py` / `compare.py` mutation sites before flipping `frozen=True`; `test_frozen.py` falsifier proves immutability |
-| Decimal↔float boundary in the solver | Solve in `float64`, quantize w\* back to `Decimal` within `qp_tolerance`; **re-assert `1ᵀw=1` within `AssetPortfolio`'s 0.0001 validator** before reporting (§A.2) |
+| Freezing `OptimizationResult` breaks an existing mutator, **and blocks `_optimizer_propose` from setting `.rebalance` post-hoc** | po0 audits `runner.py` / `compare.py` mutation sites before flipping `frozen=True`; the handler **constructs** the result with `rebalance=` or `model_copy(update=...)`, never assigns (§B.1); `test_frozen.py` falsifier proves immutability |
+| Decimal↔float boundary in the solver | Solve in `float64`; **clip float dust into `[w_min, w_max]`** (avoids `AllocationSlot.weight ge=0/le=1` raises), quantize to `Decimal`, then **explicitly re-assert `Σw=1` within 0.0001 in po0** — the `AssetPortfolio` sum validator is *not* in po0's path (it builds `SleeveRiskState`/`AllocationSlot` directly) (§A.2) |
 | Infeasible IPS bounds silently clipped | Feasibility guard raises (`test_qp_infeasible_raises`) |
 | Analyst flags creep into hard constraints | §6 invariant + `test_analyst_flags_not_optimizer_constraints` (open-Q#13 v0) |
 
@@ -446,13 +461,22 @@ pct_variance_contributions` — its real purpose here. (Reuse the formula, not t
 solve; reuse the function, not the formula, for the report.)
 
 **Solver (pure-Python, no external dependency):** projected-gradient ascent on
-`f(w) = wᵀμ − (λ/2)wᵀΣw` with each iterate projected onto `{w : 1ᵀw = 1, w_min ≤ w ≤ w_max}` via the
-**capped-simplex (Held–Wolfe / Michelot) projection** — a closed-form, exact, per-iteration
-projection requiring no solver. Step size `1/L` with `L = λ·ρ(Σ)` (use a cheap Gershgorin/row-sum
-bound for `ρ(Σ)`); stop when `‖w_{k+1} − w_k‖∞ < qp_tolerance` (pinned, e.g. `1e-8`) or
-`qp_max_iters`. Solve in `float64`; quantize w\* back to `Decimal` and **re-assert `1ᵀw = 1` within
-the `AssetPortfolio` validator's `0.0001` tolerance** before reporting — else the reporting-side
-`AssetPortfolio` construction raises (a feature, not a bug: a w\* that fails the sum check is wrong).
+`f(w) = wᵀμ − (λ/2)wᵀΣw` with each iterate projected onto `{w : 1ᵀw = 1, w_min ≤ w ≤ w_max}` via a
+**capped-simplex / continuous quadratic-knapsack projection** (the bounded-box generalization of
+the unit-simplex projection — Held–Wolfe–Crowder / Pardalos–Kovoor; Michelot 1986 covers only the
+`w ≥ 0` unit-simplex case) — a closed-form, exact, per-iteration projection requiring no solver.
+Step size `1/L` with `L = λ·ρ(Σ)` (use a cheap Gershgorin/row-sum bound for `ρ(Σ)`); stop when
+`‖w_{k+1} − w_k‖∞ < qp_tolerance` (pinned, e.g. `1e-8`) or `qp_max_iters`. Solve in `float64`, then:
+
+1. **Clip float dust into the box** before anything else — a `−1e-12` weight raises on
+   `AllocationSlot.weight`'s `ge=0` (and `> 1` on `le=1`); clamp to `[w_min, w_max]` within
+   `qp_tolerance`.
+2. Quantize w\* to `Decimal`.
+3. **Explicitly re-assert `Σ_s w*[s] = 1` within `0.0001`** in po0 — this is an *own* guard, not a
+   free side-effect: po0 reports `RC_i` by building `SleeveRiskState`/`AllocationSlot` directly and
+   calling `portfolio_covariance`; it never constructs an `AssetPortfolio`, so that model's sum=1
+   validator is **not** in the path. A w\* that fails the sum check raises `OptimizerInfeasibleError`
+   (a feature, not a bug — it means the projection or quantization is wrong).
 
 ### A.3 Feasibility, default bounds, illiquid sleeves
 
@@ -471,9 +495,7 @@ the `AssetPortfolio` validator's `0.0001` tolerance** before reporting — else 
 ### A.4 Spec deltas folded back into §3–§7
 
 - §3 formula block is the **summary**; §A.1–A.3 is the **authoritative** po0 spec.
-- §4 `RebalanceProposal` fields: `{target_weights, current_weights, delta_w, binding_bounds,
-  unbounded_sleeves, risk_contributions, objective_value, lam, config_version}` — components always
-  present; `binding_bounds`/`unbounded_sleeves` make the constraint set legible (PM axiom 6).
+- §4 `RebalanceProposal` fields: **canonical set in §B.2** (supersedes the partial list here).
 - §6 adds `test_sleeve_mapping_raises` (unmapped → `OptimizerMappingError`),
   `test_qp_infeasible_raises` (empty box∩simplex → `OptimizerInfeasibleError`), and
   `test_optimizer_mapping.py` as the **silent-success regression** for A.1.
@@ -482,8 +504,154 @@ the `AssetPortfolio` validator's `0.0001` tolerance** before reporting — else 
 
 ---
 
+## 13. Addendum B — Pre-implementation edits (review deltas, po0 spec)
+
+Review against [`research/portfolio_optimization.md`](research/portfolio_optimization.md) and
+[`heuristics/Portfolio Optimization.md`](heuristics/Portfolio%20Optimization.md) (PO1–PO8).
+**Authoritative for po0** where it extends Addendum A. Fold into code on the po0 PR.
+
+### B.1 v0 TLH trades vs po0 advisory rebalance — two fields, one op
+
+Live v0 (`run_tax_aware_optimizer`) **emits `TradeProposal` sells** for TLH harvests and records
+IPS min/max breaches in `binding_constraints` — it is not flags-only. po0 adds a **second output
+leg** on the same op:
+
+| Field | Source | po0 behavior |
+| --- | --- | --- |
+| `OptimizationResult.trades` | v0 TLH heuristic | **Unchanged** — lot-level harvest proposals |
+| `OptimizationResult.rebalance` | po0 `run_mv_rebalance` | **New** — sleeve-weight w\*/Δw/RC; **no trades** |
+
+**Invariant:** the QP/rebalance path never appends to `trades`. `_optimizer_propose` calls both
+engines and **constructs one `OptimizationResult` carrying both fields** — because po0 freezes
+`OptimizationResult` (§4), `result.rebalance` **cannot be set after construction**. Either thread
+`rebalance=` into the `run_tax_aware_optimizer` return (preferred — single construction site) or
+`result.model_copy(update={"rebalance": proposal})` in the handler (the CLAUDE.md model-copy
+pattern). Do not write `result.rebalance = ...`; the frozen model will raise. PM axiom 7 and the
+human gate treat rebalance as advisory; TLH trades remain a separate approval surface (unchanged).
+
+**Test:** `test_rebalance_coexists_with_tlh_trades` — demo household with loss lots →
+`len(result.trades) > 0` **and** `result.rebalance is not None`; rebalance path alone never
+creates trades.
+
+### B.2 Canonical `RebalanceProposal` fields (supersedes §4 / A.4 partial lists)
+
+Single field list for po0 — all components always present (empty collections / `None` where noted):
+
+| Field | Type | Role |
+| --- | --- | --- |
+| `target_weights` | `dict[IpsSleeve, Decimal]` | MV optimum w\* |
+| `current_weights` | `dict[IpsSleeve, Decimal]` | As-of sleeve weights |
+| `delta_w` | `dict[IpsSleeve, Decimal]` | w\* − w_current (MV rebalance vector) |
+| `policy_drift` | `dict[IpsSleeve, Decimal]` | w_current − IPS `target_weight` (0 if no target; §B.4) |
+| `binding_bounds` | `list[str]` | IPS bounds active at w\* (legible set — PM axiom 6) |
+| `unbounded_sleeves` | `list[IpsSleeve]` | Sleeves in positions with no `AllocationTarget` (A.3) |
+| `illiquid_advisory_sleeves` | `list[IpsSleeve]` | Δw flagged non-executable (§B.5); po0 = `{ALTERNATIVES}` |
+| `risk_contributions` | `dict[IpsSleeve, Decimal]` | `RC_i` at w\* (pct variance share) |
+| `turnover_l1` | `Decimal` | `‖Δw‖₁` — reported po0, constrained po1 (§B.3) |
+| `objective_value` | `Decimal` | `w*ᵀμ − (λ/2)w*ᵀΣw` at solve |
+| `mu_source` | `Literal["ex_ante_class_assumption"]` | PO6 honesty label — single-value by typing; the real guard is on **rendered copy** (§B.9) |
+| `lam` | `Decimal` | `risk_aversion_lambda` used in solve |
+| `config_version` | `str` | `optimizer_config_version` pin |
+
+Freeze + register per §4. The dashboard and PM **axiom enrichment**
+(`portfolio_manager_implementation.md` Addendum C) read these fields directly.
+
+### B.3 Turnover `‖Δw‖₁` — report po0, constrain po1
+
+Honesty matrix #6: po0 **computes and reports** `turnover_l1 = Σ_s |Δw[s]|` on every
+`RebalanceProposal`. When `ips.turnover_budget_pct` is set, po0 also reports
+`turnover_budget_pct` alongside (informational — no constraint yet). po1 adds the hard constraint
+`‖Δw‖₁ ≤ τ` to the QP/projection and flips dashboard status from "reported" to "within budget".
+
+PO8 rebalance-on-drift (not calendar) stays on PM axiom 7 / po1 — po0 runs whenever
+`optimizer.propose` is called; it does not implement a drift trigger.
+
+### B.4 Policy drift vs MV Δw — reported, not optimized
+
+Research defines drift `d = w_current − w_policy`; the QP optimizes `Δw = w* − w_current`.
+IPS `target_weight` is **not** a QP objective term in po0 (no tracking-error objective — §B.7).
+
+**Spec:** for each sleeve with an `AllocationTarget`, set
+`policy_drift[s] = w_current[s] − target.target_weight`; sleeves without a target → `Decimal("0")`.
+Report on `RebalanceProposal` and the rebalance panel. Hard min/max breach detection stays on
+`policy.check` / `drift_vs_ips()`; the optimizer does not duplicate breach alerts — it surfaces
+**where the MV optimum sits relative to policy center**, not whether policy is violated.
+
+### B.5 Illiquid sleeve flags — field name pinned for PM axiom 6
+
+Research failure mode: illiquids treated as daily-rebalance assets. po0 includes alternatives in
+**w** (correct Σ and `1ᵀw=1`) but marks non-executable Δw explicitly:
+
+- Field: **`illiquid_advisory_sleeves: list[IpsSleeve]`**
+- po0 rule: if `IpsSleeve.ALTERNATIVES ∈ universe`, append `ALTERNATIVES` to the list —
+  **membership is sleeve-level, not magnitude-gated**. The flag fires even when `delta_w` is
+  near zero (e.g. the §9 zero-Δ probe), so the dashboard always shows the non-executable
+  constraint. (Do **not** gate on `|delta_w| > qp_tolerance` — that would drop the badge exactly
+  when the sleeve is correctly left untouched, and would contradict `test_illiquid_sleeve_flagged`.)
+- Dashboard: render an **"advisory only — not daily tradable"** badge beside those sleeves' Δw rows.
+- PM axiom enrichment (Addendum C), axiom 6: count `illiquid_advisory_sleeves` toward the legible
+  binding/feasibility set.
+
+Hard liquidity-laddering (committed-capital caps on alternatives Δw) remains po1.
+
+### B.6 λ calibration — platform prior, not household-specific
+
+`risk_aversion_lambda` is pinned to `optimizer_config_version` as a **platform prior** — not
+calibrated per household from IPS risk tolerance or `risk.evaluate` output. po0 finds **one**
+efficient-frontier point (fixed λ), not a frontier trace (PO2 partial satisfaction: dominance is
+shown via Δw magnitude and binding bounds, not an explicit "current w is dominated" flag).
+
+Household-specific λ / frontier tracing is out of scope until a future slice justifies it here.
+
+### B.7 Out-of-scope objectives and model limits (named, not silent)
+
+| Topic | po0 stance |
+| --- | --- |
+| Tracking-error objective `(w − w_policy)'Σ(w − w_policy)` | Out of scope — policy drift **reported** only (B.4) |
+| Equal risk contribution (ERC) / risk-budget rebalance | Out of scope — `RC_i` **reported** at w\* for advisor review |
+| Native sensitivity units (beta, DV01, greeks) | **`not_computed`** — class-block Σ only; no unified greek stack |
+| PO3 CML / cash-leverage blend, PO4 Kelly sizing | Out of scope (honesty matrix #11) |
+
+### B.8 po2 robust objective — pin before po2 code (not po0)
+
+po2 complements base-regime MV with crisis-correlation stress. **Do not implement until this
+objective is chosen** (po2 planning PR or po2 kickoff):
+
+| Option | Form | Notes |
+| --- | --- | --- |
+| **A (default candidate)** | Re-solve constrained MV under each crisis Σ pack; report side-by-side w\* | Uses existing QP machinery; PO7 via alternate ρ |
+| **B** | Base solve + penalty `max_s (w'Σ_s w)` over stress packs | Single objective; needs penalty weight pin |
+| **C** | Scenario P&L simulation primary (research preference) | Heavier; may need risk-plane scenario hook |
+
+po0 dashboard label "base-regime Σ only" remains until po2 ships and honesty matrix #8 flips.
+
+### B.9 po0 acceptance additions (from review)
+
+Add to po0 acceptance (§5) and CI gate (§7):
+
+| Criterion | Test |
+| --- | --- |
+| `turnover_l1` present and equals `Σ|Δw|` | `test_rebalance_turnover_l1` |
+| `policy_drift[s] = w_current[s] − target_weight[s]` | `test_policy_drift_reported` |
+| `illiquid_advisory_sleeves` contains `ALTERNATIVES` when in universe | `test_illiquid_sleeve_flagged` |
+| v0 TLH trades + rebalance both populated when applicable | `test_rebalance_coexists_with_tlh_trades` |
+| Dashboard shows μ source label (`mu_source`) | `test_mu_source_label_on_panel` |
+| **Rendered panel + rationale copy** never contains "forecast"/"alpha" for μ (scans text, not just the `mu_source` Literal — which is trivially safe by typing; mirrors analyst `test_residual_not_named_alpha`) | `test_mu_not_named_forecast` |
+
+### B.10 Spec deltas folded back
+
+- §1 v0 row: TLH `TradeProposal` + breach flags (not flags-only).
+- §2 honesty #6: `turnover_l1` reported po0; constrained po1.
+- §2 stated limitations: native units + alternative objectives + policy drift reporting.
+- §4–§7: canonical fields (B.2), acceptance (B.9), invariants, test plan updated.
+- A.4 field list: defers to B.2.
+
+---
+
 ## Review / iteration log
 
 | Date | Note |
 | --- | --- |
 | 2026-06-28 | Initial draft (Claude). Plan-doc-only PR — no production code; suite unchanged. Grounded against shipped code: `run_tax_aware_optimizer` (TLH-only, IPS breach flags), `portfolio_covariance` (Σ scalars + `pct_variance_contributions`), `assumptions_for("base")` (μ/vol/ρ priors), `AllocationTarget` (`IpsSleeve` min/max/target), `_optimizer_propose` handler. po0 = constrained MV QP in sleeve-weight space, pure + advisory, behind the existing `optimizer.propose` op (no new op). **Addendum A** inverts the analyst's KeyError trap: `IpsSleeve` and `research.risk.AssetClass` are value-identical `StrEnum`s, so the naive μ-join *silently succeeds* — A.1 specifies an explicit raising `_SLEEVE_TO_RISK` map; A.2 catches that `portfolio_covariance` returns variance, not Σ, so the QP must build Σ once. Flagged the CLAUDE.md heuristics-table gap (Portfolio Optimization.md unlisted) for §10. |
+| 2026-06-28 | **Addendum B** — pre-implementation review deltas: v0 TLH trades vs po0 advisory rebalance split (B.1); canonical `RebalanceProposal` fields (B.2); turnover report po0 / constrain po1 (B.3); policy drift reported not optimized (B.4); `illiquid_advisory_sleeves` pinned for PM axiom 6 (B.5); λ as platform prior (B.6); named out-of-scope objectives (B.7); po2 robust objective options pinned for po2 kickoff (B.8); po0 acceptance tests (B.9). §1–§7 cross-refs updated. |
+| 2026-06-28 | **Addendum review fixes (Claude).** Six corrections: (1) B.5 illiquid flag is **sleeve-level, not magnitude-gated** — dropped the `\|Δw\| > qp_tolerance` predicate that contradicted `test_illiquid_sleeve_flagged` and the zero-Δ probe. (2) A.2 — po0 builds `SleeveRiskState`/`AllocationSlot` directly and never constructs an `AssetPortfolio`, so its sum=1 validator is **not** in the path; made the `Σw=1` re-assertion an explicit po0 guard and added a **clip-float-dust-into-`[w_min,w_max]`** step (avoids `AllocationSlot.weight ge=0/le=1` raises). (3) Freezing `OptimizationResult` blocks post-hoc `result.rebalance = …`; §5/§B.1/risk-table now specify **construct-with-`rebalance=` or `model_copy(update=…)`**. (4) `test_mu_not_named_forecast` retargeted to **scan rendered copy** (the single-value `mu_source` Literal is trivially safe by typing; mirrors analyst `test_residual_not_named_alpha`). (5) projection citation corrected — capped-simplex / continuous quadratic-knapsack (Held–Wolfe–Crowder / Pardalos–Kovoor); Michelot 1986 is unit-simplex-only. (6) coined "PM enrich-1" → grounded "PM axiom enrichment (Addendum C)". No code; suite green. |
