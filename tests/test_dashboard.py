@@ -44,3 +44,30 @@ def test_render_html_contains_key_sections() -> None:
     # pa1: kill-criteria watch panel (alerts only, human gate).
     assert "Kill-criteria watch" in html
     assert "Alerts only" in html
+    # po0: MV rebalance panel (target weights w*, advisory).
+    assert "MV rebalance" in html
+    assert "Target w*" in html
+
+
+def test_optimizer_panel_shows_mu_source_label() -> None:
+    """po0 §B.9: panel labels μ as an ex-ante class assumption (PO6)."""
+    html = render_html()
+    assert "ex-ante class assumption" in html
+
+
+def test_mu_not_named_forecast() -> None:
+    """po0 §B.9: rendered rebalance copy never calls μ a forecast/alpha.
+
+    Scans the rendered panel text — the ``mu_source`` Literal is trivially
+    safe by typing, so the real guard is on the copy (mirrors the analyst
+    test_residual_not_named_alpha).
+    """
+    from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
+    from warehouse.dashboard.render_phase3 import (
+        render_optimizer_rebalance_section,
+    )
+
+    panel = render_optimizer_rebalance_section(load_optimizer_dashboard())
+    lowered = panel.lower()
+    assert "forecast" not in lowered
+    assert "alpha" not in lowered

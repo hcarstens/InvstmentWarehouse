@@ -97,6 +97,39 @@ def test_policy_check_concentration_live() -> None:
     assert report.concentration_alerts
 
 
+def test_pm_bundle_carries_rebalance_hnw(seeded: None) -> None:
+    """po0: optimizer.propose enriches the result with rebalance."""
+    with session_scope() as session:
+        bundle = run_rebalance_advisory(
+            session, DEMO, correlation_id="rebalance-po0"
+        )
+    assert bundle.proposal.rebalance is not None
+    # Advisory leg carries target weights summing to 1 (Σw=1 re-asserted).
+    target = bundle.proposal.rebalance.target_weights
+    total = sum(target.values())
+    assert abs(total - 1) < 0.0001  # type: ignore[operator]
+
+
+def test_pm_rebalance_present_rung3() -> None:
+    """HNW rung-3 path: PM bundle carries the constrained-MV rebalance."""
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="hnw-rebalance",
+            household_id=payload.household_id,
+        ),
+    )
+    assert isinstance(out, AdviceBundle)
+    assert out.proposal.rebalance is not None
+    assert out.proposal.rebalance.mu_source == "ex_ante_class_assumption"
+
+
 def test_pm_no_new_ops() -> None:
     """PM reaches specialists only via the shipped catalog."""
     from warehouse.messaging import REGISTRY as catalog

@@ -13,6 +13,7 @@ from warehouse.config import repo_root
 from warehouse.dashboard.advisory_data import load_advisory_dashboard
 from warehouse.dashboard.analyst_data import load_kill_criteria_dashboard
 from warehouse.dashboard.npa_data import load_npa_dashboard
+from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
@@ -24,7 +25,10 @@ from warehouse.dashboard.render_analyst import (
 )
 from warehouse.dashboard.render_orchestrator import render_orchestrator_section
 from warehouse.dashboard.render_phase2 import render_phase2_sections
-from warehouse.dashboard.render_phase3 import render_phase3_sections
+from warehouse.dashboard.render_phase3 import (
+    render_optimizer_rebalance_section,
+    render_phase3_sections,
+)
 from warehouse.dashboard.render_phase4 import render_phase4_sections
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.render_risk_build import render_risk_build_page
@@ -180,6 +184,9 @@ def render_html(
         phase2, risk_html=render_risk_section(risk)
     )
     phase3_html = render_phase3_sections(phase3)
+    optimizer_html = render_optimizer_rebalance_section(
+        load_optimizer_dashboard()
+    )
     phase4_html = render_phase4_sections(phase4)
     advisory_html = render_advisory_section(advisory)
     analyst_html = render_analyst_section(load_kill_criteria_dashboard())
@@ -276,6 +283,8 @@ def render_html(
 {phase2_html}
 
 {phase3_html}
+
+{optimizer_html}
 
 {advisory_html}
 {analyst_html}

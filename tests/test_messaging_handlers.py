@@ -117,7 +117,13 @@ def test_optimizer_propose_round_trip(seeded: None) -> None:
             ),
         )
         direct = run_tax_aware_optimizer(DEMO, positions, ips)
-    assert out.model_dump() == direct.model_dump()
+    # po0: the handler enriches the result with the additive advisory
+    # ``rebalance`` leg (no new op); the v0 TLH ``trades`` are unchanged.
+    assert out.rebalance is not None
+    assert direct.rebalance is None
+    assert out.model_copy(update={"rebalance": None}).model_dump() == (
+        direct.model_dump()
+    )
 
 
 def test_trade_validate_round_trip(seeded: None) -> None:

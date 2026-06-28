@@ -52,6 +52,22 @@ def test_concentrated_stress_optimizer_documents_binding() -> None:
     assert "binding_constraints=" in rebalance.detail
 
 
+def test_concentrated_stress_qp_documents_binding() -> None:
+    """po0: the constrained-MV QP binds a sleeve bound on the stress book."""
+    from warehouse.decision.optimizer.rebalance import run_mv_rebalance
+
+    bundle = emit_synthetic_household(
+        cohort_id="concentrated_stress", seed=42, rung=4, validate=False
+    )
+    positions = lot_positions_from_fixture(bundle.fixture)
+    proposal = run_mv_rebalance(positions, bundle.ips)
+    # Concentrated single-name → w* clips against IPS sleeve bounds.
+    assert proposal.binding_bounds
+    # Σw = 1 re-asserted (AssetPortfolio validator is not in this path).
+    total = sum(proposal.target_weights.values())
+    assert abs(total - 1) < 0.0001  # type: ignore[operator]
+
+
 def test_scenario_card_fingerprint_stable() -> None:
     first = build_scenario_card(rung_level=3, seed=3)
     second = build_scenario_card(rung_level=3, seed=3)

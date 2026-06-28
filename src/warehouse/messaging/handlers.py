@@ -35,6 +35,7 @@ from warehouse.decision.ips.monitor import (
 )
 from warehouse.decision.optimizer import OptimizationResult
 from warehouse.decision.optimizer.heuristics import run_tax_aware_optimizer
+from warehouse.decision.optimizer.rebalance import run_mv_rebalance
 from warehouse.decision.optimizer.runner import (
     OptimizationRunView,
     persist_optimization,
@@ -102,7 +103,12 @@ def _policy_check(
 def _optimizer_propose(
     ctx: DispatchContext, p: OptimizePayload
 ) -> OptimizationResult:
-    return run_tax_aware_optimizer(p.household_id, p.positions, p.ips)
+    # Both engines run behind the one op (no new atomic op — S1): v0 TLH
+    # ``trades`` unchanged + the additive po0 advisory ``rebalance`` (§B.1).
+    # Frozen result → carry rebalance via model_copy, never post-hoc assign.
+    result = run_tax_aware_optimizer(p.household_id, p.positions, p.ips)
+    rebalance = run_mv_rebalance(p.positions, p.ips)
+    return result.model_copy(update={"rebalance": rebalance})
 
 
 def _trade_validate(

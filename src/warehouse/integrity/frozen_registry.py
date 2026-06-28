@@ -27,7 +27,9 @@ from warehouse.decision.analyst import (
     PositionThesis,
 )
 from warehouse.decision.ips.monitor import IpsDriftReport
+from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer import OptimizationResult
+from warehouse.decision.optimizer.models import RebalanceProposal
 from warehouse.decision.tax.scenarios import (
     TaxScenarioOverlays,
     TaxScenarioResult,
@@ -68,11 +70,13 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     Message,
     NpaFlag,
     NpaFlags,
+    OptimizationResult,
     OrchestratorError,
     OrchestratorResponse,
     PmNarrative,
     PositionAttribution,
     PositionThesis,
+    RebalanceProposal,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -241,6 +245,16 @@ def _sample_instance(cls: type[Any]) -> Any:
             flags=[_sample_npa_flag()],
             limitations=["advisory only"],
         )
+    if cls is RebalanceProposal:
+        return _sample_rebalance_proposal()
+    if cls is OptimizationResult:
+        return OptimizationResult(
+            household_id="hh_test",
+            config_version="test",
+            trades=[],
+            estimated_tax_delta=Decimal("0"),
+            rebalance=_sample_rebalance_proposal(),
+        )
     if cls is OrchestratorError:
         return OrchestratorError(
             correlation_id="corr_test",
@@ -259,6 +273,23 @@ def _sample_instance(cls: type[Any]) -> Any:
             elapsed_ms=0,
         )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
+
+
+def _sample_rebalance_proposal() -> RebalanceProposal:
+    return RebalanceProposal(
+        target_weights={IpsSleeve.EQUITY: Decimal("1")},
+        current_weights={IpsSleeve.EQUITY: Decimal("1")},
+        delta_w={IpsSleeve.EQUITY: Decimal("0")},
+        policy_drift={IpsSleeve.EQUITY: Decimal("0")},
+        binding_bounds=[],
+        unbounded_sleeves=[IpsSleeve.EQUITY],
+        illiquid_advisory_sleeves=[],
+        risk_contributions={IpsSleeve.EQUITY: Decimal("1")},
+        turnover_l1=Decimal("0"),
+        objective_value=Decimal("0.07"),
+        lam=Decimal("6.0"),
+        config_version="2026.06",
+    )
 
 
 def _sample_npa_flag() -> NpaFlag:
@@ -323,6 +354,10 @@ def _mutation_probe_attr(instance: Any) -> str:
     if isinstance(instance, NpaFlag):
         return "detail"
     if isinstance(instance, NpaFlags):
+        return "household_id"
+    if isinstance(instance, RebalanceProposal):
+        return "turnover_l1"
+    if isinstance(instance, OptimizationResult):
         return "household_id"
     if isinstance(instance, OrchestratorError):
         return "message"

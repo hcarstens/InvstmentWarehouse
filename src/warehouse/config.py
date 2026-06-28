@@ -55,6 +55,20 @@ class Settings(BaseSettings):
     mip_optimizer_enabled: bool = True
     mip_max_trades: int = 3
 
+    # Portfolio Optimization v1 (po0) — constrained mean-variance QP.
+    # Version-pinned for audit replay (CLAUDE.md: pin decision inputs). λ is a
+    # PLATFORM prior (§B.6), not calibrated per household from IPS risk
+    # tolerance — one efficient-frontier point at a fixed risk aversion. It is
+    # calibrated against the §9 HNW fixtures so the interior rung-3 book gives
+    # a sensible multi-sleeve target while the concentrated rung-4 books bind
+    # their sleeve caps; the acceptance tests are property-based (λ-monotone,
+    # binding clip, zero-Δ), so they do not depend on this exact magnitude.
+    # qp_tolerance / qp_max_iters bound the projected-gradient ascent.
+    optimizer_config_version: str = "2026.06"
+    risk_aversion_lambda: float = 6.0
+    qp_tolerance: float = 1e-9
+    qp_max_iters: int = 5000
+
     research_sandbox_path: str = "./runs/research"
     walk_forward_purge_days: int = 5
 

@@ -73,6 +73,11 @@ PHASES: list[Phase] = [
         panels=[
             DashboardPanel(name="IPS drift monitor", phase=3, status="live"),
             DashboardPanel(name="Optimizer proposals", phase=3, status="live"),
+            DashboardPanel(
+                name="MV rebalance (target weights w*)",
+                phase=3,
+                status="live",
+            ),
             DashboardPanel(name="Approval queue", phase=3, status="live"),
             DashboardPanel(name="Backtest results", phase=3, status="live"),
             DashboardPanel(

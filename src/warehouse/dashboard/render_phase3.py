@@ -5,6 +5,7 @@ from __future__ import annotations
 import html
 from decimal import Decimal
 
+from warehouse.dashboard.optimizer_data import OptimizerPanelData
 from warehouse.dashboard.phase3_data import Phase3DashboardData
 from warehouse.dashboard.render_synthetic_ips import (
     render_synthetic_ips_section,
@@ -13,6 +14,73 @@ from warehouse.dashboard.render_synthetic_ips import (
 
 def _pct(value: Decimal) -> str:
     return f"{value * 100:.1f}%"
+
+
+def _signed_pct(value: Decimal) -> str:
+    return f"{value * 100:+.1f}%"
+
+
+def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
+    """po0 MV rebalance panel — target-vs-current w, Δw, RC, illiquid flags.
+
+    Advisory only: w*/Δw are proposals; nothing is staged or executed (human
+    gate). μ is labelled an ex-ante class assumption (PO6), never a forecast.
+    """
+    error = ""
+    if data.error:
+        error = (
+            '<section class="error-banner"><strong>MV rebalance panel '
+            f"error:</strong> {html.escape(data.error)}</section>"
+        )
+
+    status_badge = "badge-err" if data.panel_status == "error" else "badge-ok"
+
+    def _row(r) -> str:  # type: ignore[no-untyped-def]
+        flags = []
+        if r.illiquid:
+            flags.append(
+                '<span class="badge badge-warn">advisory only — not '
+                "daily tradable</span>"
+            )
+        if r.unbounded:
+            flags.append('<span class="badge badge-muted">no IPS bound</span>')
+        flag_html = " ".join(flags) or "—"
+        return (
+            f"<tr><td>{html.escape(r.sleeve)}</td>"
+            f"<td>{_pct(r.current_weight)}</td>"
+            f"<td>{_pct(r.target_weight)}</td>"
+            f"<td>{_signed_pct(r.delta_w)}</td>"
+            f"<td>{_signed_pct(r.policy_drift)}</td>"
+            f"<td>{_pct(r.risk_contribution)}</td>"
+            f"<td>{flag_html}</td></tr>"
+        )
+
+    rows = "".join(_row(r) for r in data.rows) or (
+        '<tr><td colspan="7">No rebalance computed</td></tr>'
+    )
+    binding = ", ".join(data.binding_bounds) or "none"
+    return f"""
+  <section>
+    <h2>MV rebalance (target weights w*)</h2>
+    {error}
+    <p><span class="badge {status_badge}">{html.escape(data.panel_status)}</span>
+       Cohort <code>{html.escape(data.cohort_id)}</code> ·
+       household <code>{html.escape(data.household_id)}</code> ·
+       as of {data.as_of_date.isoformat()} ·
+       config <code>{html.escape(data.config_version)}</code></p>
+    <p>μ source: <strong>{html.escape(data.mu_source_label)}</strong>
+       (base-regime Σ only) · risk aversion λ = {data.lam} ·
+       turnover ‖Δw‖₁ = {_pct(data.turnover_l1)} ·
+       objective = {data.objective_value}</p>
+    <p>Binding IPS bounds at w*: {html.escape(binding)}</p>
+    <p><em>Advisory only — w*/Δw are proposals; the constrained MV QP stages
+       no trade and executes nothing (human gate). Weight ≠ risk: read RC.</em></p>
+    <table>
+      <thead><tr><th>Sleeve</th><th>Current</th><th>Target w*</th>
+        <th>Δw</th><th>Policy drift</th><th>RC</th><th>Flags</th></tr></thead>
+      <tbody>{rows}</tbody>
+    </table>
+  </section>"""
 
 
 def render_phase3_sections(phase3: Phase3DashboardData) -> str:
