@@ -160,6 +160,7 @@ domain. Do not paste the full axioms into responses — use them as lenses.
 | When you are… | Read and apply |
 | --- | --- |
 | Designing, reviewing, or implementing **risk** (measurement, scenarios, stress, limits, portfolio construction, `warehouse.research.risk`, risk API/dashboard) | [`docs/heuristics/Risk Management.md`](docs/heuristics/Risk%20Management.md) — RM1–RM7 (quantify, diversify, prevent, EV, tails, factor independence, controllable exposure) |
+| Designing, reviewing, or implementing **portfolio optimization** (allocation, target weights, rebalance, mean-variance / QP, efficient frontier, position sizing, turnover, `warehouse.decision.optimizer`) | [`docs/heuristics/Portfolio Optimization.md`](docs/heuristics/Portfolio%20Optimization.md) — PO1–PO8 (diversification, efficient frontier, CML, Kelly sizing, concentration–diversification, estimation error, non-stationarity, turnover cost) |
 | Thinking about **repo or project organization** (where code/docs live, naming, discovery, package boundaries, docs layout) | [`docs/heuristics/Libraries.md`](docs/heuristics/Libraries.md) — HLib1–HLib6 (collocation, fixed location, hierarchy, controlled vocabulary, citation chaining, single entry point) |
 | Thinking about **module or system structure** (planes, packages, APIs, dashboards, how subsystems map to reality) | [`docs/heuristics/Cartography.md`](docs/heuristics/Cartography.md) — C1–C8 (projection, scale, coordinates, purposeful omission, legend, hierarchy, orientation, self-contained maps) |
 
@@ -202,6 +203,8 @@ pytest tests/test_frozen.py   # frozen registry immutability
 - `docs/heuristics/Risk Management.md` — risk reasoning axioms (RM1–RM7)
 - `docs/heuristics/Libraries.md` — repo organization axioms (HLib1–HLib6)
 - `docs/heuristics/Cartography.md` — module/map structure axioms (C1–C8)
+- `docs/heuristics/Portfolio Optimization.md` — allocation/sizing/rebalance axioms (PO1–PO8)
+- `docs/portfolio_optimization_implementation.md` — optimizer v1 build plan (po0 constrained MV QP)
 - `docs/risk_api_contract.md` — risk API v0 contract
 - `docs/risk_api_implementation_plan.md` — HNW-informed build plan (v0a/b/c PRs)
 - `TODO.md` — phased deliverables

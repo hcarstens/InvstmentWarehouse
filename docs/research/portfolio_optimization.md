@@ -4,6 +4,8 @@ Multi-asset portfolio optimization selects a **weight vector** **w** (or trade v
 
 Related: [ips.md](ips.md) (IPS governance), [portfolio_risk.md](portfolio_risk.md) (risk measurement), [rebalancing.md](rebalancing.md) (rebalance rules), [simple_risk_models.md](simple_risk_models.md) (covariance / VaR stack).
 
+**Build plan:** [`../portfolio_optimization_implementation.md`](../portfolio_optimization_implementation.md) decomposes this synthesis into PR slices. po0 implements the **constrained MV QP** row of "InvestmentWarehouse today" below (sleeve-weight space, real Σ, pure + advisory, inside IPS bounds); after-tax μ, regime-conditional Σ, and lot-discrete MIQP are scoped `not_computed`/deferred there.
+
 ---
 
 ## Optimization Math

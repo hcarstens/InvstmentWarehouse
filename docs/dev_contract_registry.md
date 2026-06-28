@@ -39,6 +39,7 @@ decision (contract §8-style tables) without an explicit **contract amendment** 
 | `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | m0a–m1 **shipped** (plan iteration log) |
 | `portfolio_manager` | Decision (`warehouse.decision.pm`) | [portfolio_manager_implementation.md](portfolio_manager_implementation.md) | pm0–pm2 **shipped** (plan iteration log) |
 | `portfolio_analyst` | Decision (`warehouse.decision.analyst`) | [portfolio_analyst_implementation.md](portfolio_analyst_implementation.md) · [heuristics/Mental Model of The Portfolio Analyst.md](heuristics/Mental%20Model%20of%20The%20Portfolio%20Analyst.md) | pa0–pa2 **shipped** (pa0 attribution + residual + PM 5th leg; pa1 thesis + kill criteria + checkpoint-1 wiring + kill-criteria watch panel; pa2 `flag_non_performing` reason-coded NPA flags — sustained drawdown, stale alt mark, missed capital call, IPS liquidity breach — pure/advisory, feeds the approval gate only, NPA panel; falsifiers `tests/test_analyst_attribution.py`, `tests/test_analyst_review.py`, `tests/test_analyst_thesis.py`, `tests/test_analyst_npa.py`). Next: portfolio_optimization v1 |
+| `portfolio_optimization` | Decision (`warehouse.decision.optimizer`) | [portfolio_optimization_implementation.md](portfolio_optimization_implementation.md) · [heuristics/Portfolio Optimization.md](heuristics/Portfolio%20Optimization.md) · [research/portfolio_optimization.md](research/portfolio_optimization.md) | **planned** — po0 constrained MV QP (sleeve-weight space, real Σ, pure + advisory: target w\* + Δw + risk contributions **behind** `optimizer.propose`, **no new op**, no trades staged); po1 turnover/TLH overlay, po2 scenario-robust stress, po3 lot-discrete MIQP (documented upgrade path). **Boundary:** engine upgraded in place; additive `OptimizationResult.rebalance`; analyst flags advisory-only, never hard constraints (open question #13 v0). Plan doc shipped; po0 code next |
 
 ```text
 risk_contract v0a–v0c          [shipped]
@@ -58,8 +59,9 @@ messaging m0a (core, plane-free)   [shipped]
                  └─ pm0 (narrative + 7-axiom checklist)      [shipped]
                       └─ pm1 (working set + rebalance advisory) [shipped]
                            └─ pm2 (dashboard + registry)        [shipped]
-                                └─ portfolio_analyst pa0+        [planned — next milestone]
-                                     └─ portfolio_optimization v1 [planned — hard problem]
+                                └─ portfolio_analyst pa0–pa2     [shipped]
+                                     └─ portfolio_optimization po0 [planned — constrained MV QP, advisory]
+                                          └─ po1/po2/po3           [planned — turnover/TLH, robust, MIQP]
 ```
 
 Tax leg held at `$0` stub on purpose (`evaluate_tax_scenario → 0`): a deterministic tax leg
@@ -108,7 +110,7 @@ Each row in `risk_build_registry.py` (`BuildDeliverable`):
 | Field | Required | Values / notes |
 | --- | --- | --- |
 | `id` | yes | Stable slug, e.g. `si0a-asset-class` |
-| `track` | yes | `risk_contract` \| `hnw_synthetic` \| `synthetic_ips` \| `decision_plane` \| `messaging` \| `portfolio_manager` \| `portfolio_analyst` |
+| `track` | yes | `risk_contract` \| `hnw_synthetic` \| `synthetic_ips` \| `decision_plane` \| `messaging` \| `portfolio_manager` \| `portfolio_analyst` \| `portfolio_optimization` |
 | `slice` | yes | Plan slice, e.g. `v0a`, `si2` |
 | `name` | yes | Short human label |
 | `status` | yes | `planned` \| `in_progress` \| `shipped` \| `deferred` \| `retired` |
