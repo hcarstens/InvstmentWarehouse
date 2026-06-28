@@ -1,6 +1,6 @@
 # Messaging Protocol — In-Process Request Taxonomy
 
-**Status:** v0 — decisions closed (§10); ready to implement
+**Status:** v0 shipped (m0a–m1) — `warehouse.messaging` live; daily_refresh + rebalance loop route through `dispatch_message`
 **Owner:** platform / orchestrator
 **Related:** `docs/research/messaging_systems.md` (out-of-process superset),
 `docs/heuristics/Simplicity.md`, `docs/heuristics/Mental Model of The Portfolio Manager.md`,

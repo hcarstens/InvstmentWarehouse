@@ -1,6 +1,6 @@
 # Messaging Protocol — Implementation Plan
 
-**Status:** m0a–m0d shipped; m1 pending
+**Status:** m0a–m1 shipped — complete
 **Date:** 2026-06-28
 **Owner:** platform / orchestrator
 **Inputs:** [`messaging_protocol.md`](messaging_protocol.md) (contract — wins on conflict),
@@ -164,9 +164,18 @@ raises), not by "the module looks done."
 - A deliberately failing event subscriber appears on the phase-2 panel; the refresh still commits (isolation S3).
 - `warehouse serve` phase-2 panel shows `ingest.completed` / `break.opened` from a real run (not a stub).
 
-### m1 — coordinator + tax *(~1 PR)*
+### m1 — coordinator + tax *(~1 PR)* — ✅ shipped
 
 **Goal:** the Portfolio Manager tier and the full advisory middle through dispatch.
+
+> **Notes:** added a pure session-less `evaluate_tax_scenario` + `TaxScenarioResult` (the Tax
+> Analyst's after-tax baseline-vs-overlay delta) as the EVALUATE backing — `run_tax_scenario`
+> still persists for the dashboard/CLI. Coordinators need the inbound trace, so `dispatch_message`
+> now threads `correlation_id` into `DispatchContext` (via `dataclasses.replace`) and `pm.advise`
+> reuses it for every nested message. Two small decision-plane fixes the loop surfaced:
+> `create_approval_request` now `flush()`es (queryable within the txn — `autoflush=False` engine),
+> and `optimizer.persist` passes `queue_approval=False` so persist doesn't fuse in an approval
+> (S2 — `approval.create` is the op for that).
 
 | Task | File(s) |
 | --- | --- |
@@ -309,3 +318,4 @@ Critical path: **m0a → m0b → m0d**; m0c can overlap after m0b; m1 last.
 | 2026-06-28 | **m0b shipped.** `payloads.py` (11 request bodies + 4 result wrappers), `handlers.py` composition root registering all 11 atomic ops; `Handler` payload typed `Any` for clean wrapper registration. `tests/test_messaging_handlers.py` (8 tests: round-trip == direct for the 5 QUERY/EVALUATE ops, EVALUATE purity via poisoned session, `ingest.run` COMMAND, `orders.stage` gate). Deliberate deviation: `__init__` stays light, handlers self-register on import. 215 pass, ruff + mypy strict clean. |
 | 2026-06-28 | **m0c shipped (decouple).** Removed the internal `stage_orders_from_approval` call + import from `update_approval_status`; chained explicit staging in the two callers (`cli.py approve`, `dashboard/phase4_data.py` demo) and reworked `test_phase4.py` (`test_approval_decoupled_then_stage_dispatched` chains `orders.stage` via dispatch; `test_order_state_machine` stages explicitly). Gate test (`test_oms_gate_blocks_unapproved_staging`) unchanged + green. Side benefit: broke the `approval.service → oms.service` import edge. 215 pass, ruff + mypy clean. |
 | 2026-06-28 | **m0d shipped.** `observability.py` (plane-free in-process event + subscriber-failure log); `emit_event`/`record_exception_panel` write it. `run_daily_refresh` routes `ingest.run` + `ledger.reconcile` through `dispatch_message` (one `correlation_id` = run_id) and emits `ingest.completed`/`break.opened`; `update_order_status` emits `order.filled`. Phase-2 dashboard gained an Event-stream + subscriber-failures panel. `tests/test_messaging_events.py` (3: emit records to log, subscriber failure recorded+isolated, daily_refresh emits traced events). No import cycle. 218 pass, ruff + mypy clean. |
+| 2026-06-28 | **m1 shipped — protocol complete.** Pure `evaluate_tax_scenario`/`TaxScenarioResult`; `tax.scenario` + `pm.advise` (composite EVALUATE) handlers; `AdviceBundle`. `correlation_id` threaded into `DispatchContext` by dispatch. Fixes: `create_approval_request` flush; `optimizer.persist` `queue_approval=False`. `tests/test_messaging_coordinator.py` (2: pm.advise purity via poisoned session + correlation propagation via spy override; full `ledger.positions → … → orders.stage → order.filled` rebalance loop through dispatch). 220 pass, ruff + mypy clean. **Ship gate met.** |

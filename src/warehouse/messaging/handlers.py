@@ -10,6 +10,9 @@ Composition roots (dashboard server, workflows, CLI, tests) must
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
+
+from pydantic import BaseModel
 
 from warehouse.data.ingest.runner import IngestRunSummary, run_custodian_ingest
 from warehouse.data.ledger.views import list_lot_positions
@@ -29,11 +32,16 @@ from warehouse.decision.optimizer.runner import (
     OptimizationRunView,
     persist_optimization,
 )
+from warehouse.decision.tax.scenarios import (
+    TaxScenarioResult,
+    evaluate_tax_scenario,
+)
 from warehouse.execution.oms.service import stage_orders_from_approval
 from warehouse.execution.reconciliation.service import reconcile_ingest
-from warehouse.messaging.core import register
-from warehouse.messaging.models import DispatchContext, Kind
+from warehouse.messaging.core import dispatch_message, register
+from warehouse.messaging.models import DispatchContext, Kind, Message
 from warehouse.messaging.payloads import (
+    AdviceBundle,
     ApprovalCreatePayload,
     ApprovalDecidePayload,
     IngestRunPayload,
@@ -41,12 +49,14 @@ from warehouse.messaging.payloads import (
     OptimizePayload,
     OptimizerPersistPayload,
     OrdersStagePayload,
+    PmAdvisePayload,
     PolicyCheckPayload,
     PositionSet,
     ReconcilePayload,
     ReconcileResult,
     RiskEvaluatePayload,
     StagedOrders,
+    TaxScenarioPayload,
     TradeValidatePayload,
     TradeValidation,
 )
@@ -92,6 +102,62 @@ def _trade_validate(
     return TradeValidation(allowed=allowed, binding=binding)
 
 
+def _tax_scenario(
+    ctx: DispatchContext, p: TaxScenarioPayload
+) -> TaxScenarioResult:
+    return evaluate_tax_scenario(p.positions, p.overlays)
+
+
+# --- EVALUATE composite — the Portfolio Manager tier (§4.1) ------------------
+
+
+def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
+    """Pure advisory fan-out: nest-dispatch EVALUATE ops with the same trace.
+
+    Mutates nothing — never touches ``ctx.session`` (each child is pure).
+    """
+    cid = ctx.correlation_id
+
+    def _eval(op: str, payload: BaseModel) -> BaseModel:
+        return dispatch_message(
+            ctx,
+            Message(
+                op=op,
+                kind=Kind.EVALUATE,
+                payload=payload,
+                correlation_id=cid,
+                household_id=p.household_id,
+            ),
+        )
+
+    risk = _eval(
+        "risk.evaluate",
+        RiskEvaluatePayload(request=p.request, manifest=p.manifest),
+    )
+    drift = _eval(
+        "policy.check",
+        PolicyCheckPayload(
+            household_id=p.household_id, positions=p.positions, ips=p.ips
+        ),
+    )
+    proposal = _eval(
+        "optimizer.propose",
+        OptimizePayload(
+            household_id=p.household_id, positions=p.positions, ips=p.ips
+        ),
+    )
+    tax = _eval(
+        "tax.scenario",
+        TaxScenarioPayload(positions=p.positions, overlays=p.tax_overlays),
+    )
+    return AdviceBundle(
+        risk=cast(RiskResult, risk),
+        proposal=cast(OptimizationResult, proposal),
+        tax=cast(TaxScenarioResult, tax),
+        drift=cast(IpsDriftReport, drift),
+    )
+
+
 # --- COMMAND (gated + audited; uses ctx.session + ctx.actor_id) -------------
 
 
@@ -123,11 +189,14 @@ def _ledger_reconcile(
 def _optimizer_persist(
     ctx: DispatchContext, p: OptimizerPersistPayload
 ) -> OptimizationRunView:
+    # queue_approval=False: persisting is just persisting. The approval is a
+    # separate `approval.create` op (no fused persist+queue — S2).
     return persist_optimization(
         ctx.session,
         p.result,
         input_snapshot_id=p.input_snapshot_id,
         actor_id=ctx.actor_id,
+        queue_approval=False,
     )
 
 
@@ -182,6 +251,8 @@ register(
     _trade_validate,
     Kind.EVALUATE,
 )
+register("tax.scenario", TaxScenarioPayload, _tax_scenario, Kind.EVALUATE)
+register("pm.advise", PmAdvisePayload, _pm_advise, Kind.EVALUATE)
 register("ingest.run", IngestRunPayload, _ingest_run, Kind.COMMAND)
 register(
     "ledger.reconcile",

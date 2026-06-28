@@ -49,6 +49,9 @@ def create_approval_request(
         household_id=household_id,
         details={"optimization_run_id": optimization_run_id},
     )
+    # Flush so the request is queryable within the same transaction (a chained
+    # caller may approval.decide it immediately) — matches stage_orders flush.
+    session.flush()
     return ApprovalRequestView(
         request_id=request_id,
         optimization_run_id=optimization_run_id,

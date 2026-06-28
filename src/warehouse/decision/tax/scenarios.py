@@ -33,6 +33,37 @@ class TaxScenarioRunView(BaseModel):
     created_at: datetime
 
 
+class TaxScenarioResult(BaseModel):
+    """Session-less after-tax scenario — baseline vs overlay + delta."""
+
+    overlays: TaxScenarioOverlays
+    baseline_tax: Decimal
+    scenario_tax: Decimal
+    tax_delta: Decimal
+
+
+def evaluate_tax_scenario(
+    positions: list[LotPositionView],
+    overlays: TaxScenarioOverlays | None = None,
+    *,
+    settings: Settings | None = None,
+) -> TaxScenarioResult:
+    """Pure after-tax comparison (Tax Analyst: after-tax NPV is the only
+    relevant basis) — no session, no persistence. ``run_tax_scenario`` wraps
+    this and persists for the dashboard/CLI.
+    """
+    cfg = settings or get_settings()
+    policy = overlays or TaxScenarioOverlays()
+    baseline = _baseline_tax(positions, cfg)
+    scenario = _scenario_tax(positions, cfg, policy)
+    return TaxScenarioResult(
+        overlays=policy,
+        baseline_tax=baseline,
+        scenario_tax=scenario,
+        tax_delta=scenario - baseline,
+    )
+
+
 def _baseline_tax(
     positions: list[LotPositionView], settings: Settings
 ) -> Decimal:

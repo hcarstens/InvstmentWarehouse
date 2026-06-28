@@ -56,6 +56,9 @@ class DispatchContext:
     session: Session
     actor_id: str = "system:messaging"
     settings: Settings | None = None  # resolved by handler/dispatch if None
+    # Set by dispatch to the message's correlation_id so a coordinator can
+    # thread the same trace into nested dispatch (contract §4.1).
+    correlation_id: str = ""
 
 
 # --- EVENT payloads (plane-free — primitive fields only, no cycle with the

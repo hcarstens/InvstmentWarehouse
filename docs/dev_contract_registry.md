@@ -36,7 +36,7 @@ decision (contract §8-style tables) without an explicit **contract amendment** 
 | `hnw_synthetic` | Research (synthetic) | [research/hnw_portfolios.md](research/hnw_portfolios.md) · risk plan §HNW | `RISK_BUILD_DELIVERABLES` |
 | `synthetic_ips` | Decision + synthetic | [research/synthetic_ips.md](research/synthetic_ips.md) · [synthetic_ips_implementation.md](synthetic_ips_implementation.md) | *Add rows when si0a starts* |
 | `decision_plane` | Decision | Phase 3 panels · `decision/` package | `TODO.md` Phase 3 ✓ |
-| `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | *Add rows when m0a starts* |
+| `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | m0a–m1 **shipped** (plan iteration log) |
 
 ### Track dependency DAG (current)
 
@@ -50,11 +50,11 @@ risk_contract v0a–v0c          [shipped]
                            ├─ si3 [shipped — workflow smokes]
                            └─ si4 [planned — dashboard + DB seed]
 
-messaging m0a (core, plane-free)   [proposed — independent of plane work]
-  └─ m0b (handlers + payloads)     [proposed — wraps risk.evaluate etc.]
-       ├─ m0c (decouple ⚠)         [proposed — touches decision approval/staging]
-       └─ m0d (daily_refresh + events) [proposed — touches workflows + phase-2 dashboard]
-            └─ m1 (pm.advise + tax.scenario) [proposed]
+messaging m0a (core, plane-free)   [shipped]
+  └─ m0b (handlers + payloads)     [shipped]
+       ├─ m0c (decouple ⚠)         [shipped — approval/staging decoupled]
+       └─ m0d (daily_refresh + events) [shipped — phase-2 event panel]
+            └─ m1 (pm.advise + tax.scenario) [shipped — protocol complete]
 ```
 
 `messaging` is a new root — m0a depends on no other track; m0c/m0d/m1 touch the decision,

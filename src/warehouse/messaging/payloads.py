@@ -12,10 +12,19 @@ from pydantic import BaseModel
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.ips import InvestmentPolicyStatement
+from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.optimizer import OptimizationResult
+from warehouse.decision.tax.scenarios import (
+    TaxScenarioOverlays,
+    TaxScenarioResult,
+)
 from warehouse.execution.oms.service import StagedOrderView
 from warehouse.execution.reconciliation.service import ReconciliationBreak
-from warehouse.research.risk.models import AssetPortfolio, RiskRequest
+from warehouse.research.risk.models import (
+    AssetPortfolio,
+    RiskRequest,
+    RiskResult,
+)
 
 # --- request payloads -------------------------------------------------------
 
@@ -77,6 +86,22 @@ class OrdersStagePayload(BaseModel):
     approval_request_id: str
 
 
+class TaxScenarioPayload(BaseModel):
+    positions: list[LotPositionView]
+    overlays: TaxScenarioOverlays = TaxScenarioOverlays()
+
+
+class PmAdvisePayload(BaseModel):
+    """Portfolio-Manager working set — the (P, IPS) artifact, sliced per op."""
+
+    household_id: str
+    positions: list[LotPositionView]
+    ips: InvestmentPolicyStatement
+    manifest: AssetPortfolio
+    request: RiskRequest
+    tax_overlays: TaxScenarioOverlays = TaxScenarioOverlays()
+
+
 # --- result wrappers (boundary returns must be BaseModel) -------------------
 
 
@@ -95,3 +120,12 @@ class ReconcileResult(BaseModel):
 
 class StagedOrders(BaseModel):
     orders: list[StagedOrderView]
+
+
+class AdviceBundle(BaseModel):
+    """Portfolio-Manager advisory output — mutates nothing (§4.1)."""
+
+    risk: RiskResult
+    proposal: OptimizationResult
+    tax: TaxScenarioResult
+    drift: IpsDriftReport

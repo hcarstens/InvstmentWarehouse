@@ -8,6 +8,7 @@ reporting). Plane wrappers register from ``warehouse.messaging.handlers``
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import structlog
@@ -60,6 +61,9 @@ def dispatch_message(ctx: DispatchContext, msg: Message) -> BaseModel:
             f"{msg.op}: payload is {type(msg.payload).__name__}, "
             f"expected {payload_type.__name__}"
         )
+    # Thread the trace into ctx so a coordinator can propagate it to nested
+    # dispatch with the same correlation_id (contract §4.1).
+    ctx = replace(ctx, correlation_id=msg.correlation_id)
     try:
         return handler(ctx, msg.payload)
     except Exception as err:
