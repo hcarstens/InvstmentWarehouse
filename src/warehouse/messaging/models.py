@@ -23,10 +23,10 @@ PROTOCOL_VERSION = "0"
 class Kind(StrEnum):
     """The request taxonomy — every message is exactly one kind (§2)."""
 
-    QUERY = "query"        # read stored state         — pure, no mutation
+    QUERY = "query"  # read stored state         — pure, no mutation
     EVALUATE = "evaluate"  # compute over passed input — pure, no mutation
-    COMMAND = "command"    # change state              — gated + audited
-    EVENT = "event"        # notify of a past change   — fire-and-forget
+    COMMAND = "command"  # change state              — gated + audited
+    EVENT = "event"  # notify of a past change   — fire-and-forget
 
 
 class Message(BaseModel):
@@ -34,10 +34,10 @@ class Message(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    op: str                          # routes to exactly one handler
+    op: str  # routes to exactly one handler
     kind: Kind
-    payload: BaseModel               # the typed request body (the contract)
-    correlation_id: str              # caller-generated — trace one workflow
+    payload: BaseModel  # the typed request body (the contract)
+    correlation_id: str  # caller-generated — trace one workflow
     household_id: str | None = None  # the scoping key threaded everywhere
     # Self-stamped identity (contract §3):
     message_id: str = Field(default_factory=lambda: uuid4().hex)

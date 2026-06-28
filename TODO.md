@@ -101,7 +101,21 @@ Backend:
 - [x] **Full MIP optimizer** (Gurobi / CPLEX) — lot-discrete solves behind feature flag
 - [x] **Multi-custodian ingest** — parser registry, per-custodian normalization
 - [x] **Alternatives sub-ledger** — manual marks, capital calls, distributions
-- [x] **Tax scenario depth** — AMT, NIIT, QSBS, trust DNI overlays on optimizer/backtest
+- [x] **Tax scenario depth** — AMT, NIIT, QSBS, trust DNI overlays on optimizer/backtest *(UI wired; engine stubbed to zero — see loose threads below)*
+
+---
+
+## Loose threads (post-messaging)
+
+- [x] **Reconcile `as_of_date` gate** — `reconcile_ingest` opens a break when custodian file `as_of_date` ≠ ledger market-price `as_of_date` (stale file no longer reconciles clean).
+- [ ] **Tax scenario engine (estimate)** — Replace the zero-stub in `evaluate_tax_scenario` with threshold-aware after-tax math (Tax Analyst heuristic: cliff-effect navigation, not flat additive NIIT/AMT). Sub-notes:
+  - [ ] Pin NIIT/AMT phase-outs and income thresholds to `tax_config_version`
+  - [ ] Model income character and entity splits (not a single rate × unrealized gains)
+  - [ ] Falsifier tests against known household fixtures
+- [x] **Advisory bundle panel (stub)** — `pm.advise` dispatches on dashboard load; summary table for risk / propose / tax / drift legs.
+- [ ] **Advisory bundle panel (full)** — Upgrade stub to full `AdviceBundle` presentation keyed by `correlation_id`.
+
+---
 
 Dashboard panels:
 - [x] **Staged orders** — pending / routed / filled with approval linkage

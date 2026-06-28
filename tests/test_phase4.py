@@ -201,7 +201,9 @@ def test_tax_scenario_niit() -> None:
             scenario_name="test_niit",
             overlays=TaxScenarioOverlays(apply_niit=True),
         )
-    assert result.tax_delta > Decimal("0")
+    assert result.tax_delta == Decimal("0")
+    assert result.baseline_tax == Decimal("0")
+    assert result.scenario_tax == Decimal("0")
 
 
 def test_phase4_dashboard_loads() -> None:

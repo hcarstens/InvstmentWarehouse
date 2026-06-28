@@ -135,9 +135,7 @@ def test_rebalance_loop_through_dispatch(seeded: None) -> None:
         run_view = call(
             "optimizer.persist",
             Kind.COMMAND,
-            OptimizerPersistPayload(
-                result=proposal, input_snapshot_id="snap"
-            ),
+            OptimizerPersistPayload(result=proposal, input_snapshot_id="snap"),
         )
         appr = call(
             "approval.create",

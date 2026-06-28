@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
+
+from collections.abc import Sequence
 
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -15,6 +17,7 @@ from warehouse.infra.db.models import (
     CustodianPositionRow,
     EntityRelationshipRow,
     LotRow,
+    MarketPriceRow,
     ReconciliationBreakRow,
     SecurityRow,
 )
@@ -44,6 +47,117 @@ def _ledger_quantities(session: Session) -> dict[tuple[str, str], Decimal]:
     }
 
 
+def _ledger_as_of_date(session: Session) -> date | None:
+    dates = session.scalars(select(MarketPriceRow.as_of_date)).all()
+    return max(dates) if dates else None
+
+
+def _as_of_date_breaks(
+    session: Session,
+    ingest_run_id: str,
+    custodian_rows: Sequence[CustodianPositionRow],
+    *,
+    actor_id: str,
+    household_id: str | None,
+) -> list[ReconciliationBreak]:
+    """Open breaks when custodian file as_of_date does not match the ledger."""
+    if not custodian_rows:
+        return []
+
+    breaks: list[ReconciliationBreak] = []
+    custodian_dates = {row.as_of_date for row in custodian_rows}
+    ledger_as_of = _ledger_as_of_date(session)
+
+    if len(custodian_dates) > 1:
+        description = (
+            "mixed as_of_date in ingest: "
+            f"{sorted(d.isoformat() for d in custodian_dates)}"
+        )
+        breaks.append(
+            _open_break(
+                session,
+                ingest_run_id=ingest_run_id,
+                account_id=custodian_rows[0].account_id,
+                security_id=None,
+                description=description,
+                actor_id=actor_id,
+                household_id=household_id,
+            )
+        )
+        return breaks
+
+    custodian_as_of = next(iter(custodian_dates))
+    if ledger_as_of is None:
+        description = (
+            "ledger has no market-price as_of_date; "
+            f"custodian={custodian_as_of}"
+        )
+    elif custodian_as_of != ledger_as_of:
+        description = (
+            f"stale custodian file: custodian as_of={custodian_as_of}, "
+            f"ledger as_of={ledger_as_of}"
+        )
+    else:
+        return breaks
+
+    breaks.append(
+        _open_break(
+            session,
+            ingest_run_id=ingest_run_id,
+            account_id=custodian_rows[0].account_id,
+            security_id=None,
+            description=description,
+            actor_id=actor_id,
+            household_id=household_id,
+        )
+    )
+    return breaks
+
+
+def _open_break(
+    session: Session,
+    *,
+    ingest_run_id: str,
+    account_id: str,
+    security_id: str | None,
+    description: str,
+    actor_id: str,
+    household_id: str | None,
+) -> ReconciliationBreak:
+    break_id = f"break_{uuid4().hex[:12]}"
+    opened = datetime.now(UTC)
+    session.add(
+        ReconciliationBreakRow(
+            break_id=break_id,
+            ingest_run_id=ingest_run_id,
+            account_id=account_id,
+            security_id=security_id,
+            description=description,
+            opened_at=opened,
+            resolved=False,
+        )
+    )
+    write_audit(
+        session,
+        actor_id=actor_id,
+        action="recon_break_opened",
+        resource_type="reconciliation_break",
+        resource_id=break_id,
+        household_id=household_id,
+        details={"ingest_run_id": ingest_run_id, "description": description},
+    )
+    return ReconciliationBreak(
+        break_id=break_id,
+        ingest_run_id=ingest_run_id,
+        account_id=account_id,
+        security_id=security_id,
+        description=description,
+        opened_at=opened,
+        resolved_at=None,
+        resolved=False,
+    )
+
+
 def _accounts_for_custodian(session: Session, custodian_id: str) -> set[str]:
     rows = session.scalars(
         select(EntityRelationshipRow.source_id).where(
@@ -67,6 +181,8 @@ def reconcile_ingest(
     ingest_run = session.get(IngestRunRow, ingest_run_id)
     if ingest_run is None:
         raise ValueError(f"Ingest run not found: {ingest_run_id}")
+    # autoflush=False — ensure ingest rows from the same txn are visible
+    session.flush()
     custodian_accounts = _accounts_for_custodian(
         session, ingest_run.custodian_id
     )
@@ -77,7 +193,13 @@ def reconcile_ingest(
         )
     ).all()
     ledger = _ledger_quantities(session)
-    breaks: list[ReconciliationBreak] = []
+    breaks = _as_of_date_breaks(
+        session,
+        ingest_run_id,
+        custodian_rows,
+        actor_id=actor_id,
+        household_id=household_id,
+    )
     seen: set[tuple[str, str]] = set()
 
     for row in custodian_rows:
@@ -90,45 +212,19 @@ def reconcile_ingest(
                     SecurityRow.security_id == row.security_id
                 )
             )
-            break_id = f"break_{uuid4().hex[:12]}"
             sid = ticker or row.security_id
             description = (
                 f"{sid}: custodian={row.quantity}, ledger={ledger_qty}"
             )
-            opened = datetime.now(UTC)
-            session.add(
-                ReconciliationBreakRow(
-                    break_id=break_id,
-                    ingest_run_id=ingest_run_id,
-                    account_id=row.account_id,
-                    security_id=row.security_id,
-                    description=description,
-                    opened_at=opened,
-                    resolved=False,
-                )
-            )
-            write_audit(
-                session,
-                actor_id=actor_id,
-                action="recon_break_opened",
-                resource_type="reconciliation_break",
-                resource_id=break_id,
-                household_id=household_id,
-                details={
-                    "ingest_run_id": ingest_run_id,
-                    "description": description,
-                },
-            )
             breaks.append(
-                ReconciliationBreak(
-                    break_id=break_id,
+                _open_break(
+                    session,
                     ingest_run_id=ingest_run_id,
                     account_id=row.account_id,
                     security_id=row.security_id,
                     description=description,
-                    opened_at=opened,
-                    resolved_at=None,
-                    resolved=False,
+                    actor_id=actor_id,
+                    household_id=household_id,
                 )
             )
 
@@ -144,32 +240,18 @@ def reconcile_ingest(
                 SecurityRow.security_id == security_id
             )
         )
-        break_id = f"break_{uuid4().hex[:12]}"
         description = (
             f"{ticker or security_id}: custodian=0, ledger={ledger_qty}"
         )
-        opened = datetime.now(UTC)
-        session.add(
-            ReconciliationBreakRow(
-                break_id=break_id,
-                ingest_run_id=ingest_run_id,
-                account_id=account_id,
-                security_id=security_id,
-                description=description,
-                opened_at=opened,
-                resolved=False,
-            )
-        )
         breaks.append(
-            ReconciliationBreak(
-                break_id=break_id,
+            _open_break(
+                session,
                 ingest_run_id=ingest_run_id,
                 account_id=account_id,
                 security_id=security_id,
                 description=description,
-                opened_at=opened,
-                resolved_at=None,
-                resolved=False,
+                actor_id=actor_id,
+                household_id=household_id,
             )
         )
 

@@ -10,10 +10,12 @@ from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 from warehouse.config import repo_root
+from warehouse.dashboard.advisory_data import load_advisory_dashboard
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
 from warehouse.dashboard.phase4_data import load_phase4_dashboard
+from warehouse.dashboard.render_advisory import render_advisory_section
 from warehouse.dashboard.render_phase2 import render_phase2_sections
 from warehouse.dashboard.render_phase3 import render_phase3_sections
 from warehouse.dashboard.render_phase4 import render_phase4_sections
@@ -96,6 +98,7 @@ def render_html(
     risk = load_risk_dashboard(household_id=phase2.household_id)
     phase3 = load_phase3_dashboard()
     phase4 = load_phase4_dashboard(custodian_id=custodian_id)
+    advisory = load_advisory_dashboard(household_id=phase2.household_id)
     phase_rows = "".join(
         f"<tr><td>Phase {p.number}</td><td>{html.escape(p.name)}</td>"
         f"<td>{_badge(p.status, _phase_kind(p.status))}</td>"
@@ -171,6 +174,7 @@ def render_html(
     )
     phase3_html = render_phase3_sections(phase3)
     phase4_html = render_phase4_sections(phase4)
+    advisory_html = render_advisory_section(advisory)
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -262,6 +266,8 @@ def render_html(
 {phase2_html}
 
 {phase3_html}
+
+{advisory_html}
 
 {phase4_html}
 

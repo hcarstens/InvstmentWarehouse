@@ -161,9 +161,7 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
 # --- COMMAND (gated + audited; uses ctx.session + ctx.actor_id) -------------
 
 
-def _ingest_run(
-    ctx: DispatchContext, p: IngestRunPayload
-) -> IngestRunSummary:
+def _ingest_run(ctx: DispatchContext, p: IngestRunPayload) -> IngestRunSummary:
     return run_custodian_ingest(
         ctx.session,
         Path(p.path),
@@ -219,9 +217,7 @@ def _approval_decide(
     )
 
 
-def _orders_stage(
-    ctx: DispatchContext, p: OrdersStagePayload
-) -> StagedOrders:
+def _orders_stage(ctx: DispatchContext, p: OrdersStagePayload) -> StagedOrders:
     return StagedOrders(
         orders=stage_orders_from_approval(
             ctx.session, p.approval_request_id, actor_id=ctx.actor_id

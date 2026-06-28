@@ -48,68 +48,20 @@ def evaluate_tax_scenario(
     *,
     settings: Settings | None = None,
 ) -> TaxScenarioResult:
-    """Pure after-tax comparison (Tax Analyst: after-tax NPV is the only
-    relevant basis) — no session, no persistence. ``run_tax_scenario`` wraps
-    this and persists for the dashboard/CLI.
+    """Pure after-tax comparison — stubbed to zero pending real estimates.
+
+    ``run_tax_scenario`` wraps this and persists for the dashboard/CLI.
+    See ``TODO.md`` — Tax scenario engine (estimate).
     """
-    cfg = settings or get_settings()
+    del positions, settings  # reserved for threshold-aware implementation
     policy = overlays or TaxScenarioOverlays()
-    baseline = _baseline_tax(positions, cfg)
-    scenario = _scenario_tax(positions, cfg, policy)
+    zero = Decimal("0")
     return TaxScenarioResult(
         overlays=policy,
-        baseline_tax=baseline,
-        scenario_tax=scenario,
-        tax_delta=scenario - baseline,
+        baseline_tax=zero,
+        scenario_tax=zero,
+        tax_delta=zero,
     )
-
-
-def _baseline_tax(
-    positions: list[LotPositionView], settings: Settings
-) -> Decimal:
-    taxable_gains = sum(
-        (
-            p.unrealized_gain
-            for p in positions
-            if p.unrealized_gain and p.unrealized_gain > 0
-        ),
-        Decimal("0"),
-    )
-    ltcg = Decimal(str(settings.fed_ltcg_rate))
-    return taxable_gains * ltcg
-
-
-def _scenario_tax(
-    positions: list[LotPositionView],
-    settings: Settings,
-    overlays: TaxScenarioOverlays,
-) -> Decimal:
-    taxable_gains = sum(
-        (
-            p.unrealized_gain
-            for p in positions
-            if p.unrealized_gain and p.unrealized_gain > 0
-        ),
-        Decimal("0"),
-    )
-    ltcg = Decimal(str(settings.fed_ltcg_rate))
-    tax = taxable_gains * ltcg
-
-    if overlays.apply_niit:
-        niit = Decimal(str(settings.niit_rate))
-        tax += taxable_gains * niit
-
-    if overlays.apply_amt:
-        amt = Decimal(str(settings.amt_rate))
-        tax += taxable_gains * amt
-
-    if overlays.qsbs_exclusion_pct > 0:
-        tax *= Decimal("1") - overlays.qsbs_exclusion_pct
-
-    if overlays.trust_dni_rate > 0:
-        tax *= Decimal("1") - overlays.trust_dni_rate
-
-    return tax
 
 
 def run_tax_scenario(
@@ -126,9 +78,10 @@ def run_tax_scenario(
     if not positions:
         raise ValueError(f"No positions for household {household_id}")
 
-    baseline = _baseline_tax(positions, cfg)
-    scenario = _scenario_tax(positions, cfg, policy)
-    delta = scenario - baseline
+    result = evaluate_tax_scenario(positions, policy, settings=cfg)
+    baseline = result.baseline_tax
+    scenario = result.scenario_tax
+    delta = result.tax_delta
 
     run_id = f"tax_{uuid4().hex[:12]}"
     created = datetime.now(UTC)

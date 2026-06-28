@@ -53,6 +53,32 @@ def test_daily_refresh_reconciles_clean(custodian_file: Path) -> None:
     assert result.status == "success"
 
 
+def test_reconcile_stale_as_of_date_opens_break(tmp_path: Path) -> None:
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.execution.reconciliation.service import reconcile_ingest
+
+    bootstrap_database(seed=True)
+    stale = tmp_path / "stale_positions.csv"
+    stale.write_text(
+        "account_id,ticker,quantity,as_of_date\n"
+        "acct_taxable,VTI,550,2024-01-01\n"
+        "acct_taxable,AAPL,100,2024-01-01\n"
+        "acct_ira,BND,300,2024-01-01\n"
+    )
+    with session_scope() as session:
+        ingest = run_custodian_ingest(
+            session,
+            stale,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+        breaks = reconcile_ingest(
+            session,
+            ingest.run_id,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+    assert any("stale custodian file" in b.description for b in breaks)
+
+
 def test_phase2_dashboard_loads() -> None:
     data = load_phase2_dashboard()
     assert data.error is None

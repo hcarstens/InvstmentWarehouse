@@ -105,9 +105,7 @@ def test_handler_error_carries_context(ctx: DispatchContext) -> None:
 
     register("t.boom", _Ping, _boom, Kind.COMMAND)
     with pytest.raises(ValueError) as exc:
-        dispatch_message(
-            ctx, _msg("t.boom", _Ping(), household_id="hh_1")
-        )
+        dispatch_message(ctx, _msg("t.boom", _Ping(), household_id="hh_1"))
     notes = " ".join(getattr(exc.value, "__notes__", []))
     assert "op=t.boom" in notes
     assert "correlation_id=corr-1" in notes

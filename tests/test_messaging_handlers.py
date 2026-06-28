@@ -217,8 +217,6 @@ def test_orders_stage_gate_via_dispatch(seeded: None) -> None:
                 _msg(
                     "orders.stage",
                     Kind.COMMAND,
-                    OrdersStagePayload(
-                        approval_request_id=pending.request_id
-                    ),
+                    OrdersStagePayload(approval_request_id=pending.request_id),
                 ),
             )

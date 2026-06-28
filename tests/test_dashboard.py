@@ -32,3 +32,5 @@ def test_render_html_contains_key_sections() -> None:
     assert "Workflow catalog" in html
     assert "after-tax wealth" in html
     assert "Synthetic IPS binding matrix" in html
+    assert "Advisory bundle" in html
+    assert "pm.advise" in html
