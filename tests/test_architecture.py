@@ -1,6 +1,7 @@
 """Architecture and domain model smoke tests."""
 
 from decimal import Decimal
+from pathlib import Path
 
 from warehouse.data.security_master import AssetClass, TaxCharacter
 from warehouse.models.entities import (
@@ -63,3 +64,19 @@ def test_security_master_tax_attributes(sample_security) -> None:
 def test_lot_ledger_holding_period(sample_lot) -> None:
     assert sample_lot.quantity == Decimal("100")
     assert sample_lot.cost_basis_per_share == Decimal("220.50")
+
+
+def test_messaging_core_is_plane_free() -> None:
+    """Messaging core must import no plane (contract §4; impl plan §1)."""
+    import warehouse.messaging.core as core
+
+    src = Path(core.__file__).read_text()
+    forbidden = [
+        "warehouse.data",
+        "warehouse.decision",
+        "warehouse.execution",
+        "warehouse.research",
+        "warehouse.reporting",
+    ]
+    hits = [mod for mod in forbidden if mod in src]
+    assert not hits, f"messaging.core must be plane-free, found: {hits}"

@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import Settings
+from warehouse.messaging.models import DispatchContext, Kind, Message
 from warehouse.models.events import Event, EventType
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
@@ -28,7 +29,9 @@ from warehouse.research.risk.models import (
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
     BacktestResult,
+    DispatchContext,
     Event,
+    Message,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -56,6 +59,17 @@ def _sample_instance(cls: type[Any]) -> Any:
         )
     if cls is Settings:
         return Settings()
+    if cls is Message:
+        return Message(
+            op="messaging.ping",
+            kind=Kind.QUERY,
+            payload=RiskHorizon(years=Decimal("5")),
+            correlation_id="corr_test",
+        )
+    if cls is DispatchContext:
+        # Frozen dataclass — no runtime type check; a real Session is not
+        # needed to prove setattr is rejected.
+        return DispatchContext(session=None)  # type: ignore[arg-type]
     if cls is RiskResult:
         portfolio = AssetPortfolio(
             allocations=[
@@ -101,6 +115,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "deltas"
     if isinstance(instance, RiskDeltas):
         return "overlay_label"
+    if isinstance(instance, Message):
+        return "op"
+    if isinstance(instance, DispatchContext):
+        return "actor_id"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

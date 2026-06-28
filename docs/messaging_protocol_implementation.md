@@ -1,6 +1,6 @@
 # Messaging Protocol — Implementation Plan
 
-**Status:** m0 proposed — not started
+**Status:** m0a shipped; m0b–m1 pending
 **Date:** 2026-06-28
 **Owner:** platform / orchestrator
 **Inputs:** [`messaging_protocol.md`](messaging_protocol.md) (contract — wins on conflict),
@@ -70,7 +70,7 @@ Do **not** put plane imports in `core.py` (the analog of "no `warehouse.data` in
 Acceptance is by **downstream behavior** (a workflow routes through dispatch; the gate still
 raises), not by "the module looks done."
 
-### m0a — core + registry *(~1 PR)*
+### m0a — core + registry *(~1 PR)* — ✅ shipped
 
 **Goal:** the plane-free dispatch substrate; no handlers yet.
 
@@ -289,3 +289,4 @@ Critical path: **m0a → m0b → m0d**; m0c can overlap after m0b; m1 last.
 | Date | Note |
 | --- | --- |
 | 2026-06-28 | Initial plan from `messaging_protocol.md` (decisions closed §10). Five slices m0a–m1; grounded against `run_daily_refresh`, `infra/notify` collision, phase-2 exception panel, `FROZEN_TYPES`, `dev_contract_registry`. Self-review §8 appended before publish. |
+| 2026-06-28 | **m0a shipped.** `warehouse/messaging/{models,core}.py` (plane-free), `__init__` public surface; `Message`/`DispatchContext` frozen + registered. `tests/test_messaging_core.py` (9 tests: unknown-op KeyError, payload-mismatch TypeError, payload type preserved, `add_note` context, event isolation, dup-register, message_id stamp); `test_architecture.py` plane-free assertion. 207 pass, ruff + mypy strict clean. |
