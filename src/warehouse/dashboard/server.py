@@ -11,11 +11,13 @@ from urllib.parse import parse_qs, urlparse
 
 from warehouse.config import repo_root
 from warehouse.dashboard.advisory_data import load_advisory_dashboard
+from warehouse.dashboard.analyst_data import load_kill_criteria_dashboard
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
 from warehouse.dashboard.phase4_data import load_phase4_dashboard
 from warehouse.dashboard.render_advisory import render_advisory_section
+from warehouse.dashboard.render_analyst import render_analyst_section
 from warehouse.dashboard.render_orchestrator import render_orchestrator_section
 from warehouse.dashboard.render_phase2 import render_phase2_sections
 from warehouse.dashboard.render_phase3 import render_phase3_sections
@@ -176,6 +178,7 @@ def render_html(
     phase3_html = render_phase3_sections(phase3)
     phase4_html = render_phase4_sections(phase4)
     advisory_html = render_advisory_section(advisory)
+    analyst_html = render_analyst_section(load_kill_criteria_dashboard())
     orchestrator_html = render_orchestrator_section(advisory.in_flight)
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -270,6 +273,7 @@ def render_html(
 {phase3_html}
 
 {advisory_html}
+{analyst_html}
 {orchestrator_html}
 
 {phase4_html}

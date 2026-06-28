@@ -127,8 +127,8 @@ Analyst leg is **live** today for drift + concentration (`policy.check`). The de
 the next build, and it feeds the genuinely hard downstream problem (optimization). Keep tax at
 `$0` throughout so the analyst → optimizer signal can be stress-tested on synthetic books.
 
-- [ ] **pa0 — attribution** — P&L residual vs benchmark / policy; explainable per-sleeve contribution (Portfolio Analyst heuristic: Goodhart vigilance, no faked scores).
-- [ ] **pa1 — kill criteria** — pre-committed exit rules per thesis; surface breaches as alerts (not autonomous sells).
+- [x] **pa0 — attribution** — P&L residual vs benchmark / policy; explainable per-sleeve contribution (Portfolio Analyst heuristic: Goodhart vigilance, no faked scores). Shipped: `attribution.evaluate`, residual decomposition, PM 5th leg, attribution residuals panel.
+- [x] **pa1 — kill criteria** — pre-committed exit rules per thesis; surface breaches as alerts (not autonomous sells). Shipped: `PositionThesis`/`KillCriteria`/`KillBreach`, `evaluate_kill_criteria` (pure, alerts-only), checkpoint-1 wiring, synthetic theses, kill-criteria watch panel.
 - [ ] **pa2 — non-performing-asset flags** — sustained drawdown vs cost, stale alt marks, missed capital calls, IPS liquidity breach (cross-ref open question #13).
 - [ ] **Unlocks → Portfolio Optimization v1** — multi-period, tax-aware, lot-discrete, IPS-constrained. The hard problem; only as good as the analyst signal feeding it.
 - [ ] **Review all portfolios** — Household-book review workflow (PM orchestrator): run across every household when material inputs change. Triggers and scope:

@@ -41,3 +41,6 @@ def test_render_html_contains_key_sections() -> None:
     # pa0: attribution residual panel (5th PM leg).
     assert "attribution.evaluate" in html
     assert "active return vs ex-ante class assumption" in html
+    # pa1: kill-criteria watch panel (alerts only, human gate).
+    assert "Kill-criteria watch" in html
+    assert "Alerts only" in html

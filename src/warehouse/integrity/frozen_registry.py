@@ -16,7 +16,11 @@ from warehouse.decision.analyst import (
     AnalystCheckpointScore,
     AnalystReview,
     AttributionReport,
+    KillBreach,
+    KillCriteria,
+    KillCriterion,
     PositionAttribution,
+    PositionThesis,
 )
 from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.optimizer import OptimizationResult
@@ -55,11 +59,14 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     BacktestResult,
     DispatchContext,
     Event,
+    KillBreach,
+    KillCriteria,
     Message,
     OrchestratorError,
     OrchestratorResponse,
     PmNarrative,
     PositionAttribution,
+    PositionThesis,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -198,6 +205,26 @@ def _sample_instance(cls: type[Any]) -> Any:
             details={"checkpoint_2": "test detail"},
             headline="test headline",
         )
+    if cls is KillCriteria:
+        return KillCriteria(max_drawdown_vs_cost=Decimal("-0.20"))
+    if cls is PositionThesis:
+        return PositionThesis(
+            account_id="acct_test",
+            instrument="AAPL",
+            mechanism="test thesis",
+            effective_date=date(2020, 1, 1),
+            kill_criteria=KillCriteria(max_drawdown_vs_cost=Decimal("-0.20")),
+            config_version="2026.06",
+        )
+    if cls is KillBreach:
+        return KillBreach(
+            account_id="acct_test",
+            instrument="AAPL",
+            criterion=KillCriterion.DRAWDOWN_VS_COST,
+            observed=Decimal("-0.25"),
+            threshold=Decimal("-0.20"),
+            detail="test breach",
+        )
     if cls is OrchestratorError:
         return OrchestratorError(
             correlation_id="corr_test",
@@ -225,6 +252,7 @@ def _sample_position_attribution() -> PositionAttribution:
         ticker="VTI",
         security_asset_class=SecurityAssetClass.ETF,
         risk_class=AssetClass.EQUITY,
+        liquidity_tier=1,
         holding_years=Decimal("2.45"),
         market_value=Decimal("100"),
         total_return=Decimal("0.10"),
@@ -258,6 +286,12 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "detail"
     if isinstance(instance, AnalystReview):
         return "headline"
+    if isinstance(instance, KillCriteria):
+        return "max_drawdown_vs_cost"
+    if isinstance(instance, PositionThesis):
+        return "mechanism"
+    if isinstance(instance, KillBreach):
+        return "detail"
     if isinstance(instance, OrchestratorError):
         return "message"
     if isinstance(instance, OrchestratorResponse):

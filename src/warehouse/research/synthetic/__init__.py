@@ -48,6 +48,10 @@ from warehouse.research.synthetic.stress_harness import (
     run_harness_cell,
     summarize_matrix,
 )
+from warehouse.research.synthetic.thesis_emit import (
+    emit_synthetic_theses,
+    synthetic_thesis_as_of,
+)
 from warehouse.research.synthetic.workflow_smoke import (
     WorkflowSmokeCheck,
     WorkflowSmokeResult,
@@ -75,6 +79,8 @@ __all__ = [
     "emit_hnw_fixture",
     "emit_ips_for_cohort",
     "emit_synthetic_household",
+    "emit_synthetic_theses",
+    "synthetic_thesis_as_of",
     "hnw_asset_spec",
     "iter_hnw_combinations",
     "load_asset_test_summary",

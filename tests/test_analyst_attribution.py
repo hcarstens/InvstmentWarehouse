@@ -187,8 +187,7 @@ def test_portfolio_active_is_market_value_weighted() -> None:
     report = _evaluate([big, small])
     total_mv = big.market_value + small.market_value
     expected = sum(
-        (p.market_value / total_mv) * p.active_return
-        for p in report.positions
+        (p.market_value / total_mv) * p.active_return for p in report.positions
     )
     assert abs(report.portfolio_active_return - expected) <= Decimal(
         "0.000001"

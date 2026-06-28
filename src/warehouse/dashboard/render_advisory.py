@@ -134,7 +134,7 @@ def render_advisory_section(advisory: AdvisoryDashboardData) -> str:
             <td>VaR 95 {bundle.risk.report.level_1_portfolio.parametric_var.value}</td></tr>
         <tr><td>attribution.evaluate</td>
             <td>{len(attribution.positions) if attribution else 0} positions ·
-                portfolio active {attribution.portfolio_active_return if attribution else '—'}</td></tr>
+                portfolio active {attribution.portfolio_active_return if attribution else "—"}</td></tr>
         <tr><td>optimizer.propose</td>
             <td>{trade_count} trades · tax delta {bundle.proposal.estimated_tax_delta}</td></tr>
         <tr><td>tax.scenario</td>

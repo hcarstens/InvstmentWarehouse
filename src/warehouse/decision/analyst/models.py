@@ -59,6 +59,7 @@ class PositionAttribution(BaseModel):
     ticker: str | None
     security_asset_class: SecurityAssetClass
     risk_class: RiskAssetClass
+    liquidity_tier: int  # carried so the report scores liquidity kills (pa1)
     holding_years: Decimal
     market_value: Decimal
     total_return: Decimal
@@ -84,6 +85,77 @@ class AttributionReport(BaseModel):
     positions: list[PositionAttribution]
     portfolio_active_return: Decimal
     limitations: list[str]
+
+
+class KillCriterion(StrEnum):
+    """The four pre-committed kill tests (pa1, §5).
+
+    Each is *advisory only* — a breach raises an alert to the advisor, never an
+    autonomous sell (CLAUDE.md human gate).
+    """
+
+    DRAWDOWN_VS_COST = "drawdown_vs_cost"
+    RESIDUAL_CAP = "residual_cap"
+    LIQUIDITY_FLOOR = "liquidity_floor"
+    HORIZON = "horizon"
+
+
+class KillCriteria(BaseModel):
+    """Pre-specified falsification thresholds for a thesis (axiom 2).
+
+    Every threshold is optional: only the criteria the advisor pre-committed
+    are evaluated — an unset limit is never fabricated. ``max_active_residual``
+    is only checked when an ``active_return`` is supplied (it needs the
+    attribution leg); a bare position cannot compute it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    # Breach if total_return ≤ this (a negative drawdown floor, e.g. −0.20).
+    max_drawdown_vs_cost: Decimal | None = None
+    # Breach if |active_return| ≥ this (a non-negative residual cap).
+    max_active_residual: Decimal | None = None
+    # Breach if liquidity_tier > this (1 = most liquid .. 5 = least).
+    min_liquidity_tier: int | None = None
+    # Breach if holding_years > this (the thesis horizon).
+    max_holding_years: Decimal | None = None
+
+
+class PositionThesis(BaseModel):
+    """Falsifiable, effective-dated thesis for an instrument-in-account (pa1).
+
+    ``effective_date`` is the pre-commitment date: the kill criteria must be
+    set on or before the position's ``acquisition_date`` (axiom 2 — no
+    hindsight); ``evaluate_kill_criteria`` raises if a thesis post-dates the
+    lot. Audit/replay-critical → frozen + version-pinned.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    account_id: str
+    instrument: str  # ticker (or security_id) — keyed account×instrument
+    mechanism: str  # why we hold it (the thesis, one causal hop)
+    effective_date: date  # pre-committed on/before acquisition_date
+    kill_criteria: KillCriteria
+    config_version: str
+
+
+class KillBreach(BaseModel):
+    """One tripped kill criterion — an ALERT, never a staged trade (pa1).
+
+    ``observed`` is the live figure, ``threshold`` the pre-committed limit.
+    Surfaced on the kill-criteria watch panel and flips checkpoint 1 to BREACH;
+    the advisor decides — the system never sells (CLAUDE.md).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    account_id: str
+    instrument: str
+    criterion: KillCriterion
+    observed: Decimal
+    threshold: Decimal
+    detail: str
 
 
 class AnalystCheckpoint(BaseModel):

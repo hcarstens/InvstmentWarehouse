@@ -149,6 +149,7 @@ def _attribute_one(
         ticker=pos.ticker,
         security_asset_class=pos.security_asset_class,
         risk_class=risk_class,
+        liquidity_tier=pos.liquidity_tier,
         holding_years=holding_years.quantize(_YEARS_QUANTUM),
         market_value=pos.market_value,
         total_return=total_return.quantize(_RETURN_QUANTUM),

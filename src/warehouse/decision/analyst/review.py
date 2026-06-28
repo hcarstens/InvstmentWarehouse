@@ -22,15 +22,34 @@ from warehouse.decision.analyst.models import (
     AnalystReview,
     AttributionReport,
     PositionAttribution,
+    PositionThesis,
+)
+from warehouse.decision.analyst.thesis import (
+    ThesisStore,
+    breaches_for_attribution,
 )
 
 _S = AnalystCheckpointScore
 
-_DETAILS: dict[str, str] = {
-    "checkpoint_1": (
-        "Thesis + kill criteria — no thesis store yet (pa1); "
+# Checkpoint-1 detail copy keyed by the score it resolved to (pa1). The thesis
+# store now flips it off the pa0 ``not_documented`` stub.
+_CHECKPOINT_1_DETAILS: dict[AnalystCheckpointScore, str] = {
+    _S.NOT_DOCUMENTED: (
+        "Thesis + kill criteria — no thesis covers a reported position; "
         "not_documented, not a faked pass."
     ),
+    _S.PASS: (
+        "Thesis + kill criteria — documented positions carry pre-committed "
+        "kill criteria and none are breached."
+    ),
+    _S.BREACH: (
+        "Thesis + kill criteria — a pre-committed kill criterion is breached; "
+        "advisor alert raised (no trade staged)."
+    ),
+}
+
+_DETAILS: dict[str, str] = {
+    "checkpoint_1": _CHECKPOINT_1_DETAILS[_S.NOT_DOCUMENTED],
     "checkpoint_2": (
         f"Attribution reconciliation — scored on |{ACTIVE_RETURN_LABEL}| "
         "(annualized where the window clears the floor, cumulative "
@@ -61,8 +80,10 @@ def position_active_score(
     Uses the annualized active return where present (cross-position
     comparable), else the cumulative figure for short windows.
     """
-    metric = pa.active_annualized if pa.active_annualized is not None else (
-        pa.active_return
+    metric = (
+        pa.active_annualized
+        if pa.active_annualized is not None
+        else (pa.active_return)
     )
     magnitude = abs(metric)
     if magnitude >= breach:
@@ -75,29 +96,68 @@ def position_active_score(
 def score_analyst_checkpoints(
     report: AttributionReport, theses: Any | None = None
 ) -> AnalystReview:
-    """Score the 7 ℍ_PortfolioAnalyst checkpoints from the report."""
-    del theses  # pa1 thesis store flips checkpoint 1 — absent in pa0
+    """Score the 7 ℍ_PortfolioAnalyst checkpoints from the report.
+
+    ``theses`` (pa1) may be a ``ThesisStore`` or any iterable of
+    ``PositionThesis``. Checkpoint-1 pin (axiom 2): NOT_DOCUMENTED when no
+    reported position carries a thesis; BREACH when any *documented* position
+    trips a pre-committed kill criterion; otherwise PASS. Positions without a
+    thesis are not scored as breaches — they simply leave checkpoint 1 keyed to
+    documentation coverage.
+    """
     settings = get_settings()
     warn = Decimal(str(settings.analyst_residual_warn))
     breach = Decimal(str(settings.analyst_residual_breach))
 
+    checkpoint_1 = _score_checkpoint_1(report, theses)
     checkpoints: dict[str, AnalystCheckpointScore] = {
-        "checkpoint_1": _S.NOT_DOCUMENTED,
+        "checkpoint_1": checkpoint_1,
         "checkpoint_2": _score_checkpoint_2(report, warn, breach),
         "checkpoint_3": _S.NOT_COMPUTED,
         "checkpoint_4": _S.NOT_COMPUTED,
-        "checkpoint_5": (
-            _S.PASS if report.positions else _S.NOT_COMPUTED
-        ),
+        "checkpoint_5": (_S.PASS if report.positions else _S.NOT_COMPUTED),
         "checkpoint_6": _S.NOT_COMPUTED,
         "checkpoint_7": _score_checkpoint_7(report),
     }
+    details = dict(_DETAILS)
+    details["checkpoint_1"] = _CHECKPOINT_1_DETAILS[checkpoint_1]
     return AnalystReview(
         config_version=report.config_version,
         checkpoints=checkpoints,
-        details=dict(_DETAILS),
+        details=details,
         headline=_build_headline(checkpoints),
     )
+
+
+def _score_checkpoint_1(
+    report: AttributionReport, theses: Any | None
+) -> AnalystCheckpointScore:
+    if theses is None:
+        return _S.NOT_DOCUMENTED
+    store = (
+        theses
+        if isinstance(theses, ThesisStore)
+        else ThesisStore.from_theses(_as_theses(theses))
+    )
+    if len(store) == 0:
+        return _S.NOT_DOCUMENTED
+
+    documented = 0
+    any_breach = False
+    for pa in report.positions:
+        thesis = store.get(pa.account_id, pa.ticker or "")
+        if thesis is None:
+            continue
+        documented += 1
+        if breaches_for_attribution(pa, thesis):
+            any_breach = True
+    if documented == 0:
+        return _S.NOT_DOCUMENTED
+    return _S.BREACH if any_breach else _S.PASS
+
+
+def _as_theses(theses: Any) -> list[PositionThesis]:
+    return [t for t in theses if isinstance(t, PositionThesis)]
 
 
 def analyst_checkpoint_rows(review: AnalystReview) -> list[AnalystCheckpoint]:

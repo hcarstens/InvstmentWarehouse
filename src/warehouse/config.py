@@ -103,6 +103,17 @@ class Settings(BaseSettings):
     analyst_residual_breach: float = 0.06
     analyst_min_holding_years: float = 0.5
 
+    # Portfolio Analyst — synthetic-thesis kill-criteria calibration (pa1).
+    # These are the default kill thresholds stamped on synthetic theses
+    # (emit-side), pinned to analyst_config_version for audit replay. Kill
+    # criteria are pre-committed ON the thesis (per position); these are the
+    # cohort defaults. A concentrated single-issuer lot gets the tighter
+    # drawdown floor so the §9 concentrated_stress fixture trips a real breach.
+    analyst_kill_drawdown_pct: float = -0.30
+    analyst_kill_concentrated_drawdown_pct: float = -0.10
+    analyst_kill_residual_cap: float = 0.10
+    analyst_kill_min_liquidity_tier: int = 4
+
     household_rls_enabled: bool = False
 
     @classmethod
