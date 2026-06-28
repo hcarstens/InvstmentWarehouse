@@ -9,13 +9,20 @@ Composition roots (dashboard server, workflows, CLI, tests) must
 
 from __future__ import annotations
 
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import cast
 
 from pydantic import BaseModel
 
+from warehouse.config import get_settings
 from warehouse.data.ingest.runner import IngestRunSummary, run_custodian_ingest
 from warehouse.data.ledger.views import list_lot_positions
+from warehouse.decision.analyst import (
+    AttributionReport,
+    evaluate_attribution,
+)
 from warehouse.decision.approval.service import (
     ApprovalRequestView,
     create_approval_request,
@@ -45,6 +52,7 @@ from warehouse.messaging.payloads import (
     AdviceBundle,
     ApprovalCreatePayload,
     ApprovalDecidePayload,
+    AttributionEvaluatePayload,
     IngestRunPayload,
     LedgerPositionsPayload,
     OptimizePayload,
@@ -63,6 +71,7 @@ from warehouse.messaging.payloads import (
 )
 from warehouse.research.risk import evaluate_risk
 from warehouse.research.risk.models import RiskResult
+from warehouse.research.risk.scenarios import assumptions_for
 
 # --- QUERY ------------------------------------------------------------------
 
@@ -109,6 +118,21 @@ def _tax_scenario(
     return evaluate_tax_scenario(p.positions, p.overlays)
 
 
+def _attribution_evaluate(
+    ctx: DispatchContext, p: AttributionEvaluatePayload
+) -> AttributionReport:
+    settings = get_settings()
+    # Shipped base-regime class-expected returns are the attribution mechanism.
+    return evaluate_attribution(
+        p.positions,
+        assumptions_for("base").class_expected_return,
+        household_id=p.household_id,
+        as_of=p.as_of_date or date.today(),
+        config_version=settings.analyst_config_version,
+        min_holding_years=Decimal(str(settings.analyst_min_holding_years)),
+    )
+
+
 # --- EVALUATE composite — the Portfolio Manager tier (§4.1) ------------------
 
 
@@ -147,6 +171,14 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
             household_id=p.household_id, positions=p.positions, ips=p.ips
         ),
     )
+    attribution = _eval(
+        "attribution.evaluate",
+        AttributionEvaluatePayload(
+            household_id=p.household_id,
+            positions=p.positions,
+            as_of_date=p.as_of_date,
+        ),
+    )
     tax = _eval(
         "tax.scenario",
         TaxScenarioPayload(positions=p.positions, overlays=p.tax_overlays),
@@ -156,6 +188,7 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
         proposal=cast(OptimizationResult, proposal),
         tax=cast(TaxScenarioResult, tax),
         drift=cast(IpsDriftReport, drift),
+        attribution=cast(AttributionReport, attribution),
     )
     narrative = score_pm_axioms(bundle, p, correlation_id=cid)
     return bundle.model_copy(update={"narrative": narrative})
@@ -251,6 +284,12 @@ register(
     Kind.EVALUATE,
 )
 register("tax.scenario", TaxScenarioPayload, _tax_scenario, Kind.EVALUATE)
+register(
+    "attribution.evaluate",
+    AttributionEvaluatePayload,
+    _attribution_evaluate,
+    Kind.EVALUATE,
+)
 register("pm.advise", PmAdvisePayload, _pm_advise, Kind.EVALUATE)
 register("ingest.run", IngestRunPayload, _ingest_run, Kind.COMMAND)
 register(

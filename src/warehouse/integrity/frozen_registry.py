@@ -10,6 +10,14 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import Settings
+from warehouse.data.security_master import AssetClass as SecurityAssetClass
+from warehouse.decision.analyst import (
+    AnalystCheckpoint,
+    AnalystCheckpointScore,
+    AnalystReview,
+    AttributionReport,
+    PositionAttribution,
+)
 from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.optimizer import OptimizationResult
 from warehouse.decision.tax.scenarios import (
@@ -19,6 +27,11 @@ from warehouse.decision.tax.scenarios import (
 from warehouse.messaging.models import DispatchContext, Kind, Message
 from warehouse.messaging.payloads import AdviceBundle, AxiomScore, PmNarrative
 from warehouse.models.events import Event, EventType
+from warehouse.orchestrator.models import (
+    OrchestratorError,
+    OrchestratorIntent,
+    OrchestratorResponse,
+)
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
 from warehouse.research.risk.models import (
@@ -36,11 +49,17 @@ from warehouse.research.risk.models import (
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
     AdviceBundle,
+    AnalystCheckpoint,
+    AnalystReview,
+    AttributionReport,
     BacktestResult,
     DispatchContext,
     Event,
     Message,
+    OrchestratorError,
+    OrchestratorResponse,
     PmNarrative,
+    PositionAttribution,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -155,7 +174,65 @@ def _sample_instance(cls: type[Any]) -> Any:
             ),
             narrative=None,
         )
+    if cls is PositionAttribution:
+        return _sample_position_attribution()
+    if cls is AttributionReport:
+        return AttributionReport(
+            household_id="hh_test",
+            as_of_date=date(2026, 6, 28),
+            config_version="2026.06",
+            positions=[_sample_position_attribution()],
+            portfolio_active_return=Decimal("-0.08"),
+            limitations=["unrealized point-in-time only"],
+        )
+    if cls is AnalystCheckpoint:
+        return AnalystCheckpoint(
+            checkpoint_id="checkpoint_2",
+            score=AnalystCheckpointScore.PASS,
+            detail="test detail",
+        )
+    if cls is AnalystReview:
+        return AnalystReview(
+            config_version="2026.06",
+            checkpoints={"checkpoint_2": AnalystCheckpointScore.PASS},
+            details={"checkpoint_2": "test detail"},
+            headline="test headline",
+        )
+    if cls is OrchestratorError:
+        return OrchestratorError(
+            correlation_id="corr_test",
+            message="test failure",
+        )
+    if cls is OrchestratorResponse:
+        return OrchestratorResponse(
+            correlation_id="corr_test",
+            intent=OrchestratorIntent.REBALANCE_ADVISORY,
+            household_id="hh_test",
+            status="failed",
+            error=OrchestratorError(
+                correlation_id="corr_test",
+                message="test failure",
+            ),
+            elapsed_ms=0,
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
+
+
+def _sample_position_attribution() -> PositionAttribution:
+    return PositionAttribution(
+        lot_id="lot_test",
+        account_id="acct_test",
+        ticker="VTI",
+        security_asset_class=SecurityAssetClass.ETF,
+        risk_class=AssetClass.EQUITY,
+        holding_years=Decimal("2.45"),
+        market_value=Decimal("100"),
+        total_return=Decimal("0.10"),
+        class_expected=Decimal("0.07"),
+        expected_cumulative=Decimal("0.18"),
+        active_return=Decimal("-0.08"),
+        active_annualized=Decimal("-0.03"),
+    )
 
 
 def _mutation_probe_attr(instance: Any) -> str:
@@ -173,6 +250,18 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "headline"
     if isinstance(instance, AdviceBundle):
         return "narrative"
+    if isinstance(instance, PositionAttribution):
+        return "lot_id"
+    if isinstance(instance, AttributionReport):
+        return "household_id"
+    if isinstance(instance, AnalystCheckpoint):
+        return "detail"
+    if isinstance(instance, AnalystReview):
+        return "headline"
+    if isinstance(instance, OrchestratorError):
+        return "message"
+    if isinstance(instance, OrchestratorResponse):
+        return "status"
     if isinstance(instance, Message):
         return "op"
     if isinstance(instance, DispatchContext):

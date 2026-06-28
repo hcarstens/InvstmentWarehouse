@@ -84,6 +84,14 @@ PHASES: list[Phase] = [
             DashboardPanel(
                 name="Advisory bundle (pm.advise)", phase=3, status="live"
             ),
+            DashboardPanel(
+                name="Office Manager gate", phase=3, status="live"
+            ),
+            DashboardPanel(
+                name="Attribution residuals (attribution.evaluate)",
+                phase=3,
+                status="live",
+            ),
         ],
     ),
     Phase(

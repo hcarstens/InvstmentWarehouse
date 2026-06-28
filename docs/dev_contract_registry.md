@@ -38,7 +38,7 @@ decision (contract §8-style tables) without an explicit **contract amendment** 
 | `decision_plane` | Decision | Phase 3 panels · `decision/` package | `TODO.md` Phase 3 ✓ |
 | `messaging` | Platform / orchestrator | [messaging_protocol.md](messaging_protocol.md) · [messaging_protocol_implementation.md](messaging_protocol_implementation.md) | m0a–m1 **shipped** (plan iteration log) |
 | `portfolio_manager` | Decision (`warehouse.decision.pm`) | [portfolio_manager_implementation.md](portfolio_manager_implementation.md) | pm0–pm2 **shipped** (plan iteration log) |
-| `portfolio_analyst` | Decision (`warehouse.decision.analyst`) | [portfolio_analyst_implementation.md](portfolio_analyst_implementation.md) · [heuristics/Mental Model of The Portfolio Analyst.md](heuristics/Mental%20Model%20of%20The%20Portfolio%20Analyst.md) | pa0 **planned** — next milestone |
+| `portfolio_analyst` | Decision (`warehouse.decision.analyst`) | [portfolio_analyst_implementation.md](portfolio_analyst_implementation.md) · [heuristics/Mental Model of The Portfolio Analyst.md](heuristics/Mental%20Model%20of%20The%20Portfolio%20Analyst.md) | pa0 **shipped** (attribution + residual; PM 5th leg; falsifiers `tests/test_analyst_attribution.py`, `tests/test_analyst_review.py`); pa1/pa2 planned |
 
 ```text
 risk_contract v0a–v0c          [shipped]

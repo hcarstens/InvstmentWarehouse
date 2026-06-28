@@ -91,6 +91,18 @@ class Settings(BaseSettings):
     pm_drift_warn: float = 0.03
     pm_binding_constraint_warn: int = 3
 
+    # Portfolio Analyst — ℍ_PortfolioAnalyst checkpoint thresholds.
+    # Version-pinned for audit replay. WARN/BREACH are magnitudes of the
+    # (annualized where present) active return vs the ex-ante class assumption;
+    # calibrated against the §9 HNW fixtures so rung-3 sleeves WARN and the
+    # founder concentrated drawdown lot BREACHes, while a zero-active probe
+    # PASSes. min_holding_years is the floor below which active_annualized is
+    # not_computed (annualizing sub-six-month windows amplifies noise).
+    analyst_config_version: str = "2026.06"
+    analyst_residual_warn: float = 0.025
+    analyst_residual_breach: float = 0.06
+    analyst_min_holding_years: float = 0.5
+
     household_rls_enabled: bool = False
 
     @classmethod

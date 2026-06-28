@@ -37,3 +37,7 @@ def test_render_html_contains_key_sections() -> None:
     assert "axiom checklist" in html
     assert "tax: stub" in html
     assert "not_computed" in html
+    assert "Office Manager gate" in html
+    # pa0: attribution residual panel (5th PM leg).
+    assert "attribution.evaluate" in html
+    assert "active return vs ex-ante class assumption" in html

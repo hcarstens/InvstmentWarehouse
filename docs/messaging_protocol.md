@@ -161,7 +161,8 @@ Each plane registers handlers; the `op` namespace is `plane.verb`.
 | `optimizer.propose` | EVALUATE | decision | `{positions, ips}` → `OptimizationResult` | `run_tax_aware_optimizer` |
 | `trade.validate` | EVALUATE | decision | `{lot, ips}` → `tuple[bool, list[str]]` | `evaluate_lot_sell_allowed` |
 | `tax.scenario` | EVALUATE | decision | `{positions, ips, overlays}` → `TaxScenarioResult` | `run_tax_scenario` |
-| `pm.advise` | EVALUATE *(composite)* | decision | `{portfolio, ips, request}` → `AdviceBundle` | nest-dispatches `risk.evaluate` / `optimizer.propose` / `tax.scenario` / `policy.check` (§4.1) |
+| `attribution.evaluate` | EVALUATE | decision | `AttributionEvaluatePayload{household_id, positions, as_of_date}` → `AttributionReport` | `evaluate_attribution` (analyst — pa0) |
+| `pm.advise` | EVALUATE *(composite)* | decision | `{portfolio, ips, request}` → `AdviceBundle` | nest-dispatches `risk.evaluate` / `attribution.evaluate` / `optimizer.propose` / `tax.scenario` / `policy.check` (§4.1) |
 | `report.build` | QUERY | reporting | `{household_id, period}` → `Report` | **planned** (no reporting plane yet) |
 | `ingest.run` | COMMAND | data | `{household_id, custodian, file}` → `IngestSummary` | `run_custodian_ingest` |
 | `ledger.reconcile` | COMMAND | execution | `{household_id, ingest_run_id}` → `ReconcileResult` | `reconcile_ingest` |

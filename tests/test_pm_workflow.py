@@ -103,3 +103,56 @@ def test_pm_no_new_ops() -> None:
 
     pm_ops = {op for op in catalog if op.startswith("pm.")}
     assert pm_ops == {"pm.advise"}
+
+
+def test_pm_bundle_carries_attribution() -> None:
+    """pa0: PM nest-dispatches the attribution leg as a 5th specialist."""
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="hnw-attribution",
+            household_id=payload.household_id,
+        ),
+    )
+    assert isinstance(out, AdviceBundle)
+    assert out.attribution is not None
+    assert out.attribution.positions
+    # Components present for every lot (¬M7 / checkpoint 7).
+    for pa in out.attribution.positions:
+        assert pa.expected_cumulative is not None
+        assert pa.active_return is not None
+
+
+def test_pm_attribution_correlation() -> None:
+    """correlation_id threads PM → the nested attribution leg (§4.1)."""
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+
+    captured: dict[str, str] = {}
+    payload_type, handler, kind = REGISTRY["attribution.evaluate"]
+
+    def _spy(ctx: DispatchContext, p: object) -> object:
+        captured["cid"] = ctx.correlation_id
+        return handler(ctx, p)
+
+    REGISTRY["attribution.evaluate"] = (payload_type, _spy, kind)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="pm-attr-cid",
+            household_id=payload.household_id,
+        ),
+    )
+    assert out.narrative is not None
+    assert out.narrative.correlation_id == "pm-attr-cid"
+    assert captured["cid"] == "pm-attr-cid"

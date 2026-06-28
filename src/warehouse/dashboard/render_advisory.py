@@ -5,6 +5,10 @@ from __future__ import annotations
 import html
 
 from warehouse.dashboard.advisory_data import AdvisoryDashboardData
+from warehouse.decision.analyst import (
+    ACTIVE_RETURN_LABEL,
+    AttributionReport,
+)
 from warehouse.messaging.payloads import AxiomScore
 
 _AXIOM_LABELS: dict[str, str] = {
@@ -50,6 +54,36 @@ def _specialist_badges(status: dict[str, str]) -> str:
     return " ".join(chips)
 
 
+def _attribution_table(report: AttributionReport) -> str:
+    """Residual table — ordered by |active_return| (the primary signal)."""
+    rows = "".join(
+        f"<tr><td>{html.escape(pa.ticker or '—')}</td>"
+        f"<td>{html.escape(pa.risk_class.value)}</td>"
+        f"<td>{pa.holding_years}</td>"
+        f"<td>{pa.total_return}</td>"
+        f"<td>{pa.expected_cumulative}</td>"
+        f"<td>{pa.active_return}</td>"
+        f"<td>{pa.active_annualized if pa.active_annualized is not None else 'not_computed'}</td>"
+        "</tr>"
+        for pa in report.positions[:10]
+    )
+    limitations = "".join(
+        f"<li>{html.escape(item)}</li>" for item in report.limitations
+    )
+    return f"""
+    <h3>Attribution — {html.escape(ACTIVE_RETURN_LABEL)}</h3>
+    <p>Portfolio active return (MV-weighted):
+       <code>{report.portfolio_active_return}</code></p>
+    <table>
+      <thead><tr><th>Ticker</th><th>Class</th><th>Holding yrs</th>
+        <th>Total return</th><th>Expected (window)</th>
+        <th>Active return</th><th>Active annualized</th></tr></thead>
+      <tbody>{rows or '<tr><td colspan="7">No positions</td></tr>'}</tbody>
+    </table>
+    <p><em>Limitations:</em></p>
+    <ul>{limitations}</ul>"""
+
+
 def render_advisory_section(advisory: AdvisoryDashboardData) -> str:
     error = ""
     if advisory.error:
@@ -82,6 +116,10 @@ def render_advisory_section(advisory: AdvisoryDashboardData) -> str:
                 f"<h3>Specialist legs</h3>"
                 f"<p>{_specialist_badges(narrative.specialist_status)}</p>"
             )
+        attribution_html = ""
+        attribution = bundle.attribution
+        if attribution is not None:
+            attribution_html = _attribution_table(attribution)
         body = f"""
     <p><span class="badge badge-ok">live</span>
        Dispatch via <code>pm.advise</code> ·
@@ -94,6 +132,9 @@ def render_advisory_section(advisory: AdvisoryDashboardData) -> str:
       <tbody>
         <tr><td>risk.evaluate</td>
             <td>VaR 95 {bundle.risk.report.level_1_portfolio.parametric_var.value}</td></tr>
+        <tr><td>attribution.evaluate</td>
+            <td>{len(attribution.positions) if attribution else 0} positions ·
+                portfolio active {attribution.portfolio_active_return if attribution else '—'}</td></tr>
         <tr><td>optimizer.propose</td>
             <td>{trade_count} trades · tax delta {bundle.proposal.estimated_tax_delta}</td></tr>
         <tr><td>tax.scenario</td>
@@ -104,7 +145,8 @@ def render_advisory_section(advisory: AdvisoryDashboardData) -> str:
         <tr><td>policy.check</td>
             <td>{drift_alerts} drift alert(s)</td></tr>
       </tbody>
-    </table>"""
+    </table>
+    {attribution_html}"""
 
     return f"""
   <section>

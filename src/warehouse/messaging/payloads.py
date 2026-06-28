@@ -13,6 +13,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict
 
 from warehouse.data.ledger.views import LotPositionView
+from warehouse.decision.analyst import AttributionReport
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.ips.monitor import IpsDriftReport
@@ -94,6 +95,14 @@ class TaxScenarioPayload(BaseModel):
     overlays: TaxScenarioOverlays = TaxScenarioOverlays()
 
 
+class AttributionEvaluatePayload(BaseModel):
+    """Portfolio-Analyst attribution leg — per-position decomposition."""
+
+    household_id: str
+    positions: list[LotPositionView]
+    as_of_date: date | None = None
+
+
 class PmAdvisePayload(BaseModel):
     """Portfolio-Manager working set — the (P, IPS) artifact, sliced per op."""
 
@@ -154,4 +163,5 @@ class AdviceBundle(BaseModel):
     proposal: OptimizationResult
     tax: TaxScenarioResult
     drift: IpsDriftReport
+    attribution: AttributionReport | None = None
     narrative: PmNarrative | None = None

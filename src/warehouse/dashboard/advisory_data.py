@@ -1,29 +1,30 @@
-"""Advisory dashboard — ``pm.advise`` composite via messaging dispatch."""
+"""Advisory dashboard — routes through the Office Manager gate."""
 
 from __future__ import annotations
 
 from pydantic import BaseModel
 
-import warehouse.messaging.handlers  # noqa: F401 — register catalog ops
+from warehouse.config import get_settings
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
-from warehouse.decision.pm import build_working_set
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
-from warehouse.messaging import (
-    DispatchContext,
-    Kind,
-    Message,
-    dispatch_message,
-)
 from warehouse.messaging.payloads import AdviceBundle
+from warehouse.orchestrator import (
+    OrchestratorIntent,
+    OrchestratorRequest,
+    receive_request,
+    recent_in_flight,
+)
+from warehouse.orchestrator.models import InFlightRecord
 
 
 class AdvisoryDashboardData(BaseModel):
     household_id: str
     correlation_id: str
     bundle: AdviceBundle | None
-    panel_status: str = "stub"
+    panel_status: str = "live"
+    in_flight: list[InFlightRecord] = []
     error: str | None = None
 
 
@@ -33,42 +34,36 @@ def load_advisory_dashboard(
     correlation_id = "advisory-dashboard"
     try:
         bootstrap_database(seed=True)
-        # phase3 → phase2 ensures demo ingest + decision runs exist.
         load_phase3_dashboard()
+        get_settings()
         with session_scope() as session:
-            # Single working-set assembly path (shared with the rebalance
-            # advisory workflow) — no duplicate manifest construction.
-            payload = build_working_set(session, household_id)
-            ctx = DispatchContext(
-                session=session,
-                actor_id="dashboard:advisory",
-                correlation_id=correlation_id,
-            )
-            bundle = dispatch_message(
-                ctx,
-                Message(
-                    op="pm.advise",
-                    kind=Kind.EVALUATE,
-                    payload=payload,
-                    correlation_id=correlation_id,
+            response = receive_request(
+                session,
+                OrchestratorRequest(
+                    intent=OrchestratorIntent.REBALANCE_ADVISORY,
                     household_id=household_id,
+                    correlation_id=correlation_id,
+                    actor_id="dashboard:advisory",
                 ),
             )
-        if not isinstance(bundle, AdviceBundle):
-            raise TypeError(
-                f"pm.advise returned {type(bundle).__name__}, "
-                "expected AdviceBundle"
+        if response.status != "completed" or response.result is None:
+            msg = (
+                response.error.message
+                if response.error
+                else "advisory gate returned no result"
             )
+            raise RuntimeError(msg)
         return AdvisoryDashboardData(
             household_id=household_id,
-            correlation_id=correlation_id,
-            bundle=bundle,
-            panel_status="live",
+            correlation_id=response.correlation_id,
+            bundle=response.result,
+            in_flight=recent_in_flight(limit=10),
         )
     except Exception as err:
         return AdvisoryDashboardData(
             household_id=household_id,
             correlation_id=correlation_id,
             bundle=None,
+            in_flight=recent_in_flight(limit=10),
             error=str(err),
         )
