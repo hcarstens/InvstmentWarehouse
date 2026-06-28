@@ -60,8 +60,14 @@ output**:
   need an engine we don't have (valuation scenario range, factor loadings, out-of-sample
   validation) score `NOT_COMPUTED` — the exact Goodhart guard the PM plan uses for axiom 5, and
   the analyst's **own axiom 6 (Goodhart vigilance)** turned inward.
-- **Residual is labelled "idiosyncratic + unexplained," never "alpha"** (axiom 1: unexplained
-  residual is unidentified risk, not skill).
+- **¬Frequentist inference → deferred, not claimed.** Bayesian/small-sample updating needs an
+  inference engine pa0 does not have. pa0 honestly handles **two of the three** negations
+  (single-path, composite) and marks the inference negation **out of scope** — it does not imply
+  the third is satisfied.
+- **The headline gap is labelled "active vs ex-ante class assumption," never "alpha" or
+  "idiosyncratic"** (Addendum A.3). A *beta-stripped* idiosyncratic residual (axiom 1's
+  unidentified-risk instrument) needs a realized class-return series we lack, so that quantity is
+  `not_computed` — its own honest gap, not a relabelled benchmark gap.
 
 ### 7-checkpoint computability (the honesty matrix)
 
@@ -75,15 +81,23 @@ output**:
 | 6 | Goodhart audit | reported-vs-economic divergence — no fundamentals feed | **`not_computed`** (applied to our own metrics) |
 | 7 | Composite decomposition | attribution **is** the decomposition | **satisfied by design** (invariant) |
 
-`AnalystCheckpoint` reuses the PM `AxiomScore` vocabulary: `PASS | WARN | BREACH |
-NOT_COMPUTED`, plus `NOT_DOCUMENTED` for checkpoint 1 (thesis absent — first-class, not faked).
+`AnalystCheckpoint` uses a **separate** `AnalystCheckpointScore` enum — **not** the PM
+`AxiomScore`, which the PM contract and its falsifiers depend on (widening that shared StrEnum
+would churn a frozen-adjacent type). It mirrors the vocabulary — `PASS | WARN | BREACH |
+NOT_COMPUTED` — plus `NOT_DOCUMENTED` for checkpoint 1 (thesis absent — first-class, not faked).
 
 ---
 
 ## 3. What is computable today (pa0 attribution mechanics)
 
-From `LotPositionView` (`cost_basis`, `market_value`, `unrealized_gain`, `acquisition_date`,
-`asset_class`, `liquidity_tier`) and `RiskAssumptions.class_expected_return` (shipped):
+From `LotPositionView` (`total_cost_basis`, `market_value`, `unrealized_gain`,
+`acquisition_date`, `security_asset_class`, `liquidity_tier`) and
+`RiskAssumptions.class_expected_return` (shipped):
+
+> **Superseded by Addendum A (§12).** The block below is the original first draft. It
+> (a) joined on the wrong enum, (b) annualized with an unstable `1/holding_years` term,
+> and (c) mislabelled a realized-vs-*expected* gap as an idiosyncratic residual. The
+> corrected, stable math + the asset-class mapping live in §12; read that as the pa0 spec.
 
 ```text
 holding_years      = (as_of_date − acquisition_date) / 365
@@ -314,8 +328,128 @@ theses (pa1) emitted alongside households so kill-criteria are flow-testable wit
 
 ---
 
+## 12. Addendum A — §3 attribution math correction (pre-pa0 spec)
+
+**Supersedes the §3 formula block.** Folds review findings #1–#4: the first draft (a) joined the
+class-expected return on the wrong enum (a hard `KeyError`), (b) labelled a realized-vs-*expected*
+gap as a beta-stripped idiosyncratic residual, (c) annualized with a `1/holding_years` term that
+explodes for young lots, and (d) left the portfolio rollup weighting unspecified. This is the
+spec pa0 implements.
+
+### A.1 Asset-class mapping (resolves the join blocker, #1)
+
+`class_expected_return` is keyed by `research.risk.AssetClass`; positions carry
+`security_master.AssetClass`. They are **different enums** with different members *and* different
+string values (`"alternative"` vs `"alternatives"`; security-side `ETF`; risk-side
+`COMMODITIES`/`FX`). A direct `class_expected_return[pos.security_asset_class]` raises. pa0 adds an
+explicit, total mapping; an unmapped class **raises** — never a silent zero-residual fallback,
+which would mislabel an unattributed lot as fully explained (CLAUDE.md: errors bubble to surface):
+
+```python
+# decision/analyst/attribution.py
+from warehouse.data.security_master import AssetClass as SecClass
+from warehouse.research.risk.models import AssetClass as RiskClass
+
+_SEC_TO_RISK: dict[SecClass, RiskClass] = {
+    SecClass.EQUITY: RiskClass.EQUITY,
+    SecClass.ETF: RiskClass.EQUITY,        # v0 beta proxy — see limitation
+    SecClass.FIXED_INCOME: RiskClass.FIXED_INCOME,
+    SecClass.CASH: RiskClass.CASH,
+    SecClass.ALTERNATIVE: RiskClass.ALTERNATIVES,
+}
+
+class AttributionError(ValueError):
+    """Raised when a position cannot be attributed (e.g. unmapped class)."""
+
+def risk_class_for(sec: SecClass) -> RiskClass:
+    try:
+        return _SEC_TO_RISK[sec]
+    except KeyError as err:                 # bubble to surface, never default
+        raise AttributionError(
+            f"no risk-class mapping for {sec!r}; cannot assign a "
+            "class-expected return"
+        ) from err
+```
+
+**New stated limitation (surfaced in the report + dashboard):** `ETF → EQUITY` is a v0 beta
+proxy — a bond or commodity ETF is mis-mapped until ETF look-through ships. `COMMODITIES`/`FX`
+risk classes are unreachable from positions today (no security-master member); acceptable.
+
+### A.2 Compare on the holding window — do not annualize the realized (resolves #3)
+
+Rather than annualize the realized return (the unstable `(1 + r) ** (1/h) − 1`),
+**de-annualize the class assumption onto the holding window** — no division by `holding_years`,
+so nothing blows up as `h → 0`:
+
+```text
+holding_years       = max((as_of − acquisition_date).days, 0) / 365.25
+total_return        = unrealized_gain / total_cost_basis        # price-only, unrealized
+class_expected      = class_expected_return[risk_class_for(security_asset_class)]
+expected_cumulative = (1 + class_expected) ** holding_years − 1  # assumption, scaled to window
+active_return       = total_return − expected_cumulative        # over the holding window
+```
+
+`active_return` is **stable for every holding period**: a 2-week-old lot gets a near-zero
+`expected_cumulative`, not a `1/h` explosion. For a 0-day lot, `expected_cumulative = 0` and
+`active_return = total_return` — no special case.
+
+### A.3 Name it honestly (resolves #2)
+
+`active_return = realized − ex-ante class assumption` is **not** a beta-stripped idiosyncratic
+residual. It still contains the class's realized-vs-expected *surprise* (pure market/beta),
+because we have no realized class-return series to subtract. Therefore:
+
+- **Label:** `active_return` = **"active return vs ex-ante class assumption"** (a policy/benchmark
+  gap) — **never** "idiosyncratic," "residual-as-risk," or "alpha."
+  `test_residual_not_named_alpha` extends to ban `"idiosyncratic"` on this field too.
+- **The axiom-1 quantity (beta-stripped idiosyncratic residual) is `not_computed`** — it needs a
+  realized class-return series (price/index history) we do not have. The §2 honesty rule applied
+  to the headline number itself.
+- **Decomposition (checkpoint 7 / ¬M7) is preserved and exact:**
+  `realized = expected_cumulative + active_return` — two components, always present, never
+  collapsed. The *further* split of `active_return` into beta-surprise + idiosyncratic is the
+  `not_computed` sub-component.
+
+### A.4 Checkpoint impacts (replaces the affected §2 honesty-matrix rows)
+
+| # | Checkpoint | pa0 score after correction |
+| --- | --- | --- |
+| 2 | Attribution reconciliation | **scorable on `active_return`** (vs ex-ante assumption); idiosyncratic isolation `not_computed` |
+| 5 | Mechanism | **partial — and weaker than §2 first stated:** the class assumption is one hop, but the gap is *not* beta-stripped; the label says so |
+| 7 | Composite decomposition | **satisfied** — `{expected_cumulative, active_return}` always present |
+
+### A.5 Portfolio rollup + ordering (resolves #4)
+
+Per-lot `active_return` figures span heterogeneous windows and cost bases; a raw sum is
+meaningless. Roll up **market-value-weighted**:
+
+```text
+port_active = Σ_i (market_value_i / Σ_j market_value_j) · active_return_i
+```
+
+Order the position table by `|active_return|` (primary signal). For cross-position comparability,
+an optional `active_annualized` is computed **only** when
+`holding_years ≥ analyst_min_holding_years` (config-pinned to `analyst_config_version`); below
+that floor it is `not_computed`, never a noisy annualized number. WARN/BREACH thresholds are
+**holding-period-aware** — annualized view where present, cumulative view otherwise.
+
+### A.6 Spec deltas folded back into §3–§6
+
+- §3 formula block → **superseded** by A.2 (banner added in §3).
+- §4 model `PositionAttribution` fields: `{class_expected, expected_cumulative, total_return,
+  active_return, active_annualized: float | None, holding_years}` — components always present
+  (¬M7).
+- §6 acceptance matrix: add `test_attribution_class_mapping_raises` (unmapped class →
+  `AttributionError`, no silent zero) and `test_attribution_short_holding_stable` (2-week lot →
+  finite `active_return`, `active_annualized is None`).
+- `test_residual_not_named_alpha` widened to also forbid `"idiosyncratic"`/`"residual"` on the
+  `active_return` field name and report copy.
+
+---
+
 ## Review / iteration log
 
 | Date | Note |
 | --- | --- |
 | 2026-06-28 | Initial draft (Claude). Grounded against shipped code: `LotPositionView` (cost/marks/acq-date), `RiskAssumptions.class_expected_return`, `AlternativeHoldingView.last_mark_date`, live `policy.check`. Attribution-first ordering per `portfolio_manager_implementation.md` §12 (tax held at `$0` as flow-test enabler). Honesty matrix maps the 7 mental-model checkpoints to computability; one new atomic op (`attribution.evaluate`); PM gets additive 5th leg. |
+| 2026-06-28 | **Review folded (Claude) — Addendum A added; §2/§3 corrected.** Code-grounding caught a hard blocker: §3 joined `class_expected_return` (keyed by `research.risk.AssetClass`) on `LotPositionView.security_asset_class` (`security_master.AssetClass`) — different enums, different string values (`"alternative"`≠`"alternatives"`), `ETF` unmapped → `KeyError`. A.1 adds an explicit mapping that **raises** on unmapped class (no silent zero-residual). A.2 replaces the unstable `(1+r)**(1/h)` annualization with window de-annualization of the class assumption (stable as `h→0`). A.3 relabels the headline `realized−expected` gap as **"active vs ex-ante class assumption"** (still contains beta surprise); the true beta-stripped idiosyncratic residual is `not_computed`. A.5 specifies market-value-weighted rollup + holding-period-aware thresholds. Also: §2 now states only **two of three** negations are handled (¬frequentist deferred); checkpoint scores use a **separate** `AnalystCheckpointScore` enum (not PM `AxiomScore`); §3 field names fixed (`total_cost_basis`, `security_asset_class`). |
