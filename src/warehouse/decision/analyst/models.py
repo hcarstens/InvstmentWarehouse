@@ -158,6 +158,73 @@ class KillBreach(BaseModel):
     detail: str
 
 
+class NpaSubject(StrEnum):
+    """What a non-performing-asset flag is raised against (pa2).
+
+    A flag lives on a public lot (``POSITION``), an alternatives-sleeve
+    holding (``ALTERNATIVE``), or the household manifest as a whole
+    (``MANIFEST`` — e.g. an IPS liquidity-floor breach).
+    """
+
+    POSITION = "position"
+    ALTERNATIVE = "alternative"
+    MANIFEST = "manifest"
+
+
+class NpaReason(StrEnum):
+    """The reason code for an NPA flag (pa2, §5).
+
+    Each is *advisory only* — a flag surfaces on the dashboard and feeds the
+    approval gate, never an optimizer constraint or a staged trade (CLAUDE.md
+    human gate).
+    """
+
+    SUSTAINED_DRAWDOWN = "sustained_drawdown"
+    STALE_ALT_MARK = "stale_alt_mark"
+    MISSED_CAPITAL_CALL = "missed_capital_call"
+    IPS_LIQUIDITY_BREACH = "ips_liquidity_breach"
+
+
+class NpaFlag(BaseModel):
+    """One reason-coded non-performing-asset flag — an ALERT, never a trade.
+
+    ``observed`` is the live figure that tripped the rule, ``threshold`` the
+    version-pinned limit; the units differ by ``reason`` (return fraction for
+    drawdown/liquidity, days for a stale mark, unfunded dollars for a missed
+    call). ``detail`` carries the human-readable, unit-aware copy. Surfaced on
+    the NPA panel and available to the approval gate; the advisor decides.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    subject: NpaSubject
+    subject_id: str  # lot_id / holding_id / household_id
+    label: str  # instrument ticker or holding name
+    reason: NpaReason
+    observed: Decimal
+    threshold: Decimal
+    detail: str
+
+
+class NpaFlags(BaseModel):
+    """Non-performing-asset snapshot across positions + alternatives (pa2).
+
+    Audit/replay-critical → frozen + version-pinned. ``flags`` is ordered by
+    reason then subject for a stable dashboard; ``limitations`` surfaces the
+    honest gaps (v0 missed-call heuristic, public-lot-only liquidity share) in
+    the report itself (dashboard-first). Advisory only — never an optimizer
+    constraint or a staged trade.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    household_id: str
+    as_of_date: date
+    config_version: str
+    flags: list[NpaFlag]
+    limitations: list[str]
+
+
 class AnalystCheckpoint(BaseModel):
     """One scored checkpoint plus its honest detail line (dashboard row)."""
 

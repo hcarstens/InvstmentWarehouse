@@ -19,6 +19,10 @@ from warehouse.decision.analyst import (
     KillBreach,
     KillCriteria,
     KillCriterion,
+    NpaFlag,
+    NpaFlags,
+    NpaReason,
+    NpaSubject,
     PositionAttribution,
     PositionThesis,
 )
@@ -62,6 +66,8 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     KillBreach,
     KillCriteria,
     Message,
+    NpaFlag,
+    NpaFlags,
     OrchestratorError,
     OrchestratorResponse,
     PmNarrative,
@@ -225,6 +231,16 @@ def _sample_instance(cls: type[Any]) -> Any:
             threshold=Decimal("-0.20"),
             detail="test breach",
         )
+    if cls is NpaFlag:
+        return _sample_npa_flag()
+    if cls is NpaFlags:
+        return NpaFlags(
+            household_id="hh_test",
+            as_of_date=date(2026, 6, 28),
+            config_version="2026.06",
+            flags=[_sample_npa_flag()],
+            limitations=["advisory only"],
+        )
     if cls is OrchestratorError:
         return OrchestratorError(
             correlation_id="corr_test",
@@ -243,6 +259,18 @@ def _sample_instance(cls: type[Any]) -> Any:
             elapsed_ms=0,
         )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
+
+
+def _sample_npa_flag() -> NpaFlag:
+    return NpaFlag(
+        subject=NpaSubject.POSITION,
+        subject_id="lot_test",
+        label="AAPL",
+        reason=NpaReason.SUSTAINED_DRAWDOWN,
+        observed=Decimal("-0.14"),
+        threshold=Decimal("-0.10"),
+        detail="test flag",
+    )
 
 
 def _sample_position_attribution() -> PositionAttribution:
@@ -292,6 +320,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "mechanism"
     if isinstance(instance, KillBreach):
         return "detail"
+    if isinstance(instance, NpaFlag):
+        return "detail"
+    if isinstance(instance, NpaFlags):
+        return "household_id"
     if isinstance(instance, OrchestratorError):
         return "message"
     if isinstance(instance, OrchestratorResponse):

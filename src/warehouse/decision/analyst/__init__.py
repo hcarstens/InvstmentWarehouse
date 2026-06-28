@@ -20,8 +20,16 @@ from warehouse.decision.analyst.models import (
     KillBreach,
     KillCriteria,
     KillCriterion,
+    NpaFlag,
+    NpaFlags,
+    NpaReason,
+    NpaSubject,
     PositionAttribution,
     PositionThesis,
+)
+from warehouse.decision.analyst.npa import (
+    NpaError,
+    flag_non_performing,
 )
 from warehouse.decision.analyst.review import (
     analyst_checkpoint_rows,
@@ -46,6 +54,11 @@ __all__ = [
     "KillBreach",
     "KillCriteria",
     "KillCriterion",
+    "NpaError",
+    "NpaFlag",
+    "NpaFlags",
+    "NpaReason",
+    "NpaSubject",
     "PositionAttribution",
     "PositionThesis",
     "ThesisError",
@@ -54,6 +67,7 @@ __all__ = [
     "breaches_for_attribution",
     "evaluate_attribution",
     "evaluate_kill_criteria",
+    "flag_non_performing",
     "instrument_key",
     "position_active_score",
     "risk_class_for",

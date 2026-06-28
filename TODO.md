@@ -121,15 +121,16 @@ Backend:
 - [x] **Advisory bundle panel (full)** — `AdviceBundle` presentation keyed by `correlation_id`: headline, ℍ_Allocation axiom strip, specialist liveness badges.
 - [ ] **Tax leg stub → live** — flips `evaluate_tax_scenario` to real numbers; **does not change the `pm.advise` contract**. Gated on the tax estimate engine above, *not* on PM. Kept at `$0` on purpose so synthetic portfolios + IPS can exercise the whole flow.
 
-### Portfolio Analyst (pa0+) — NEXT MILESTONE — `docs/portfolio_analyst_implementation.md`
+### Portfolio Analyst (pa0–pa2) — **shipped** — `docs/portfolio_analyst_implementation.md`
 
-Analyst leg is **live** today for drift + concentration (`policy.check`). The deferred depth is
-the next build, and it feeds the genuinely hard downstream problem (optimization). Keep tax at
-`$0` throughout so the analyst → optimizer signal can be stress-tested on synthetic books.
+Analyst leg is **live** today for drift + concentration (`policy.check`) plus the pa0–pa2 depth
+(attribution + residual, thesis + kill criteria, NPA flags). It feeds the genuinely hard
+downstream problem (optimization) — the **next milestone**. Keep tax at `$0` throughout so the
+analyst → optimizer signal can be stress-tested on synthetic books.
 
 - [x] **pa0 — attribution** — P&L residual vs benchmark / policy; explainable per-sleeve contribution (Portfolio Analyst heuristic: Goodhart vigilance, no faked scores). Shipped: `attribution.evaluate`, residual decomposition, PM 5th leg, attribution residuals panel.
 - [x] **pa1 — kill criteria** — pre-committed exit rules per thesis; surface breaches as alerts (not autonomous sells). Shipped: `PositionThesis`/`KillCriteria`/`KillBreach`, `evaluate_kill_criteria` (pure, alerts-only), checkpoint-1 wiring, synthetic theses, kill-criteria watch panel.
-- [ ] **pa2 — non-performing-asset flags** — sustained drawdown vs cost, stale alt marks, missed capital calls, IPS liquidity breach (cross-ref open question #13).
+- [x] **pa2 — non-performing-asset flags** — sustained drawdown vs cost, stale alt marks, missed capital calls, IPS liquidity breach (cross-ref open question #13 — resolved v0: rule thresholds version-pinned to `analyst_config_version`, flags feed the approval gate only, not optimizer constraints). Shipped: `flag_non_performing` (pure, reason-coded, alerts-only), `NpaFlag`/`NpaFlags` frozen, NPA panel across positions/alternatives/manifest, `tests/test_analyst_npa.py`.
 - [ ] **Unlocks → Portfolio Optimization v1** — multi-period, tax-aware, lot-discrete, IPS-constrained. The hard problem; only as good as the analyst signal feeding it.
 - [ ] **Review all portfolios** — Household-book review workflow (PM orchestrator): run across every household when material inputs change. Triggers and scope:
   - [ ] **Tax change** — `tax_config_version` bump, overlay rule change, or lot realization event → re-run `tax.scenario` / after-tax compare per book (`docs/portfolio_manager_implementation.md`).
@@ -172,7 +173,7 @@ Dashboard panels:
 10. **Agent for IPS compliance monitoring** — Explore an agent that watches household state against digitized IPS constraints and narrative governance (`docs/research/ips.md`): strategic allocation bands, concentration limits, restricted lists, liquidity floors, ESG exclusions. How does it complement (not replace) rule-based Phase 3 drift monitoring? Scope: interpret prose IPS sections vs enforce machine-readable rules, triage alerts, explain breaches, escalate to advisor approval — never autonomous trades. When scoped, ship a dashboard panel alongside the existing IPS drift monitor.
 11. **LLM first pass for tax scenarios** — Use an LLM to draft initial tax-scenario overlays (AMT, NIIT, QSBS, trust DNI, entity structure) from household state + IPS before the deterministic engine in `decision/tax/scenarios.py` runs. How to pin inputs, validate outputs, and keep advisor review + frozen audit replay?
 12. **Portfolio risk: Fermi vs measurable** — For UHNW households, how much of total portfolio risk is defensible order-of-magnitude (Fermi) estimation — illiquid alts, concentrated equity, trust/entity structure, tax path dependency — vs directly measurable from positions and prices? Where should the dashboard show confidence bands vs hard metrics?
-13. **Flag non-performing assets** — How should the platform identify and surface non-performing holdings (sustained drawdown vs cost, stale alternative marks, missed capital-call obligations, IPS liquidity breaches)? Scope: rule thresholds vs advisor-tagged NPA status, dashboard panel placement (positions, alternatives, risk manifest), and whether flags feed optimizer constraints or approval gates only.
+13. **Flag non-performing assets** — *Resolved v0 (pa2).* `flag_non_performing` ships reason-coded rules (sustained drawdown vs cost, stale alt mark, missed capital call, IPS liquidity breach) with thresholds version-pinned to `analyst_config_version`; flags are pure/advisory and feed the **approval gate only** (never optimizer constraints in v0), surfaced on a dedicated NPA panel across positions/alternatives/manifest. Still open: advisor-tagged (manual) NPA status alongside the rule-derived flags, and whether a later version promotes selected flags to optimizer constraints.
 14. **Compiled raw data has secondary value** — Ingested custodian files, lot-level ledger, and derived panels (positions, risk manifest, IPS drift) are primary operational inputs — but the *compiled* household dataset also has secondary value: research replay, walk-forward backtests, scenario packs, model priors, and advisor analytics. How should the platform treat compiled data as a product asset (versioning, fingerprinting, sandbox isolation from prod client data) vs ephemeral pipeline output? Scope: what may be exported or reused, retention, and boundaries so secondary use never leaks proprietary allocations/horizons or undermines audit replay.
 
 ---

@@ -95,6 +95,11 @@ PHASES: list[Phase] = [
                 phase=3,
                 status="live",
             ),
+            DashboardPanel(
+                name="Non-performing-asset flags",
+                phase=3,
+                status="live",
+            ),
         ],
     ),
     Phase(

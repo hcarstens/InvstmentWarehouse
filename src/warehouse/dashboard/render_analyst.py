@@ -1,9 +1,10 @@
-"""Portfolio Analyst dashboard HTML — kill-criteria watch (pa1).
+"""Portfolio Analyst dashboard HTML — kill-criteria watch + NPA flags.
 
-A distinct analyst panel (separate from the advisory bundle): it surfaces
-pre-committed kill-criteria breaches as ADVISORY ALERTS. Nothing here stages or
-sells — the advisor decides (CLAUDE.md human gate). pa2 will add the NPA panel
-to this module.
+Two distinct analyst panels (separate from the advisory bundle): the pa1
+kill-criteria watch and the pa2 non-performing-asset panel. Both surface
+pre-committed/reason-coded breaches as ADVISORY ALERTS — nothing here stages or
+sells, and NPA flags never become optimizer constraints; the advisor decides
+(CLAUDE.md human gate).
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ from __future__ import annotations
 import html
 
 from warehouse.dashboard.analyst_data import KillCriteriaWatchData
+from warehouse.dashboard.npa_data import NpaPanelData
 
 _CHECKPOINT_BADGE: dict[str, str] = {
     "pass": "badge-ok",
@@ -64,5 +66,62 @@ def render_analyst_section(data: KillCriteriaWatchData) -> str:
       <thead><tr><th>Instrument</th><th>Account</th><th>Kill criterion</th>
         <th>Observed</th><th>Threshold</th></tr></thead>
       <tbody>{_breach_rows(data)}</tbody>
+    </table>
+  </section>"""
+
+
+_NPA_BADGE: dict[str, str] = {
+    "position": "badge-warn",
+    "alternative": "badge-warn",
+    "manifest": "badge-err",
+}
+
+
+def _npa_rows(data: NpaPanelData) -> str:
+    if not data.flags:
+        return (
+            '<tr><td colspan="5">No non-performing-asset flags — positions '
+            "and alternatives within thresholds.</td></tr>"
+        )
+    rows = []
+    for f in data.flags:
+        badge = _NPA_BADGE.get(f.subject.value, "badge-muted")
+        rows.append(
+            f'<tr><td><span class="badge {badge}">'
+            f"{html.escape(f.subject.value)}</span></td>"
+            f"<td>{html.escape(f.label)}</td>"
+            f"<td>{html.escape(f.reason.value)}</td>"
+            f"<td>{html.escape(f.detail)}</td>"
+            f"<td><code>{html.escape(f.subject_id)}</code></td></tr>"
+        )
+    return "".join(rows)
+
+
+def render_npa_section(data: NpaPanelData) -> str:
+    error = ""
+    if data.error:
+        error = (
+            '<section class="error-banner"><strong>NPA panel error:'
+            f"</strong> {html.escape(data.error)}</section>"
+        )
+
+    status_badge = "badge-err" if data.panel_status == "error" else "badge-ok"
+    return f"""
+  <section>
+    <h2>Non-performing-asset flags</h2>
+    {error}
+    <p><span class="badge {status_badge}">{html.escape(data.panel_status)}</span>
+       Cohort <code>{html.escape(data.cohort_id)}</code> ·
+       household <code>{html.escape(data.household_id)}</code> ·
+       as of {data.as_of_date.isoformat()} ·
+       config <code>{html.escape(data.config_version)}</code></p>
+    <p>{data.position_count} position(s) · {data.alt_count} alternative(s) ·
+       {len(data.flags)} flag(s)</p>
+    <p><em>Advisory only — flags feed the approval gate, never optimizer
+       constraints or staged trades (human gate). The advisor decides.</em></p>
+    <table>
+      <thead><tr><th>Subject</th><th>Asset</th><th>Reason</th>
+        <th>Detail</th><th>Id</th></tr></thead>
+      <tbody>{_npa_rows(data)}</tbody>
     </table>
   </section>"""

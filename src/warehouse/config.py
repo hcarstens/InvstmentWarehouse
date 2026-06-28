@@ -114,6 +114,21 @@ class Settings(BaseSettings):
     analyst_kill_residual_cap: float = 0.10
     analyst_kill_min_liquidity_tier: int = 4
 
+    # Portfolio Analyst — non-performing-asset (NPA) flag thresholds (pa2).
+    # Reason-coded, advisory-only flags: they surface on the dashboard and
+    # feed the approval gate; they NEVER become optimizer constraints or stage
+    # trades (CLAUDE.md human gate). Pinned to analyst_config_version for audit
+    # replay. drawdown_pct/sustained_years gate the sustained-drawdown rule (a
+    # lot below cost beyond the threshold *and* held past the window — a fresh
+    # dip is not flagged); stale_mark_days ages an alt's last manual mark
+    # (semi-annual marking expected for PE); the missed-call rule needs no
+    # extra threshold (a scheduled call due on/before as_of with capital still
+    # unfunded). Calibrated against §9: founder_executive rung 4 trips
+    # sustained-drawdown + stale-mark + missed-call.
+    analyst_stale_mark_days: int = 180
+    analyst_npa_drawdown_pct: float = -0.10
+    analyst_npa_sustained_years: float = 1.0
+
     household_rls_enabled: bool = False
 
     @classmethod
