@@ -34,7 +34,11 @@ from warehouse.decision.tax.scenarios import (
     list_tax_scenarios,
     run_tax_scenario,
 )
-from warehouse.execution.oms.service import StagedOrderView, list_staged_orders
+from warehouse.execution.oms.service import (
+    StagedOrderView,
+    list_staged_orders,
+    stage_orders_from_approval,
+)
 from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
@@ -84,6 +88,12 @@ def _ensure_demo_phase4() -> None:
                     pending[0].request_id,
                     status=ApprovalStatus.APPROVED,
                     reviewer_id="advisor:demo",
+                )
+                # Decoupled: staging is now an explicit step after approval.
+                stage_orders_from_approval(
+                    session,
+                    pending[0].request_id,
+                    actor_id="advisor:demo",
                 )
         fidelity_runs = list_ingest_runs_for_custodian(
             session, "custodian_fidelity", limit=1

@@ -10,7 +10,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.decision.approval import ApprovalStatus
-from warehouse.execution.oms.service import stage_orders_from_approval
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import ApprovalRequestRow
 
@@ -104,8 +103,9 @@ def update_approval_status(
         household_id=row.household_id,
         details={"optimization_run_id": row.optimization_run_id},
     )
-    if status == ApprovalStatus.APPROVED:
-        stage_orders_from_approval(session, request_id, actor_id=reviewer_id)
+    # Decoupled (contract §5/§9.3): recording the decision does NOT stage
+    # orders. The caller chains `orders.stage` after an APPROVED decision, by
+    # correlation_id — staging venue/batching stays out of the approval gate.
     return _row_to_view(row)
 
 

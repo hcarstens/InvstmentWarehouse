@@ -166,10 +166,12 @@ def approve_list(household: str) -> None:
 def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
     """Approve or reject an optimization proposal.
 
-    Approval stages OMS orders.
+    On approval, chains OMS staging (decoupled — approval records the decision;
+    staging is a separate step).
     """
     from warehouse.decision.approval import ApprovalStatus
     from warehouse.decision.approval.service import update_approval_status
+    from warehouse.execution.oms.service import stage_orders_from_approval
     from warehouse.infra.db.base import session_scope
     from warehouse.infra.db.bootstrap import bootstrap_database
 
@@ -179,8 +181,16 @@ def approve_decide(request_id: str, reviewer: str, reject: bool) -> None:
         result = update_approval_status(
             session, request_id, status=status, reviewer_id=reviewer
         )
+        staged = 0
+        if status == ApprovalStatus.APPROVED:
+            staged = len(
+                stage_orders_from_approval(
+                    session, request_id, actor_id=reviewer
+                )
+            )
     click.echo(
-        f"{result.request_id} → {result.status} by {result.reviewer_id}"
+        f"{result.request_id} → {result.status} by {result.reviewer_id} "
+        f"({staged} orders staged)"
     )
 
 

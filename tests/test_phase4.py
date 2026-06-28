@@ -72,7 +72,17 @@ def test_fidelity_ingest(fidelity_file: Path) -> None:
     assert summary.rows_processed == 2
 
 
-def test_approval_stages_orders() -> None:
+def test_approval_decoupled_then_stage_dispatched() -> None:
+    """Approval records only; staging is a separate dispatched op (§9.3)."""
+    import warehouse.messaging.handlers  # noqa: F401 — register ops
+    from warehouse.messaging import (
+        DispatchContext,
+        Kind,
+        Message,
+        dispatch_message,
+    )
+    from warehouse.messaging.payloads import OrdersStagePayload
+
     bootstrap_database(seed=True)
     with session_scope() as session:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
@@ -84,16 +94,36 @@ def test_approval_stages_orders() -> None:
             if a.status == ApprovalStatus.PENDING.value
         ]
         assert pending
+        req_id = pending[0].request_id
         update_approval_status(
             session,
-            pending[0].request_id,
+            req_id,
             status=ApprovalStatus.APPROVED,
             reviewer_id="advisor:test",
         )
+        # Decoupled: approving alone does NOT stage.
+        assert not [
+            o
+            for o in list_staged_orders(
+                session, household_id=DEMO_HOUSEHOLD_ID
+            )
+            if o.approval_request_id == req_id
+        ]
+        # Chain orders.stage through dispatch.
+        ctx = DispatchContext(session=session, actor_id="advisor:test")
+        staged = dispatch_message(
+            ctx,
+            Message(
+                op="orders.stage",
+                kind=Kind.COMMAND,
+                payload=OrdersStagePayload(approval_request_id=req_id),
+                correlation_id="c",
+            ),
+        )
         orders = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)
-    assert orders
+    assert staged.orders
     assert orders[0].status == OrderStatus.STAGED.value
-    assert orders[0].approval_request_id == pending[0].request_id
+    assert orders[0].approval_request_id == req_id
 
 
 def test_oms_gate_blocks_unapproved_staging() -> None:
@@ -120,6 +150,8 @@ def test_oms_gate_blocks_unapproved_staging() -> None:
 
 
 def test_order_state_machine() -> None:
+    from warehouse.execution.oms.service import stage_orders_from_approval
+
     bootstrap_database(seed=True)
     with session_scope() as session:
         run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
@@ -135,6 +167,10 @@ def test_order_state_machine() -> None:
             pending.request_id,
             status=ApprovalStatus.APPROVED,
             reviewer_id="advisor:test",
+        )
+        # Decoupled: stage explicitly after approval.
+        stage_orders_from_approval(
+            session, pending.request_id, actor_id="advisor:test"
         )
         order = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)[0]
         submitted = update_order_status(
