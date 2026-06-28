@@ -105,6 +105,26 @@ def test_tax_scenario_stub_zero(seeded: None) -> None:
     assert bundle.tax.tax_delta == Decimal("0")
 
 
+def test_axiom2_breaches_on_concentration(seeded: None) -> None:
+    """Effective-bets axiom must fail a variance-concentrated book.
+
+    Regression for the scale bug where pct_variance_contribution (a
+    [0,1] fraction) was divided by 100, inflating effective bets ~100x
+    so axiom 2 always PASSed regardless of concentration.
+    """
+    bundle = _demo_advise(seeded)
+    contribs = bundle.risk.report.level_2_contributions.by_class
+    hhi = sum(float(c.pct_variance_contribution) ** 2 for c in contribs)
+    effective_bets = 1.0 / hhi
+    # Demo book is variance-concentrated (~1.3 effective bets).
+    assert effective_bets < 2.0
+    assert bundle.narrative is not None
+    assert bundle.narrative.axioms_scored["axiom_2"] in (
+        AxiomScore.WARN,
+        AxiomScore.BREACH,
+    )
+
+
 def test_score_pm_axioms_direct(seeded: None) -> None:
     bundle = _demo_advise(seeded)
     payload = build_working_set_from_bundle(

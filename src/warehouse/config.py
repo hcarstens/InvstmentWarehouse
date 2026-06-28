@@ -81,6 +81,16 @@ class Settings(BaseSettings):
 
     reconcile_max_stale_days: int = 7
 
+    # Portfolio Manager — ℍ_Allocation axiom scoring thresholds.
+    # Version-pinned for audit replay (CLAUDE.md: pin decision inputs).
+    pm_axiom_config_version: str = "2026.06"
+    pm_effective_bets_pass: float = 3.0
+    pm_effective_bets_warn: float = 2.0
+    pm_stress_breach: float = -0.35
+    pm_stress_warn: float = -0.25
+    pm_drift_warn: float = 0.03
+    pm_binding_constraint_warn: int = 3
+
     household_rls_enabled: bool = False
 
     @classmethod

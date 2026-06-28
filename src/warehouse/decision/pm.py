@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from warehouse.config import get_settings
+from warehouse.config import Settings, get_settings
 from warehouse.data.alternatives.service import list_alternative_holdings
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.decision.ips.store import load_ips
@@ -42,13 +42,6 @@ SPECIALIST_STATUS: dict[str, str] = {
     "tax": "stub",
 }
 
-_EFFECTIVE_BETS_PASS = 3.0
-_EFFECTIVE_BETS_WARN = 2.0
-_STRESS_BREACH = Decimal("-0.35")
-_STRESS_WARN = Decimal("-0.25")
-_DRIFT_WARN = Decimal("0.03")
-_BINDING_WARN = 3
-
 
 def score_pm_axioms(
     bundle: AdviceBundle,
@@ -58,14 +51,15 @@ def score_pm_axioms(
 ) -> PmNarrative:
     """Score the 7-axiom ℍ_Allocation checklist from specialist leg outputs."""
     del payload  # reserved for cohort/as_of provenance in pm1+
+    settings = get_settings()
     scores = {
         "axiom_1": _score_axiom_1(bundle),
-        "axiom_2": _score_axiom_2(bundle),
+        "axiom_2": _score_axiom_2(bundle, settings),
         "axiom_3": _score_axiom_3(bundle),
-        "axiom_4": _score_axiom_4(bundle),
+        "axiom_4": _score_axiom_4(bundle, settings),
         "axiom_5": AxiomScore.NOT_COMPUTED,
-        "axiom_6": _score_axiom_6(bundle),
-        "axiom_7": _score_axiom_7(bundle),
+        "axiom_6": _score_axiom_6(bundle, settings),
+        "axiom_7": _score_axiom_7(bundle, settings),
     }
     return PmNarrative(
         correlation_id=correlation_id,
@@ -82,20 +76,20 @@ def _score_axiom_1(bundle: AdviceBundle) -> AxiomScore:
     return AxiomScore.NOT_COMPUTED
 
 
-def _score_axiom_2(bundle: AdviceBundle) -> AxiomScore:
+def _score_axiom_2(bundle: AdviceBundle, settings: Settings) -> AxiomScore:
     contribs = bundle.risk.report.level_2_contributions.by_class
     if not contribs:
         return AxiomScore.NOT_COMPUTED
-    shares = [
-        float(c.pct_variance_contribution / Decimal("100")) for c in contribs
-    ]
+    # pct_variance_contribution is a fraction in [0, 1] summing to 1.0
+    # (covariance.py: mv / portfolio_variance), not a 0-100 percentage.
+    shares = [float(c.pct_variance_contribution) for c in contribs]
     hhi = sum(s * s for s in shares)
     if hhi <= 0:
         return AxiomScore.NOT_COMPUTED
     effective_bets = 1.0 / hhi
-    if effective_bets >= _EFFECTIVE_BETS_PASS:
+    if effective_bets >= settings.pm_effective_bets_pass:
         return AxiomScore.PASS
-    if effective_bets >= _EFFECTIVE_BETS_WARN:
+    if effective_bets >= settings.pm_effective_bets_warn:
         return AxiomScore.WARN
     return AxiomScore.BREACH
 
@@ -106,31 +100,33 @@ def _score_axiom_3(bundle: AdviceBundle) -> AxiomScore:
     return AxiomScore.PASS
 
 
-def _score_axiom_4(bundle: AdviceBundle) -> AxiomScore:
+def _score_axiom_4(bundle: AdviceBundle, settings: Settings) -> AxiomScore:
     scenarios = bundle.risk.report.level_4_stress.scenarios
     if not scenarios:
         return AxiomScore.NOT_COMPUTED
     worst = min(s.portfolio_return.value for s in scenarios)
-    if worst <= _STRESS_BREACH:
+    if worst <= Decimal(str(settings.pm_stress_breach)):
         return AxiomScore.BREACH
-    if worst <= _STRESS_WARN:
+    if worst <= Decimal(str(settings.pm_stress_warn)):
         return AxiomScore.WARN
     return AxiomScore.PASS
 
 
-def _score_axiom_6(bundle: AdviceBundle) -> AxiomScore:
-    if len(bundle.proposal.binding_constraints) > _BINDING_WARN:
+def _score_axiom_6(bundle: AdviceBundle, settings: Settings) -> AxiomScore:
+    if len(bundle.proposal.binding_constraints) > (
+        settings.pm_binding_constraint_warn
+    ):
         return AxiomScore.WARN
     return AxiomScore.PASS
 
 
-def _score_axiom_7(bundle: AdviceBundle) -> AxiomScore:
+def _score_axiom_7(bundle: AdviceBundle, settings: Settings) -> AxiomScore:
     if bundle.drift.alerts:
         return AxiomScore.BREACH
     if not bundle.drift.rows:
         return AxiomScore.NOT_COMPUTED
     max_drift = max(abs(row.drift) for row in bundle.drift.rows)
-    if max_drift > _DRIFT_WARN:
+    if max_drift > Decimal(str(settings.pm_drift_warn)):
         return AxiomScore.WARN
     return AxiomScore.PASS
 

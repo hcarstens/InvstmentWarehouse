@@ -17,7 +17,11 @@ from warehouse.messaging import (
     dispatch_message,
     observability,
 )
-from warehouse.messaging.payloads import AdviceBundle, PmAdvisePayload
+from warehouse.messaging.payloads import (
+    AdviceBundle,
+    PmAdvisePayload,
+    PolicyCheckPayload,
+)
 from warehouse.research.synthetic import emit_synthetic_household
 from warehouse.workflows.rebalance_advisory import run_rebalance_advisory
 
@@ -67,6 +71,30 @@ def test_pm_workflow_hnw_rung3() -> None:
     assert isinstance(out, AdviceBundle)
     assert out.narrative is not None
     assert out.risk.report is not None
+    # pm1 acceptance: whole-book HNW path surfaces concentration in drift.
+    assert out.drift.concentration_alerts
+
+
+def test_policy_check_concentration_live() -> None:
+    """Analyst leg is live: drift + concentration on a real HNW book."""
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    report = dispatch_message(
+        ctx,
+        Message(
+            op="policy.check",
+            kind=Kind.EVALUATE,
+            payload=PolicyCheckPayload(
+                household_id=payload.household_id,
+                positions=payload.positions,
+                ips=payload.ips,
+            ),
+            correlation_id="policy-concentration",
+            household_id=payload.household_id,
+        ),
+    )
+    assert report.concentration_alerts
 
 
 def test_pm_no_new_ops() -> None:
