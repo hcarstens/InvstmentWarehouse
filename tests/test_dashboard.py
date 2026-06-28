@@ -1,12 +1,13 @@
 """Dashboard status report tests."""
 
+import html
 import threading
 from http.server import HTTPServer
 
 from warehouse.dashboard.catalog import render_catalog
-from warehouse.dashboard.navigation import PAGES
+from warehouse.dashboard.navigation import PAGES, page_for_panel
 from warehouse.dashboard.phases import PHASES
-from warehouse.dashboard.server import DashboardHandler, render_html
+from warehouse.dashboard.server import _PHASE_API_SUCCESSORS, DashboardHandler
 from warehouse.dashboard.status import build_status_report
 
 
@@ -238,44 +239,123 @@ def test_status_report_includes_all_phases() -> None:
     assert len(report.workflows) == 7
 
 
-def test_render_html_contains_key_sections() -> None:
-    html = render_html()
-    assert "Infrastructure health" in html
-    assert "Entity graph" in html
-    assert "Security master" in html
-    assert "Schema status" in html
-    assert "Ingest status" in html
-    assert "Positions" in html and "lots" in html
-    assert "Risk manifest" in html
-    assert "Level 1" in html
-    assert "Parametric VaR" in html
-    assert "2008_liquidity" in html
-    assert "Audit log stream" in html
-    assert "Phase roadmap" in html
-    assert "Dashboard panels" in html
-    assert "Workflow catalog" in html
-    assert "after-tax wealth" in html
-    assert "Synthetic IPS binding matrix" in html
-    assert "Advisory bundle" in html
-    assert "pm.advise" in html
-    assert "axiom checklist" in html
-    assert "tax: stub" in html
-    assert "not_computed" in html
-    assert "Office Manager gate" in html
-    # pa0: attribution residual panel (5th PM leg).
-    assert "attribution.evaluate" in html
-    assert "active return vs ex-ante class assumption" in html
-    # pa1: kill-criteria watch panel (alerts only, human gate).
-    assert "Kill-criteria watch" in html
-    assert "Alerts only" in html
-    # po0: MV rebalance panel (target weights w*, advisory).
-    assert "MV rebalance" in html
-    assert "Target w*" in html
+def test_catalog_live_panel_count_matches_phases() -> None:
+    report = build_status_report()
+    expected_live = sum(
+        1
+        for phase in PHASES
+        for panel in phase.panels
+        if panel.status == "live"
+    )
+    assert report.live_panel_count == expected_live
+    html = render_catalog()
+    assert f"<strong>{report.live_panel_count}</strong> live panels" in html
+
+
+def test_catalog_registry_lists_every_panel() -> None:
+    page_html = render_catalog()
+    for phase in PHASES:
+        for panel in phase.panels:
+            assert html.escape(panel.name) in page_html
+            page = page_for_panel(panel.name)
+            assert f'href="{page.path}"' in page_html
+
+
+def test_plane_pages_http_returns_200() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import urllib.request
+
+        paths = [
+            page.path for page in PAGES if page.page_id not in ("catalog",)
+        ]
+        for path in paths:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}{path}",
+                timeout=30,
+            ) as resp:
+                assert resp.status == 200
+                assert len(resp.read()) > 0
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_decision_page_http() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/decision",
+            timeout=30,
+        ) as resp:
+            html = resp.read().decode()
+        assert "IPS drift monitor" in html
+        assert "Advisory bundle" in html
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_phase_api_deprecation_headers() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import json
+        import urllib.request
+
+        for legacy, successors in _PHASE_API_SUCCESSORS.items():
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/api/{legacy}",
+                timeout=30,
+            ) as resp:
+                assert resp.headers.get("Deprecation") == "true"
+                link = resp.headers.get("Link", "")
+                notice = resp.headers.get("X-Deprecation-Notice", "")
+                for path in successors:
+                    assert path in link
+                    assert path in notice
+                assert notice.startswith("use ")
+                payload = json.loads(resp.read())
+                assert isinstance(payload, dict)
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_page_api_has_no_deprecation_headers() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/pages/data",
+            timeout=30,
+        ) as resp:
+            assert resp.headers.get("Deprecation") is None
+            assert resp.headers.get("X-Deprecation-Notice") is None
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
 
 
 def test_optimizer_panel_shows_mu_source_label() -> None:
     """po0 §B.9: panel labels μ as an ex-ante class assumption (PO6)."""
-    html = render_html()
+    from warehouse.dashboard.pages.decision import render_decision_page
+
+    html = render_decision_page()
     assert "ex-ante class assumption" in html
 
 
