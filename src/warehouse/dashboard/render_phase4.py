@@ -171,7 +171,8 @@ def render_tax_scenario_section(phase4: Phase4DashboardData) -> str:
   <section>
     <h2>Tax scenario panel</h2>
     <p><span class="badge badge-warn">partial</span>
-       Tax scenarios live; risk reporting planned.</p>
+       Tax scenarios — reporting-owned compute via
+       <code>warehouse.reporting.tax</code>; decision interim estimator unchanged.</p>
     <table>
       <thead><tr><th>Scenario</th><th>Baseline tax</th><th>Scenario tax</th><th>Delta</th><th>Run at</th></tr></thead>
       <tbody>{tax_rows or '<tr><td colspan="5">No tax scenarios</td></tr>'}</tbody>

@@ -153,11 +153,12 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         pytest_paths=[
             "tests/test_phase4.py",
             "tests/test_reporting_performance.py",
+            "tests/test_reporting_tax.py",
         ],
         coverage_glob="src/warehouse/reporting/**",
         coverage_floor_pct=80.0,
         risk_tier="medium",
-        note="Performance falsifiers (st5i); tax interim via test_phase4.py",
+        note="Performance + reporting-owned tax scenarios (st6c)",
     ),
     PlaneTestSlice(
         plane_id="infra",

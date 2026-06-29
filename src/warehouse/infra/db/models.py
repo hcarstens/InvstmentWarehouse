@@ -404,6 +404,17 @@ class AlternativeEventRow(Base):
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
 
 
+class RealizedGainEventRow(Base):
+    __tablename__ = "realized_gain_events"
+
+    event_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    household_id: Mapped[str] = mapped_column(
+        String(64), nullable=False, index=True
+    )
+    event_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False)
+
+
 class TaxScenarioRunRow(Base):
     __tablename__ = "tax_scenario_runs"
 

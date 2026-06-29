@@ -1,6 +1,5 @@
 """Phase 4 — OMS, multi-custodian, solver comparison, alts, tax scenarios."""
 
-from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -193,6 +192,7 @@ def test_solver_comparison() -> None:
 
 
 def test_tax_scenario_niit() -> None:
+    """Phase 4 persistence smoke — oracles in test_reporting_tax."""
     bootstrap_database(seed=True)
     with session_scope() as session:
         result = run_tax_scenario(
@@ -201,9 +201,8 @@ def test_tax_scenario_niit() -> None:
             scenario_name="test_niit",
             overlays=TaxScenarioOverlays(apply_niit=True),
         )
-    assert result.tax_delta == Decimal("0")
-    assert result.baseline_tax == Decimal("0")
-    assert result.scenario_tax == Decimal("0")
+    assert result.scenario_name == "test_niit"
+    assert result.overlays.apply_niit is True
 
 
 def test_phase4_dashboard_loads() -> None:

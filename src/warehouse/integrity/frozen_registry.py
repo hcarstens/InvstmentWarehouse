@@ -46,6 +46,7 @@ from warehouse.reporting.performance import (
     HouseholdPerformanceReport,
     RealizedGainEvent,
 )
+from warehouse.reporting.tax import ReportingTaxResult
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
 from warehouse.research.risk.models import (
@@ -85,6 +86,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     PositionThesis,
     RebalanceProposal,
     RealizedGainEvent,
+    ReportingTaxResult,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -301,6 +303,13 @@ def _sample_instance(cls: type[Any]) -> Any:
             event_date=date(2026, 3, 1),
             amount=Decimal("12000"),
         )
+    if cls is ReportingTaxResult:
+        return ReportingTaxResult(
+            overlays=TaxScenarioOverlays(),
+            baseline_tax=Decimal("1000"),
+            scenario_tax=Decimal("1100"),
+            tax_delta=Decimal("100"),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -409,6 +418,8 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "household_id"
     if isinstance(instance, RealizedGainEvent):
         return "amount"
+    if isinstance(instance, ReportingTaxResult):
+        return "tax_delta"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

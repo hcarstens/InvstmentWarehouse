@@ -6,9 +6,11 @@ from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
+from warehouse.infra.db.models import RealizedGainEventRow
 
 
 class PerformanceError(ValueError):
@@ -61,9 +63,21 @@ def _fetch_realized_events(
     *,
     as_of: date,
 ) -> list[RealizedGainEvent]:
-    """Load YTD realized events from ledger (stub until persisted)."""
-    _ = session, household_id, as_of
-    return []
+    """Load realized gain/loss events for the household through ``as_of``."""
+    rows = session.scalars(
+        select(RealizedGainEventRow)
+        .where(RealizedGainEventRow.household_id == household_id)
+        .where(RealizedGainEventRow.event_date <= as_of)
+        .order_by(RealizedGainEventRow.event_date)
+    ).all()
+    return [
+        RealizedGainEvent(
+            event_id=row.event_id,
+            event_date=row.event_date,
+            amount=row.amount,
+        )
+        for row in rows
+    ]
 
 
 def _aggregate_positions(

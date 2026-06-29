@@ -21,6 +21,7 @@ from warehouse.infra.db.models import (
     IpsPolicyRow,
     LotRow,
     MarketPriceRow,
+    RealizedGainEventRow,
     SecurityRow,
     WorkflowDefinitionRow,
 )
@@ -212,6 +213,28 @@ def seed_phase4_extensions(session: Session) -> None:
         )
 
 
+def seed_realized_gain_events(session: Session) -> None:
+    """Idempotent demo realized-gain rows for reporting YTD (st6b)."""
+    if session.get(RealizedGainEventRow, "rg_ytd_demo"):
+        return
+    session.add_all(
+        [
+            RealizedGainEventRow(
+                event_id="rg_ytd_demo",
+                household_id=DEMO_HOUSEHOLD_ID,
+                event_date=date(2026, 3, 15),
+                amount=Decimal("4200.00"),
+            ),
+            RealizedGainEventRow(
+                event_id="rg_prior_year",
+                household_id=DEMO_HOUSEHOLD_ID,
+                event_date=date(2025, 11, 1),
+                amount=Decimal("10000.00"),
+            ),
+        ]
+    )
+
+
 def seed_market_prices(session: Session) -> None:
     existing = session.scalar(select(MarketPriceRow.security_id).limit(1))
     if existing:
@@ -260,6 +283,7 @@ def seed_demo_data(session: Session) -> bool:
         seed_ips_policy(session)
         seed_demo_lots(session)
         seed_phase4_extensions(session)
+        seed_realized_gain_events(session)
         _sync_workflow_definitions(session)
         return False
 
@@ -489,6 +513,20 @@ def seed_demo_data(session: Session) -> bool:
             notes="Q1 2026 manager mark",
         ),
     ]
+    realized_events = [
+        RealizedGainEventRow(
+            event_id="rg_ytd_demo",
+            household_id=DEMO_HOUSEHOLD_ID,
+            event_date=date(2026, 3, 15),
+            amount=Decimal("4200.00"),
+        ),
+        RealizedGainEventRow(
+            event_id="rg_prior_year",
+            household_id=DEMO_HOUSEHOLD_ID,
+            event_date=date(2025, 11, 1),
+            amount=Decimal("10000.00"),
+        ),
+    ]
     workflows = [
         WorkflowDefinitionRow(
             name=w.name,
@@ -506,6 +544,7 @@ def seed_demo_data(session: Session) -> bool:
     session.add_all(lots)
     session.add_all(alt_holdings)
     session.add_all(alt_events)
+    session.add_all(realized_events)
     session.add_all(workflows)
     seed_market_prices(session)
     seed_ips_policy(session)

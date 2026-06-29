@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
 
 import pytest
 from hypothesis import given
@@ -20,6 +19,7 @@ from warehouse.infra.db.models import (
     EntityRow,
     LotRow,
     MarketPriceRow,
+    RealizedGainEventRow,
     SecurityRow,
 )
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
@@ -285,24 +285,94 @@ def test_demo_household_matches_independent_oracle() -> None:
 
 
 def test_ytd_realized_wired_through_build() -> None:
+    """Integration — persisted events flow through build without mocks."""
+    hh = "hh_ytd_integration"
     events = [
-        RealizedGainEvent(
-            event_id="r1",
-            event_date=date(2026, 3, 10),
-            amount=Decimal("2500"),
+        (
+            "rg_ytd_int_in",
+            date(2026, 3, 10),
+            Decimal("2500"),
+        ),
+        (
+            "rg_ytd_int_prior",
+            date(2025, 12, 31),
+            Decimal("999"),
+        ),
+        (
+            "rg_ytd_int_after",
+            date(2026, 7, 1),
+            Decimal("500"),
         ),
     ]
+    expected = _oracle_realized_ytd(
+        [(date(2026, 3, 10), Decimal("2500"))],
+        as_of=AS_OF,
+    )
     with session_scope() as session:
-        with patch(
-            "warehouse.reporting.performance.compute._fetch_realized_events",
-            return_value=events,
-        ):
-            report = build_household_performance_report(
-                session,
-                household_id=DEMO_HOUSEHOLD_ID,
-                as_of=AS_OF,
+        session.add(
+            EntityRow(
+                entity_id=hh,
+                entity_type=EntityType.HOUSEHOLD,
+                name="YTD Test HH",
+                household_id=hh,
             )
-    assert report.realized_gain_ytd == Decimal("2500")
+        )
+        for event_id, evt_date, amount in events:
+            session.add(
+                RealizedGainEventRow(
+                    event_id=event_id,
+                    household_id=hh,
+                    event_date=evt_date,
+                    amount=amount,
+                )
+            )
+        session.flush()
+        report = build_household_performance_report(
+            session,
+            household_id=hh,
+            as_of=AS_OF,
+        )
+    assert report.realized_gain_ytd == expected
+
+
+def test_ytd_jan1_boundary_included() -> None:
+    hh = "hh_ytd_jan1"
+    jan1 = date(AS_OF.year, 1, 1)
+    with session_scope() as session:
+        session.add(
+            EntityRow(
+                entity_id=hh,
+                entity_type=EntityType.HOUSEHOLD,
+                name="Jan1 HH",
+                household_id=hh,
+            )
+        )
+        session.add(
+            RealizedGainEventRow(
+                event_id="rg_jan1",
+                household_id=hh,
+                event_date=jan1,
+                amount=Decimal("100"),
+            )
+        )
+        session.flush()
+        report = build_household_performance_report(
+            session,
+            household_id=hh,
+            as_of=AS_OF,
+        )
+    assert report.realized_gain_ytd == Decimal("100")
+
+
+def test_demo_household_nonzero_realized_ytd() -> None:
+    """Demo seed includes persisted YTD realized events (st6b)."""
+    with session_scope() as session:
+        report = build_household_performance_report(
+            session,
+            household_id=DEMO_HOUSEHOLD_ID,
+            as_of=AS_OF,
+        )
+    assert report.realized_gain_ytd == Decimal("4200.00")
 
 
 def _position_view(
