@@ -76,11 +76,24 @@ _SHIPPED_PROPERTY_PATHS = (
     "tests/test_risk_properties.py",
 )
 
+_SHIPPED_STATISTICAL_PATHS = (
+    "tests/test_synth_distribution.py",
+    "tests/test_synth_null_baseline.py",
+    "tests/test_synth_sdg_ablation.py",
+    "tests/test_synth_cross_regime.py",
+)
+
 
 @pytest.mark.parametrize("rel_path", _SHIPPED_PROPERTY_PATHS)
 def test_shipped_property_paths_exist(rel_path: str) -> None:
     path = _ROOT / rel_path
     assert path.is_file(), f"missing shipped property suite {rel_path}"
+
+
+@pytest.mark.parametrize("rel_path", _SHIPPED_STATISTICAL_PATHS)
+def test_shipped_statistical_paths_exist(rel_path: str) -> None:
+    path = _ROOT / rel_path
+    assert path.is_file(), f"missing shipped statistical suite {rel_path}"
 
 
 @pytest.mark.parametrize("slice_row", PLANE_TEST_SLICES, ids=_SLICE_IDS)

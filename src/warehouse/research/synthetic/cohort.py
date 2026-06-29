@@ -57,6 +57,28 @@ def default_cohort_for_rung(rung: int) -> str:
     return _RUNG_COHORT[rung]
 
 
+def sample_sleeve_weights_uniform(
+    cohort_id: str, seed: int
+) -> dict[AssetClass, Decimal]:
+    """Negation of cohort-conditioned priors — uniform on available sleeves."""
+    if cohort_id not in _SLEEVE_RANGES:
+        raise KeyError(f"unknown cohort_id: {cohort_id}")
+    sleeves = list(_SLEEVE_RANGES[cohort_id].keys())
+    raw = {asset_class: Decimal("1") for asset_class in sleeves}
+    total = Decimal(str(len(sleeves)))
+    keys = list(raw.keys())
+    weights: dict[AssetClass, Decimal] = {}
+    assigned = Decimal("0")
+    for index, asset_class in enumerate(keys):
+        if index == len(keys) - 1:
+            weights[asset_class] = Decimal("1") - assigned
+        else:
+            weight = (Decimal("1") / total).quantize(Decimal("0.0000001"))
+            weights[asset_class] = weight
+            assigned += weight
+    return weights
+
+
 def sample_sleeve_weights(
     cohort_id: str, seed: int
 ) -> dict[AssetClass, Decimal]:

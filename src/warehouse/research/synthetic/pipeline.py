@@ -281,6 +281,7 @@ def emit_hnw_fixture(
     rung: int,
     household_id: str | None = None,
     nav_usd: Decimal = _DEFAULT_NAV,
+    weights: dict[AssetClass, Decimal] | None = None,
 ) -> HouseholdFixture:
     """Emit Shape B fixture at rung 3 or 4.
 
@@ -290,24 +291,27 @@ def emit_hnw_fixture(
         raise ValueError("emit_hnw_fixture supports rung 3 or 4 only")
 
     hh_id = household_id or f"synthetic-{cohort_id}-s{seed}"
-    weights = sample_sleeve_weights(cohort_id, seed)
+    if weights is not None:
+        resolved_weights = weights
+    else:
+        resolved_weights = sample_sleeve_weights(cohort_id, seed)
     accounts = _build_accounts(hh_id, cohort_id)
     taxable = accounts[0].account_id
     entity_id = accounts[-1].account_id
 
     if rung == 3:
-        lots = _sleeve_only_lots(hh_id, taxable, weights, nav_usd)
-        alts = _build_alts(hh_id, entity_id, weights, nav_usd, seed)
+        lots = _sleeve_only_lots(hh_id, taxable, resolved_weights, nav_usd)
+        alts = _build_alts(hh_id, entity_id, resolved_weights, nav_usd, seed)
     else:
         lots = _split_public_lots(
             household_id=hh_id,
             account_id=taxable,
-            weights=weights,
+            weights=resolved_weights,
             nav=nav_usd,
             seed=seed,
             cohort_id=cohort_id,
         )
-        alts = _build_alts(hh_id, entity_id, weights, nav_usd, seed)
+        alts = _build_alts(hh_id, entity_id, resolved_weights, nav_usd, seed)
 
     lot_nav = sum(
         (lot.quantity * lot.market_price for lot in lots), Decimal("0")
@@ -317,7 +321,7 @@ def emit_hnw_fixture(
 
     stage_hashes = [
         _stage_hash("cohort", cohort_id),
-        _stage_hash("weights", str(sorted(weights.items()))),
+        _stage_hash("weights", str(sorted(resolved_weights.items()))),
         _stage_hash("lots", str(len(lots))),
         _stage_hash("alts", str(len(alts))),
     ]
@@ -372,6 +376,7 @@ def emit_synthetic_household(
     household_id: str | None = None,
     nav_usd: Decimal = _DEFAULT_NAV,
     validate: bool = True,
+    weights: dict[AssetClass, Decimal] | None = None,
 ) -> SyntheticHouseholdBundle:
     """Emit Shape B fixture + co-generated IPS; validate before sealing."""
     fixture = emit_hnw_fixture(
@@ -380,6 +385,7 @@ def emit_synthetic_household(
         rung=rung,
         household_id=household_id,
         nav_usd=nav_usd,
+        weights=weights,
     )
     weights = _weights_from_shape_a(fixture)
     ips = emit_ips_for_cohort(

@@ -55,6 +55,7 @@ from warehouse.research.risk.models import (
     RiskResult,
     ScenarioSet,
 )
+from warehouse.research.synthetic.daily_paths import PathTargets
 
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
@@ -73,6 +74,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     OptimizationResult,
     OrchestratorError,
     OrchestratorResponse,
+    PathTargets,
     PmNarrative,
     PositionAttribution,
     PositionThesis,
@@ -272,6 +274,13 @@ def _sample_instance(cls: type[Any]) -> Any:
             ),
             elapsed_ms=0,
         )
+    if cls is PathTargets:
+        return PathTargets(
+            annual_vol=0.16,
+            lag1_autocorr=0.05,
+            excess_kurtosis=1.5,
+            vol_clustering=0.97,
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -374,6 +383,8 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "op"
     if isinstance(instance, DispatchContext):
         return "actor_id"
+    if isinstance(instance, PathTargets):
+        return "annual_vol"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 
