@@ -199,6 +199,7 @@ def _plane_result(
     failed: int,
     total: int,
     coverage_pct: float | None,
+    mutation_kill_pct: float | None = None,
 ) -> PlaneTestResult:
     return PlaneTestResult(
         plane_id=slice_row.plane_id,
@@ -211,7 +212,7 @@ def _plane_result(
         coverage_status=_coverage_status(
             coverage_pct, slice_row.coverage_floor_pct
         ),
-        mutation_kill_pct=None,
+        mutation_kill_pct=mutation_kill_pct,
         risk_tier=slice_row.risk_tier,
         pytest_paths=list(slice_row.pytest_paths),
     )
@@ -222,6 +223,7 @@ def build_testing_report(
     cwd: Path | None = None,
     artifact_path: Path | None = None,
     coverage_path: Path | None = None,
+    mutation_path: Path | None = None,
     run_pytest: RunPytest = _default_run_pytest,
 ) -> tuple[TestingReport, int]:
     """Run pytest with coverage; return report and full-suite exit code."""
@@ -270,6 +272,14 @@ def build_testing_report(
                 coverage_pct=coverage_pct,
             )
         )
+
+    from warehouse.dashboard.mutation_report import (
+        load_mutation_artifact,
+        merge_mutation_into_planes,
+    )
+
+    kill_by_plane = load_mutation_artifact(mutation_path)
+    planes = merge_mutation_into_planes(planes, kill_by_plane)
 
     measure_pyramid_mix.cache_clear()
     pyramid = measure_pyramid_mix()
@@ -331,6 +341,7 @@ def generate_testing_report(
     *,
     artifact_path: Path | None = None,
     coverage_path: Path | None = None,
+    mutation_path: Path | None = None,
     run_pytest: RunPytest = _default_run_pytest,
     matrix_runner: object = None,
 ) -> int:
@@ -338,6 +349,7 @@ def generate_testing_report(
     report, exit_code = build_testing_report(
         artifact_path=artifact_path,
         coverage_path=coverage_path,
+        mutation_path=mutation_path,
         run_pytest=run_pytest,
     )
     e2e_path = (

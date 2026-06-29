@@ -235,9 +235,10 @@ def test_generate_testing_report_propagates_pytest_exit_code(
         cwd: Path | None = None,
         artifact_path: Path | None = None,
         coverage_path: Path | None = None,
+        mutation_path: Path | None = None,
         run_pytest: object = None,
     ) -> tuple[TestingReportModel, int]:
-        _ = cwd, artifact_path, coverage_path, run_pytest
+        _ = cwd, artifact_path, coverage_path, mutation_path, run_pytest
         cov_path.write_text(json.dumps({"files": {}}), encoding="utf-8")
         report = TestingReportModel.model_validate(
             {
@@ -310,3 +311,50 @@ def test_file_matches_bucket_exact_file() -> None:
     prefixes = ("src/warehouse/config.py",)
     assert file_matches_bucket("src/warehouse/config.py", prefixes)
     assert not file_matches_bucket("src/warehouse/config_extra.py", prefixes)
+
+
+def test_build_testing_report_merges_mutation_artifact(tmp_path: Path) -> None:
+    cov_path = tmp_path / "coverage.json"
+    mutation_path = tmp_path / "mutation_report.json"
+    cov_path.write_text(
+        json.dumps({"files": _sample_coverage_files()}),
+        encoding="utf-8",
+    )
+    mutation_path.write_text(
+        json.dumps(
+            {
+                "planes": [
+                    {"plane_id": "data", "kill_pct": 78.0},
+                    {"plane_id": "decision", "kill_pct": 65.0},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def fake_pytest(
+        args: list[str],
+        *,
+        cwd: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        if "--cov=warehouse" in args:
+            return subprocess.CompletedProcess(
+                args, 0, "10 passed in 1.0s", ""
+            )
+        return subprocess.CompletedProcess(args, 0, "2 passed in 0.1s", "")
+
+    report, exit_code = build_testing_report(
+        cwd=tmp_path,
+        coverage_path=cov_path,
+        mutation_path=mutation_path,
+        run_pytest=fake_pytest,
+    )
+    data = next(p for p in report.planes if p.plane_id == "data")
+    decision = next(p for p in report.planes if p.plane_id == "decision")
+    research = next(p for p in report.planes if p.plane_id == "research")
+    assert exit_code == 0
+    assert data.mutation_kill_pct == pytest.approx(78.0)
+    assert decision.mutation_kill_pct == pytest.approx(65.0)
+    assert research.mutation_kill_pct is None
+    assert data.ok is True
+    assert report.overall.ok is True

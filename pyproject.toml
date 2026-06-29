@@ -26,6 +26,7 @@ dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "hypothesis>=6.100",
+    "mutmut>=3.2",
     "ruff>=0.4",
     "mypy>=1.9",
     "pip-audit>=2.7",
@@ -63,11 +64,20 @@ select = ["E", "F", "I", "UP"]
 "src/warehouse/dashboard/phases.py" = ["E501"]
 "src/warehouse/dashboard/status.py" = ["E501"]
 
+[tool.mutmut]
+# Per-plane overrides at runtime (mutation_report.py); defaults list both targets.
+source_paths = ["src/"]
+only_mutate = [
+    "src/warehouse/data/ledger/__init__.py",
+    "src/warehouse/decision/optimizer/qp.py",
+]
+pytest_add_cli_args = ["-q", "--tb=no", "--disable-warnings"]
+
 [tool.mypy]
 python_version = "3.12"
 strict = true
 packages = ["warehouse"]
 
 [[tool.mypy.overrides]]
-module = ["numpy.*", "scipy.*", "redis", "redis.*"]
+module = ["numpy.*", "scipy.*", "redis", "redis.*", "mutmut", "mutmut.*"]
 ignore_missing_imports = true

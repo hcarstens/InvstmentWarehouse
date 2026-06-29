@@ -25,6 +25,7 @@ configs/local.toml
 .DS_Store
 
 # Runtime / local data
+mutants/
 runs/
 data/*
 !data/.gitkeep

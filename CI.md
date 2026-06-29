@@ -132,6 +132,8 @@ Config: `[tool.pytest.ini_options]` — `testpaths = ["tests"]`, `pythonpath = [
 | Command | Purpose |
 | --- | --- |
 | `warehouse test report` | Full suite + coverage JSON + `last_report.json` + `e2e_smoke.json` — **CI test job** |
+| `warehouse test mutation` | Scoped `mutmut` on Data + Decision targets → `mutation_report.json` — **on-demand / nightly only** (minutes; not PR path) |
+| `warehouse test report --mutation` | Run mutation first, then full report (merges kill % when artifact present) |
 | `pytest` | Full suite (no coverage artifact) |
 | `pytest -q` | Quiet summary |
 | `pytest -x` | Stop on first failure |
@@ -148,8 +150,11 @@ Written by `warehouse test report` (gitignored under `runs/`):
 | `runs/testing/coverage.json` | Full `pytest-cov` JSON — per-plane bucket source |
 | `runs/testing/last_report.json` | `TestingReport` for `/testing` and `GET /api/testing` |
 | `runs/testing/e2e_smoke.json` | E2E smoke matrix for Research panel + `e2e_smoke` headline on `/testing` |
+| `runs/testing/mutation_report.json` | Mutation kill % per critical plane (Data, Decision); merged into `last_report.json` when present |
 
-CI uploads all three files as GitHub Actions artifacts (7-day retention). Coverage
+CI uploads coverage + report + e2e artifacts (7-day retention). Mutation artifact is
+**local/on-demand** — not produced by the default PR `warehouse test report` job.
+Coverage
 **never gates** `ok` on the dashboard (ST3) — amber badges only when below floor.
 E2E smoke pass rate (`passed/households`, target 4/4) **does** gate `e2e_smoke.ok`
 and contributes to `overall.ok`.

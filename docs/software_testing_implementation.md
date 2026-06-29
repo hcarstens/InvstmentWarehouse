@@ -417,7 +417,7 @@ the investment once the suite, dashboard, and E2E wiring (st0–st4) are stable.
 | **st5e** | Decision — analyst/PM depth | `pytest tests/test_analyst_*.py tests/test_pm_*.py -q` | ☑ done |
 | **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☑ done |
 | **st5g** | Research — synthetic statistical (§4.2.1) | `pytest tests/test_synth_*.py -q` | ☑ done |
-| **st5h** | Mutation report (ST3) — `mutmut` on Data + Decision; `mutation_kill_pct` artifact | artifact shows kill % on Data + Decision rows | ☐ not done |
+| **st5h** | Mutation report (ST3) — `mutmut` on Data + Decision; `mutation_kill_pct` artifact | artifact shows kill % on Data + Decision rows | ☑ done |
 | **st5i** | Reporting — `tests/test_reporting_performance.py` when module ships | — | ☐ deferred |
 
 **Sequence:** st5a first (deps + registry). st5b–st5c can land in parallel. st5d–st5f last
@@ -642,7 +642,8 @@ st3 **adds** `--cov` flags to the test step; does not remove lint/types jobs.
 | File | Covers |
 | --- | --- |
 | `tests/test_testing_registry.py` | Registry complete; floors sane; paths exist; `report_mutation`/`property_paths` resolve |
-| `tests/test_testing_report.py` | CLI + aggregation; JSON schema; `ok` not gated on coverage; overall = `all(plane.ok)` |
+| `tests/test_mutation_report.py` | ST3 — kill-% parser + merge; mutmut config uses registry paths |
+| `tests/test_testing_report.py` | CLI + aggregation; JSON schema; `ok` not gated on coverage; overall = `all(plane.ok)`; mutation artifact merge |
 | `tests/test_dashboard.py` | `/testing` HTTP + `/api/testing` JSON; QA footnote present on every plane page (§4.8) |
 | `tests/test_optimizer_properties.py` | ST6 — optimizer invariants (Σw=1, ≥0, turnover, feasibility, monotone risk-aversion) |
 | `tests/test_lot_properties.py` | ST6 — lot ledger invariants |
@@ -724,3 +725,4 @@ all six slices are `☐ not done`** (see top status table).
 | 2026-06-29 | **st5e shipped:** `test_analyst_depth.py` — kill-criteria edges, NPA boundaries, attribution oracles; PM depth in `test_pm_narrative.py` (HNW attribution oracle, zero-residual checkpoint probe). |
 | 2026-06-29 | **st5f shipped:** `test_risk_properties.py` — hypothesis invariants on `horizon_scale`, `parametric_var`/`parametric_es` ordering, `pairwise_correlation` bounds, wᵀΣw variance oracle, pct-variance sum, vol sub-additivity on disjoint sleeves; boundary hunts (empty states, single-asset, zero vol, ρ at ±1). |
 | 2026-06-29 | **st5g shipped:** `test_synth_{distribution,null_baseline,sdg_ablation,cross_regime}.py` — independent distributional oracles (`daily_paths.py`), shuffle/bootstrap nulls, SDG3 uniform-weight ablation vs `run_workflow_smoke`, `2022_inflation` cross-regime equity-trim rule; registry + `_SHIPPED_STATISTICAL_PATHS` wired. |
+| 2026-06-29 | **st5h shipped:** `mutmut` in `[dev]`; `warehouse test mutation` writes `runs/testing/mutation_report.json`; `generate_testing_report()` merges `mutation_kill_pct` onto Data + Decision (report-only, never gates `ok`); `tests/test_mutation_report.py` falsifiers. |

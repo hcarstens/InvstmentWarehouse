@@ -317,9 +317,21 @@ def test() -> None:
 
 
 @test.command("report")
-def test_report() -> None:
+@click.option(
+    "--mutation",
+    is_flag=True,
+    help="Run mutation testing first (slow; on-demand only).",
+)
+def test_report(mutation: bool) -> None:
     """Run pytest with coverage and write ``runs/testing/last_report.json``."""
+    from warehouse.dashboard.mutation_report import generate_mutation_report
     from warehouse.dashboard.testing_report import generate_testing_report
+
+    if mutation:
+        generate_mutation_report()
+        click.echo(
+            "Mutation report written to runs/testing/mutation_report.json"
+        )
 
     exit_code = generate_testing_report()
     if exit_code != 0:
@@ -328,6 +340,15 @@ def test_report() -> None:
         "Testing report written to runs/testing/last_report.json "
         "and runs/testing/e2e_smoke.json"
     )
+
+
+@test.command("mutation")
+def test_mutation() -> None:
+    """Run scoped mutmut on Data + Decision; write mutation_report.json."""
+    from warehouse.dashboard.mutation_report import generate_mutation_report
+
+    path = generate_mutation_report()
+    click.echo(f"Mutation report written to {path.name} in runs/testing/")
 
 
 @main.command()
