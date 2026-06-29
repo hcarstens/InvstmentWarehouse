@@ -116,6 +116,12 @@ class PmAdvisePayload(BaseModel):
     as_of_date: date | None = None
 
 
+class ReportBuildPayload(BaseModel):
+    household_id: str
+    period_label: str | None = None
+    as_of_date: date | None = None
+
+
 class AxiomScore(StrEnum):
     PASS = "pass"
     WARN = "warn"

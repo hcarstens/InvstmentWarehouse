@@ -1,5 +1,6 @@
 """CLI entry point."""
 
+from datetime import datetime
 from pathlib import Path
 
 import click
@@ -309,6 +310,49 @@ def risk_evaluate(file: Path, horizon: str) -> None:
         click.echo(payload, err=True)
         raise SystemExit(1)
     click.echo(payload)
+
+
+@main.group()
+def report() -> None:
+    """Household report writer."""
+
+
+@report.command("write")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+@click.option("--as-of", "as_of", type=click.DateTime(formats=["%Y-%m-%d"]))
+@click.option(
+    "--period-label",
+    default=None,
+    help="Override period directory key.",
+)
+def report_write(
+    household: str,
+    as_of: datetime | None,
+    period_label: str | None,
+) -> None:
+    """Build internal + external Markdown report packs for a household."""
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.reporting.report_writer.writer import (
+        build_and_write_household_reports,
+    )
+
+    bootstrap_database(seed=True)
+    as_of_date = as_of.date() if as_of is not None else None
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            household,
+            period_label=period_label,
+            as_of_date=as_of_date,
+            actor_id="cli:report_write",
+        )
+    click.echo(f"Report {written.snapshot_id}")
+    click.echo(f"  Period: {written.period_label}")
+    click.echo(f"  Output: {written.output_dir}")
+    click.echo(f"  Internal: {written.internal_markdown_path}")
+    click.echo(f"  External: {written.external_markdown_path}")
+    click.echo(f"  Bundle: {written.bundle_json_path}")
 
 
 @main.group()

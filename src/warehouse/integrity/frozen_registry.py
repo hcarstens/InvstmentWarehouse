@@ -46,7 +46,11 @@ from warehouse.reporting.performance import (
     HouseholdPerformanceReport,
     RealizedGainEvent,
 )
-from warehouse.reporting.report_writer.models import ReportBundle, ReportPeriod
+from warehouse.reporting.report_writer.models import (
+    ReportBundle,
+    ReportPeriod,
+    WrittenHouseholdReport,
+)
 from warehouse.reporting.tax import ReportingTaxResult
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
@@ -92,6 +96,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     RiskDeltas,
     RiskResult,
     Settings,
+    WrittenHouseholdReport,
 )
 
 
@@ -346,6 +351,24 @@ def _sample_instance(cls: type[Any]) -> Any:
             limitations=("test limitation",),
             data_sources=("reporting.performance:test",),
         )
+    if cls is WrittenHouseholdReport:
+        return WrittenHouseholdReport(
+            snapshot_id="rpt_test",
+            household_id="hh_test",
+            period_label="month-end-2026-06-24",
+            as_of_date=date(2026, 6, 24),
+            generated_at=datetime(2026, 6, 24, tzinfo=UTC),
+            output_dir="/tmp/reports/hh_test/month-end-2026-06-24/rpt_test",
+            internal_markdown_path=(
+                "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/internal.md"
+            ),
+            external_markdown_path=(
+                "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/external.md"
+            ),
+            bundle_json_path=(
+                "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/bundle.json"
+            ),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -457,6 +480,8 @@ def _mutation_probe_attr(instance: Any) -> str:
     if isinstance(instance, ReportingTaxResult):
         return "tax_delta"
     if isinstance(instance, ReportBundle):
+        return "snapshot_id"
+    if isinstance(instance, WrittenHouseholdReport):
         return "snapshot_id"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 

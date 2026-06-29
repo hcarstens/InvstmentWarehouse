@@ -54,3 +54,19 @@ class ReportBundle(BaseModel):
     open_breaks: tuple[ReconciliationBreak, ...]
     limitations: tuple[str, ...]
     data_sources: tuple[str, ...]
+
+
+class WrittenHouseholdReport(BaseModel):
+    """Frozen write result — paths to rendered report artifacts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    snapshot_id: str
+    household_id: str
+    period_label: str
+    as_of_date: date
+    generated_at: datetime
+    output_dir: str
+    internal_markdown_path: str
+    external_markdown_path: str
+    bundle_json_path: str

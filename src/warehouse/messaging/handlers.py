@@ -64,11 +64,16 @@ from warehouse.messaging.payloads import (
     PositionSet,
     ReconcilePayload,
     ReconcileResult,
+    ReportBuildPayload,
     RiskEvaluatePayload,
     StagedOrders,
     TaxScenarioPayload,
     TradeValidatePayload,
     TradeValidation,
+)
+from warehouse.reporting.report_writer.models import WrittenHouseholdReport
+from warehouse.reporting.report_writer.writer import (
+    build_and_write_household_reports,
 )
 from warehouse.research.risk import evaluate_risk
 from warehouse.research.risk.models import RiskResult
@@ -276,6 +281,18 @@ def _orders_stage(ctx: DispatchContext, p: OrdersStagePayload) -> StagedOrders:
     )
 
 
+def _report_build(
+    ctx: DispatchContext, p: ReportBuildPayload
+) -> WrittenHouseholdReport:
+    return build_and_write_household_reports(
+        ctx.session,
+        p.household_id,
+        period_label=p.period_label,
+        as_of_date=p.as_of_date,
+        actor_id=ctx.actor_id,
+    )
+
+
 # --- registration (import side effect) --------------------------------------
 
 register(
@@ -332,3 +349,4 @@ register(
     Kind.COMMAND,
 )
 register("orders.stage", OrdersStagePayload, _orders_stage, Kind.COMMAND)
+register("report.build", ReportBuildPayload, _report_build, Kind.COMMAND)
