@@ -77,6 +77,7 @@ tiers, and lot granularity.
 | Item | Why |
 | --- | --- |
 | PM that **persists** (would be `COMMAND`) | Advisory-only v0; orchestrator owns `optimizer.persist` |
+| Full **Review all portfolios** batch | Month-end reporting leg ships via `workflows.month_end.run_month_end_reporting_batch` (rw3 — `report.build` fan-out only). Full batch (`ledger.positions` → `pm.advise` per household + risk delta + tax-change triggers) remains future — see `TODO.md`. |
 | PM axiom scoring of analyst attribution / kill / NPA | Legs shipped (pa0–pa2); `score_pm_axioms` enrichment deferred — Addendum C |
 | Threshold-aware tax estimate (NIIT/AMT cliffs) | `evaluate_tax_scenario` returns zeros today; `TODO.md` tax-estimate track |
 | Axiom 5 (margin of safety) real scoring | No valuation engine — marked `not_computed`, not faked (§4) |

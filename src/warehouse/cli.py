@@ -355,6 +355,94 @@ def report_write(
     click.echo(f"  Bundle: {written.bundle_json_path}")
 
 
+@report.command("month-end")
+@click.option(
+    "--household",
+    default=None,
+    help="Single household id (default: all households).",
+)
+@click.option("--as-of", "as_of", type=click.DateTime(formats=["%Y-%m-%d"]))
+@click.option(
+    "--all",
+    "all_households",
+    is_flag=True,
+    help="Explicit all-households batch (default when --household omitted).",
+)
+@click.option(
+    "--period-label",
+    default=None,
+    help="Override period directory key.",
+)
+def report_month_end(
+    household: str | None,
+    as_of: datetime | None,
+    all_households: bool,
+    period_label: str | None,
+) -> None:
+    """Run month-end report.build for one or all households."""
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.workflows.month_end import (
+        run_month_end_reporting,
+        run_month_end_reporting_batch,
+    )
+
+    bootstrap_database(seed=True)
+    as_of_date = as_of.date() if as_of is not None else None
+    actor_id = "cli:report_month_end"
+
+    if household is not None and all_households:
+        raise click.UsageError("Use --household or --all, not both.")
+
+    failed = 0
+    with session_scope() as session:
+        if household is not None:
+            try:
+                written = run_month_end_reporting(
+                    session,
+                    household,
+                    as_of_date=as_of_date,
+                    period_label=period_label,
+                    actor_id=actor_id,
+                )
+            except RuntimeError as err:
+                click.echo(f"{household}: FAILED: {err}", err=True)
+                raise SystemExit(1) from err
+            click.echo(f"{household}: {written.snapshot_id}")
+            click.echo(f"  Period: {written.period_label}")
+            click.echo(f"  Output: {written.output_dir}")
+            return
+
+        result = run_month_end_reporting_batch(
+            session,
+            as_of_date=as_of_date,
+            period_label=period_label,
+            actor_id=actor_id,
+        )
+        click.echo(
+            f"Month-end batch as_of={result.as_of_date.isoformat()} "
+            f"correlation_id={result.correlation_id}"
+        )
+        click.echo(
+            f"Completed: {result.completed_count}  "
+            f"Failed: {result.failed_count}"
+        )
+        for outcome in result.outcomes:
+            if outcome.status == "completed" and outcome.written is not None:
+                click.echo(
+                    f"{outcome.household_id}: {outcome.written.snapshot_id}"
+                )
+            else:
+                failed += 1
+                click.echo(
+                    f"{outcome.household_id}: FAILED: {outcome.error}",
+                    err=True,
+                )
+
+    if failed:
+        raise SystemExit(1)
+
+
 @main.group()
 def test() -> None:
     """Testing report generation."""

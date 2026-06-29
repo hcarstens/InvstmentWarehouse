@@ -331,3 +331,143 @@ def test_report_build_messaging_round_trip(seeded: None) -> None:
     assert Path(via_msg.internal_markdown_path).is_file()
     assert Path(via_msg.external_markdown_path).is_file()
     assert Path(via_msg.bundle_json_path).is_file()
+
+
+# --- rw3 month-end workflow falsifiers --------------------------------------
+
+
+@pytest.fixture
+def seeded_tmp_reports(tmp_path, monkeypatch) -> Iterator[Path]:
+    bootstrap_database(seed=True)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    yield tmp_path
+
+
+def test_run_month_end_reporting_writes_artifacts(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting
+
+    with session_scope() as session:
+        written = run_month_end_reporting(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    assert written.snapshot_id.startswith("rpt_")
+    assert Path(written.internal_markdown_path).is_file()
+    assert Path(written.external_markdown_path).is_file()
+    assert Path(written.bundle_json_path).is_file()
+    assert written.period_label == f"month-end-{AS_OF.isoformat()}"
+
+
+def test_run_month_end_reporting_uses_report_build_audit(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting
+
+    with session_scope() as session:
+        written = run_month_end_reporting(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+        entries = list_audit_entries(session, household_id=DEMO)
+    match = next(
+        e
+        for e in entries
+        if e.action == "report_build" and e.resource_id == written.snapshot_id
+    )
+    assert match.details["snapshot_id"] == written.snapshot_id
+    assert match.details["household_id"] == DEMO
+
+
+def test_month_end_batch_one_failure_does_not_swallow_others(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting_batch
+
+    bad_hh = "hh_month_end_no_ips"
+    with session_scope() as session:
+        session.add(
+            EntityRow(
+                entity_id=bad_hh,
+                entity_type=EntityType.HOUSEHOLD,
+                name="Month-end bad HH",
+                household_id=bad_hh,
+            )
+        )
+        session.flush()
+        result = run_month_end_reporting_batch(
+            session,
+            as_of_date=AS_OF,
+            household_ids=[DEMO, bad_hh],
+            actor_id="test",
+        )
+    assert result.completed_count == 1
+    assert result.failed_count == 1
+    completed = next(o for o in result.outcomes if o.status == "completed")
+    failed = next(o for o in result.outcomes if o.status == "failed")
+    assert completed.household_id == DEMO
+    assert completed.written is not None
+    assert Path(completed.written.internal_markdown_path).is_file()
+    assert failed.household_id == bad_hh
+    assert failed.error is not None
+
+
+def test_month_end_batch_failures_include_household_id(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting_batch
+
+    bad_hh = "hh_month_end_fail_ctx"
+    with session_scope() as session:
+        session.add(
+            EntityRow(
+                entity_id=bad_hh,
+                entity_type=EntityType.HOUSEHOLD,
+                name="Month-end fail HH",
+                household_id=bad_hh,
+            )
+        )
+        session.flush()
+        result = run_month_end_reporting_batch(
+            session,
+            as_of_date=AS_OF,
+            household_ids=[bad_hh],
+            actor_id="test",
+        )
+    assert result.failed_count == 1
+    outcome = result.outcomes[0]
+    assert outcome.status == "failed"
+    assert bad_hh in (outcome.error or "")
+
+
+def test_month_end_reporting_raises_on_single_household_failure() -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting
+
+    bad_hh = "hh_month_end_single_fail"
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        session.add(
+            EntityRow(
+                entity_id=bad_hh,
+                entity_type=EntityType.HOUSEHOLD,
+                name="Single fail HH",
+                household_id=bad_hh,
+            )
+        )
+        session.flush()
+        with pytest.raises(RuntimeError, match=bad_hh):
+            run_month_end_reporting(
+                session,
+                bad_hh,
+                as_of_date=AS_OF,
+                actor_id="test",
+            )

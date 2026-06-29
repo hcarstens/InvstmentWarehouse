@@ -1,8 +1,7 @@
 # Report Writer — Implementation Plan
 
-**Status:** **planned** — `report.build` remains **planned** in
-[`messaging_protocol.md`](messaging_protocol.md) §5; reporting plane ships performance +
-reporting-owned tax scenarios but no household report pack yet.
+**Status:** **rw0–rw3 shipped** — `report.build` COMMAND live; month-end batch fan-out via
+`workflows.month_end.run_month_end_reporting_batch`.
 **Date:** 2026-06-29
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
 **Inputs:** [`research/report_writing.md`](research/report_writing.md) (reader-first structure,
@@ -437,10 +436,10 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 
 | Slice | Status | Notes |
 | --- | --- | --- |
-| rw0 collect + bundle | planned | |
-| rw1 render + write + `report.build` | planned | Unblocks messaging §5 planned → shipped |
-| rw2 dashboard + registry | planned | |
-| rw3 month-end workflow | planned | Depends rw1 |
+| rw0 collect + bundle | shipped | |
+| rw1 render + write + `report.build` | shipped | |
+| rw2 dashboard + registry | shipped | |
+| rw3 month-end workflow | shipped | `run_month_end_reporting_batch`; Tier-1 recon gate deferred (firm-wide breaks, no tier field) |
 | rw4 PDF channel | deferred | Quarto/Pandoc |
 | rw5 extended exhibits | deferred | attribution, risk, alts |
 

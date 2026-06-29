@@ -24,6 +24,7 @@ def test_workflow_catalog_has_core_workflows() -> None:
         "rebalance_advisory",
         "rebalance_tax_overlay",
         "alternatives",
+        "month_end_reporting",
     }
 
 

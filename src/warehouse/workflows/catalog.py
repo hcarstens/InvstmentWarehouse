@@ -58,4 +58,11 @@ WORKFLOW_CATALOG: list[WorkflowDefinition] = [
         inputs=["manual_marks", "capital_calls", "distributions"],
         outputs=["alt_sub_ledger"],
     ),
+    WorkflowDefinition(
+        name="month_end_reporting",
+        owner="reporting",
+        inputs=["reconciled_positions", "fresh_marks", "period_close"],
+        outputs=["written_household_reports", "audit_rows"],
+        sla_hours=48,
+    ),
 ]

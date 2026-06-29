@@ -66,6 +66,10 @@ from warehouse.research.risk.models import (
     ScenarioSet,
 )
 from warehouse.research.synthetic.daily_paths import PathTargets
+from warehouse.workflows.month_end import (
+    MonthEndHouseholdOutcome,
+    MonthEndReportingResult,
+)
 
 # Append new audit/replay-critical immutable types here.
 FROZEN_TYPES: tuple[type[Any], ...] = (
@@ -80,6 +84,8 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     KillBreach,
     KillCriteria,
     Message,
+    MonthEndHouseholdOutcome,
+    MonthEndReportingResult,
     NpaFlag,
     NpaFlags,
     OptimizationResult,
@@ -369,6 +375,20 @@ def _sample_instance(cls: type[Any]) -> Any:
                 "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/bundle.json"
             ),
         )
+    if cls is MonthEndHouseholdOutcome:
+        return MonthEndHouseholdOutcome(
+            household_id="hh_test",
+            status="completed",
+            written=_sample_instance(WrittenHouseholdReport),
+        )
+    if cls is MonthEndReportingResult:
+        return MonthEndReportingResult(
+            as_of_date=date(2026, 6, 24),
+            correlation_id="month_end_batch_test",
+            started_at=datetime(2026, 6, 24, tzinfo=UTC),
+            finished_at=datetime(2026, 6, 24, tzinfo=UTC),
+            outcomes=(_sample_instance(MonthEndHouseholdOutcome),),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -483,6 +503,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "snapshot_id"
     if isinstance(instance, WrittenHouseholdReport):
         return "snapshot_id"
+    if isinstance(instance, MonthEndHouseholdOutcome):
+        return "household_id"
+    if isinstance(instance, MonthEndReportingResult):
+        return "correlation_id"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

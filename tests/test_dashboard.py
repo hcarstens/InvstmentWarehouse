@@ -236,7 +236,7 @@ def test_status_report_includes_all_phases() -> None:
     assert report.live_panel_count >= 15
     assert report.infra_error_count == 0
     assert len(report.infra_checks) == 6
-    assert len(report.workflows) == 7
+    assert len(report.workflows) == 8
 
 
 def test_catalog_live_panel_count_matches_phases() -> None:
