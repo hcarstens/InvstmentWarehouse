@@ -222,6 +222,10 @@ def build_testing_report(
     root = cwd or repo_root()
     cov_path = coverage_path or testing_coverage_path()
     cov_path.parent.mkdir(parents=True, exist_ok=True)
+    art_path = artifact_path or testing_artifact_path()
+    # Dashboard empty-state tests assume no artifact during the pytest pass.
+    if artifact_path is None and art_path.is_file():
+        art_path.unlink()
 
     full_proc = run_pytest(
         [

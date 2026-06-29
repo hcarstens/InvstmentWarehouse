@@ -455,9 +455,13 @@ def test_optimizer_panel_shows_base_vs_stress() -> None:
 
 
 def test_testing_page_empty_state() -> None:
-    from warehouse.dashboard.pages.testing import render_testing_page
+    from warehouse.dashboard.pages.testing import (
+        TestingPageData,
+        render_testing_page,
+    )
+    from warehouse.dashboard.testing_data import empty_testing_report
 
-    html = render_testing_page()
+    html = render_testing_page(TestingPageData(report=empty_testing_report()))
     assert "Testing matrix" in html
     assert "No report yet" in html
     assert "warehouse test report" in html
@@ -477,7 +481,13 @@ def test_api_testing_empty_state_json() -> None:
     assert payload["overall"]["ok"] is True
 
 
-def test_testing_page_http_returns_200() -> None:
+def test_testing_page_http_returns_200(monkeypatch) -> None:
+    from warehouse.dashboard.testing_data import empty_testing_report
+
+    monkeypatch.setattr(
+        "warehouse.dashboard.server.load_testing_report",
+        lambda **_: empty_testing_report(),
+    )
     server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
     port = server.server_address[1]
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -507,15 +517,20 @@ def test_testing_page_http_returns_200() -> None:
         thread.join(timeout=2)
 
 
-def test_qa_footnote_on_each_plane_page() -> None:
+def test_qa_footnote_on_each_plane_page(monkeypatch) -> None:
     from warehouse.dashboard.pages.data import render_data_page
     from warehouse.dashboard.pages.decision import render_decision_page
     from warehouse.dashboard.pages.execution import render_execution_page
     from warehouse.dashboard.pages.infra import render_infra_page
     from warehouse.dashboard.pages.reporting import render_reporting_page
     from warehouse.dashboard.pages.research import render_research_page
+    from warehouse.dashboard.testing_data import empty_testing_report
     from warehouse.dashboard.testing_registry import QA_FOOTNOTE_PLANE_IDS
 
+    monkeypatch.setattr(
+        "warehouse.dashboard.render_testing.load_testing_report",
+        lambda **_: empty_testing_report(),
+    )
     renderers = {
         "data": render_data_page,
         "research": render_research_page,
