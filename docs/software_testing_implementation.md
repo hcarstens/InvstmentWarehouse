@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** planned (st0–st5; E2E in st4, hard QA in st5)
+**Status:** planned · **nothing built yet** (dashboard panel st0, E2E st4, hard QA st5)
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -10,6 +10,21 @@
 
 **Baseline (2026-06-29):** 399 tests passing · 89.2% line coverage on `warehouse`
 (`pytest --cov=warehouse`).
+
+## Implementation status (current phase visibility)
+
+All slices **not done** — none started. Build order (dashboard first for visibility):
+
+| Slice | Item | Status |
+| --- | --- | --- |
+| **st0** | Dashboard panel + API + per-plane QA footnote (**top — visibility**) | ☐ not done |
+| **st1** | Registry + artifact schema | ☐ not done |
+| **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☐ not done |
+| **st3** | CI coverage artifact + badges + QA7 security gate | ☐ not done |
+| **st4** | E2E testing — up, running, completed (priority) | ☐ not done |
+| **st5** | Hard QA — optimizer / analyst / risk property + mutation (END) | ☐ not done |
+
+Mark a slice `☑ done` here and in its §5 header when its falsifier is green on `main`.
 
 ---
 
@@ -103,7 +118,7 @@ testing_registry.py          # plane → pytest paths → coverage glob → floo
 | Integration / workflow | ~25% | Every PR |
 | E2E smoke + HTTP | ~5% | PR + live Research panel |
 
-Shares are **targets**; st0 measures the actual mix (count by directory/marker) and the
+Shares are **targets**; st1 measures the actual mix (count by directory/marker) and the
 `/testing` panel shows actual vs target so ST4 stays falsifiable, not assumed.
 
 ---
@@ -302,9 +317,29 @@ an amber badge but does **not** render the footnote red; only test failures do (
 
 ## 5. Implementation slices
 
-### st0 — registry + artifact schema *(~1 PR)*
+### st0 — dashboard panel + API  ☐ **not done**  *(~1 PR — TOP, for phase visibility)*
 
-**Goal:** single source of truth for plane → tests → coverage glob; no dashboard yet.
+**Goal:** a **visible testing panel at `warehouse serve` first** (dashboard-first, CLAUDE.md) so
+current project phase is on screen from day one. Ships with the panel **wired but reading
+sample/empty-state data** until st1/st2 feed the real report; panel status starts `stub`,
+flips to `live` once st2 writes a report.
+
+| Task | Acceptance |
+| --- | --- |
+| `load_testing_report()` reads artifact if present, else empty-state | No artifact → "no report yet — run `warehouse test report`"; never crashes |
+| `render_testing.py` | Table: Plane · Tests · Pass · Fail · Coverage % (amber if < floor) · Mutation kill % (critical planes) · Status. Headline: pass rate + `planes_below_floor` + actual-vs-target pyramid |
+| `render_qa_footnote(plane_id)` in `render_testing.py` | One-line badge per §4.8; added to every `pages/*.py` footer |
+| `GET /api/testing` | JSON matches §8 schema (empty-state shape valid too) |
+| `/testing` route (or Infra sub-panel) | Linked from catalog nav |
+| Register in `phases.py`, `navigation.py` | Panel `Testing matrix` status `stub` → `live` after st2 |
+| `tests/test_dashboard.py` | `/testing` returns 200; API JSON valid (incl. empty state); **each plane page renders its QA footnote** |
+
+**Falsifier:** `pytest tests/test_dashboard.py -k "testing or qa_footnote"` — panel + every plane
+footnote render with and without a report present
+
+### st1 — registry + artifact schema  ☐ **not done**  *(~1 PR)*
+
+**Goal:** single source of truth for plane → tests → coverage glob; feeds the st0 panel.
 
 | Task | Acceptance |
 | --- | --- |
@@ -317,9 +352,10 @@ an amber badge but does **not** render the footnote red; only test failures do (
 
 **Falsifier:** `pytest tests/test_testing_registry.py`
 
-### st1 — `warehouse test report` CLI *(~1 PR)*
+### st2 — `warehouse test report` CLI  ☐ **not done**  *(~1 PR)*
 
-**Goal:** generate `runs/testing/last_report.json` without starting the HTTP server.
+**Goal:** generate `runs/testing/last_report.json` without starting the HTTP server; flips the
+st0 panel from `stub` to `live`.
 
 | Task | Acceptance |
 | --- | --- |
@@ -331,24 +367,7 @@ an amber badge but does **not** render the footnote red; only test failures do (
 
 **Falsifier:** `pytest tests/test_testing_report.py` — CLI produces valid report on fixture subset
 
-### st2 — dashboard panel + API *(~1 PR)*
-
-**Goal:** visible testing matrix at `warehouse serve`.
-
-| Task | Acceptance |
-| --- | --- |
-| `load_testing_report()` reads artifact; stale if HEAD ≠ `git_sha` | Badge: "stale — run `warehouse test report`" |
-| `render_testing.py` | Table: Plane · Tests · Pass · Fail · Coverage % (amber if < floor) · Mutation kill % (critical planes) · Status. Headline: pass rate + `planes_below_floor` + actual-vs-target pyramid |
-| `render_qa_footnote(plane_id)` in `render_testing.py` | One-line badge per §4.8; added to every `pages/*.py` footer |
-| `GET /api/testing` | JSON matches §8 schema |
-| `/testing` route (or Infra sub-panel) | Linked from catalog nav |
-| Register in `phases.py`, `navigation.py` | Panel `Testing matrix` status `live` |
-| `tests/test_dashboard.py` | `/testing` returns 200; API JSON valid; **each plane page renders its QA footnote** (pass/fail + coverage %) |
-
-**Falsifier:** `pytest tests/test_dashboard.py -k "testing or qa_footnote"` — every plane page
-contains its pass/fail + coverage footnote
-
-### st3 — CI coverage artifact + soft floors *(~1 PR)*
+### st3 — CI coverage artifact + soft floors  ☐ **not done**  *(~1 PR)*
 
 **Goal:** CI uploads coverage; warn when plane below floor.
 
@@ -363,7 +382,7 @@ contains its pass/fail + coverage footnote
 
 **Falsifier:** CI `test` job green; coverage artifact present on PR; seeded fake secret / known-vuln dep makes the security step **red**
 
-### st4 — E2E testing: up, running, and completed *(priority — do first)*
+### st4 — E2E testing: up, running, and completed  ☐ **not done**  *(priority — do first after dashboard)*
 
 **Goal:** the cross-plane smoke path is fully green and mirrored on the dashboard before any
 deep per-plane correctness work begins. Prove the wiring end-to-end first (ST4 — the thin top
@@ -381,7 +400,7 @@ layer must exist and pass), then deepen the base (st5).
 **Falsifier:** `pytest tests/integration/test_end_to_end_synthetic.py tests/test_*smoke* -q`
 green; `/testing` reports 4/4 cohorts.
 
-### st5 — hard QA: deep correctness tests *(end — after E2E green)*
+### st5 — hard QA: deep correctness tests  ☐ **not done**  *(end — after E2E green)*
 
 **Goal:** the expensive, high-rigor per-plane work — optimizer, analyst/PM, risk math, mutation.
 These are **deferred to the end on purpose**: they are slow to author and run, and only worth
@@ -571,17 +590,19 @@ and **property-based invariants**, which is what the dashboard elevates instead.
 ## 11. Dependencies & build order
 
 ```text
-st0 (registry + models)
-  → st1 (CLI report writer)
-    → st2 (dashboard + API + per-plane QA footnote)
+st0 (dashboard panel + API + QA footnote — stub data)   ← TOP, phase visibility
+  → st1 (registry + models)
+    → st2 (CLI report writer — flips panel stub→live)
       → st3 (CI artifact + badges + security gate)
         → st4 (E2E testing — up, running, completed)   ← priority
           → st5 (hard QA — optimizer / analyst / risk / mutation)   ← END
 ```
 
-**Sequencing rationale:** E2E (st4) proves cross-plane wiring cheaply and comes first; the
-hard, high-cost correctness tests (st5 — optimizer, analyst, risk, mutation) land **last**, once
-the suite + dashboard + E2E are stable.
+**Sequencing rationale:** the **dashboard panel ships first (st0)** with stub/empty-state data so
+project phase is visible immediately (dashboard-first, CLAUDE.md); st1 (registry) + st2 (CLI)
+then feed it real data and flip it `stub`→`live`. Among the test-deepening work, **E2E (st4)
+proves cross-plane wiring cheaply before** the hard, high-cost correctness tests (st5 —
+optimizer, analyst, risk, mutation), which land **last**.
 
 **Parallel safe:** the st5 reporting/cross-cutting/execution gap tests can land earlier if they
 only add pytest files. The deep optimizer/analyst/risk property + mutation work stays at the end.
@@ -652,7 +673,7 @@ leaked secret**; mutation kill % reported (not gated).
 | Risk | Mitigation |
 | --- | --- |
 | Full pytest on every page load | Artifact + stale badge; `warehouse test report` refresh |
-| Per-plane pytest subprocess slow in CLI | st1 runs full suite once; plane rows derived from node collection + coverage buckets |
+| Per-plane pytest subprocess slow in CLI | st2 runs full suite once; plane rows derived from node collection + coverage buckets |
 | Coverage bucket overlap (e.g. phase2 tests touch data + execution) | Overall suite coverage for plane %; plane `pytest_paths` for pass/fail only |
 | Reporting 0% reads as green | Coverage badge shows `below_floor` amber; plane stays `partial` in `status.py` until `test_reporting_*.py` exists — but `ok` tracks test failures, so it is not falsely red either |
 | Mutation/property tests slow CI | Property suites run every PR (fast, `derandomize`); `mutmut` runs nightly or on-demand, report-only — never on the PR critical path |
@@ -660,10 +681,12 @@ leaked secret**; mutation kill % reported (not gated).
 
 ### Verdict
 
-Plan is **ready to execute** starting with **st0**. Estimated **3–4 PRs** for dashboard +
-CI artifact. Critical path: **st0 → st1 → st2 → st3 → st4 (E2E)**; the hard QA work (**st5** —
-optimizer, analyst, risk, mutation) is the **final** slice. Get E2E up, running, and completed
-first; defer the expensive deep correctness tests to the end.
+Plan is **ready to execute** starting with **st0 (dashboard panel — for phase visibility)**.
+Estimated **3–4 PRs** for dashboard + CI artifact. Critical path: **st0 (dashboard) → st1
+(registry) → st2 (CLI) → st3 (CI) → st4 (E2E)**; the hard QA work (**st5** — optimizer, analyst,
+risk, mutation) is the **final** slice. Ship the visible panel first, then E2E up/running/
+completed, then defer the expensive deep correctness tests to the end. **Nothing is built yet —
+all six slices are `☐ not done`** (see top status table).
 
 ---
 
@@ -673,6 +696,7 @@ first; defer the expensive deep correctness tests to the end.
 | --- | --- |
 | 2026-06-29 | Initial plan from plane-by-plane audit (399 tests, 89.2% cov). Inputs: Software QA, Software Testing heuristics, software_testing research synthesis. |
 | 2026-06-29 | Review fixes (major 1–5): coverage no longer gates `ok` (ST3, amber badge only); `overall.ok = all(plane.ok)` so no green headline over failing planes; mutation kill % reported on Data + Decision (ST3); QA7 security gate (`pip-audit` + `detect-secrets`) added to CI; property-based `hypothesis` suites for optimizer/lot/risk math elevated to st4 P0/P1 (ST6). |
-| 2026-06-29 | Added per-plane QA footnote (§4.8): `render_qa_footnote(plane_id)` shows test pass/fail + coverage % on each plane page (`/data`, `/research`, `/decision`, `/execution`, `/reporting`, `/infra`), wired in st2 and covered by `test_dashboard.py`. |
+| 2026-06-29 | Added per-plane QA footnote (§4.8): `render_qa_footnote(plane_id)` shows test pass/fail + coverage % on each plane page (`/data`, `/research`, `/decision`, `/execution`, `/reporting`, `/infra`), wired in the dashboard slice and covered by `test_dashboard.py`. |
 | 2026-06-29 | Re-sequenced slices: split st4 into **st4 (E2E — up, running, completed; priority)** and **st5 (hard QA — optimizer / analyst/PM / risk property + mutation; END)**. E2E wiring proven first; expensive deep correctness tests deferred to the final slice. |
 | 2026-06-29 | Added §4.2.1 synthetic portfolio + IPS builder acceptance items: **structural** (per-SDG-axiom, emit→validate round-trip, cohort coverage, determinism, error-surfacing) gate E2E in st4; **statistical** (distributional checks, null baselines, SDG3 ablation falsifier, 2022–2025 cross-regime) land in st5. Sourced from `research/software_testing.md`; split by cost per Simplicity (S1/S3). |
+| 2026-06-29 | **Dashboard moved to top (st0)** for current-phase visibility (dashboard-first): old st2 dashboard → st0 (ships with stub/empty-state), registry → st1, CLI report → st2 (flips panel `stub`→`live`); st3–st5 unchanged. Added top **implementation-status table** and marked **all six slices `☐ not done`** (nothing built yet). |
