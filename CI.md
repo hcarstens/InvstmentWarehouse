@@ -131,7 +131,7 @@ Config: `[tool.pytest.ini_options]` — `testpaths = ["tests"]`, `pythonpath = [
 
 | Command | Purpose |
 | --- | --- |
-| `warehouse test report` | Full suite + coverage JSON + `last_report.json` — **CI test job** |
+| `warehouse test report` | Full suite + coverage JSON + `last_report.json` + `e2e_smoke.json` — **CI test job** |
 | `pytest` | Full suite (no coverage artifact) |
 | `pytest -q` | Quiet summary |
 | `pytest -x` | Stop on first failure |
@@ -139,7 +139,7 @@ Config: `[tool.pytest.ini_options]` — `testpaths = ["tests"]`, `pythonpath = [
 | `pytest --cov=warehouse --cov-report=term-missing` | Coverage terminal report |
 | `pytest --cov=warehouse --cov-report=json:runs/testing/coverage.json` | Coverage JSON only (same path as CI) |
 
-### Testing artifacts (st3)
+### Testing artifacts (st3–st4)
 
 Written by `warehouse test report` (gitignored under `runs/`):
 
@@ -147,9 +147,24 @@ Written by `warehouse test report` (gitignored under `runs/`):
 | --- | --- |
 | `runs/testing/coverage.json` | Full `pytest-cov` JSON — per-plane bucket source |
 | `runs/testing/last_report.json` | `TestingReport` for `/testing` and `GET /api/testing` |
+| `runs/testing/e2e_smoke.json` | E2E smoke matrix for Research panel + `e2e_smoke` headline on `/testing` |
 
-CI uploads both files as GitHub Actions artifacts (7-day retention). Coverage
+CI uploads all three files as GitHub Actions artifacts (7-day retention). Coverage
 **never gates** `ok` on the dashboard (ST3) — amber badges only when below floor.
+E2E smoke pass rate (`passed/households`, target 4/4) **does** gate `e2e_smoke.ok`
+and contributes to `overall.ok`.
+
+### E2E smoke falsifier (st4)
+
+```bash
+pytest tests/integration/test_end_to_end_synthetic.py tests/test_e2e_smoke.py -q
+```
+
+Structural prerequisite bundle (§4.2.1 — gate E2E):
+
+```bash
+pytest tests/test_hnw_synthetic.py tests/test_synthetic_ips*.py tests/test_ips_*.py -q
+```
 
 ### Security gates (QA7, st3)
 

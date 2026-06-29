@@ -14,12 +14,7 @@ def _leg_badge(ok: bool) -> str:
 
 
 def render_e2e_smoke_section(data: E2ePanelData) -> str:
-    """Live end-to-end smoke over generated households (portfolio + IPS).
-
-    Each row is one synthetic cohort driven through the whole stack; each
-    column is a leg (drift, v0 TLH, MV-QP v1, scenario card, pm.advise). Proves
-    generation feeds every plane — no DB, real system state.
-    """
+    """E2E smoke matrix from persisted artifact (st4 — no live re-run)."""
     error = ""
     if data.error:
         error = (
@@ -27,8 +22,29 @@ def render_e2e_smoke_section(data: E2ePanelData) -> str:
             f"error:</strong> {html.escape(data.error)}</section>"
         )
 
+    if data.panel_status == "empty":
+        return """
+  <section>
+    <h2>End-to-end smoke matrix (synthetic)</h2>
+    <p><span class="badge badge-warn">no artifact</span>
+       Run <code>warehouse test report</code> to populate the E2E smoke
+       matrix (4 cohorts × N legs).</p>
+    <p><em>Each row generates one household (positions + IPS) and drives the
+       whole stack — policy drift, v0 TLH, optimizer v1 (MV-QP + scenario-robust
+       stress), scenario card, and the pm.advise coordinator.</em></p>
+  </section>"""
+
     status_badge = "badge-err" if data.panel_status == "error" else "badge-ok"
     summary_badge = "badge-ok" if data.all_ok else "badge-warn"
+    stale_line = ""
+    if data.stale:
+        stale_line = (
+            '<p><span class="badge badge-warn">stale</span> '
+            "artifact git SHA differs from HEAD — "
+            "run <code>warehouse test report</code></p>"
+        )
+    ts = data.generated_at.isoformat() if data.generated_at else "unknown"
+    sha = html.escape(data.git_sha or "—")
 
     header_cells = "".join(
         f"<th>{html.escape(name)}</th>" for name in data.leg_names
@@ -59,10 +75,12 @@ def render_e2e_smoke_section(data: E2ePanelData) -> str:
   <section>
     <h2>End-to-end smoke matrix (synthetic)</h2>
     {error}
+    {stale_line}
+    <p>Artifact generated <code>{html.escape(ts)}</code> ·
+       git <code>{sha}</code></p>
     <p><span class="badge {status_badge}">{html.escape(data.panel_status)}</span>
        <span class="badge {summary_badge}">{data.passed}/{data.households}
-       households pass</span> · live in-process (no DB) ·
-       portfolio + IPS generated per cohort</p>
+       households pass</span> · artifact-backed (no live re-run on page view)</p>
     <p><em>Each row generates one household (positions + IPS) and drives the
        whole stack — policy drift, v0 TLH, optimizer v1 (MV-QP + scenario-robust
        stress), scenario card, and the pm.advise coordinator. Hover a cell for

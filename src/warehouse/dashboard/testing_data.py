@@ -28,6 +28,20 @@ class PyramidMix(BaseModel):
     e2e_pct: float
 
 
+class E2eSmokeSummary(BaseModel):
+    """Cross-plane E2E smoke rollup (st4 — gates its own ``ok``)."""
+
+    households: int = 0
+    passed: int = 0
+    ok: bool = True
+
+    @model_validator(mode="after")
+    def _sync_ok(self) -> E2eSmokeSummary:
+        green = self.households > 0 and self.passed == self.households
+        object.__setattr__(self, "ok", green)
+        return self
+
+
 class OverallTestSummary(BaseModel):
     tests: int = 0
     passed: int = 0
@@ -70,13 +84,15 @@ class TestingReport(BaseModel):
     stale: bool = False
     has_report: bool = False
     pyramid: PyramidMix | None = None
+    e2e_smoke: E2eSmokeSummary | None = None
     overall: OverallTestSummary
     planes: list[PlaneTestResult] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _sync_overall_ok(self) -> TestingReport:
         plane_ok = all(p.ok for p in self.planes)
-        overall_ok = self.overall.failed == 0 and plane_ok
+        e2e_ok = self.e2e_smoke is None or self.e2e_smoke.ok
+        overall_ok = self.overall.failed == 0 and plane_ok and e2e_ok
         object.__setattr__(
             self,
             "overall",

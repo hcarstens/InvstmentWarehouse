@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** st0–st3 shipped · st4–st5 planned
+**Status:** st0–st4 shipped · st5 planned
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -21,7 +21,7 @@ All slices **not done** — none started. Build order (dashboard first for visib
 | **st1** | Registry + artifact schema | ☑ done |
 | **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☑ done |
 | **st3** | CI coverage artifact + badges + QA7 security gate | ☑ done |
-| **st4** | E2E testing — up, running, completed (priority) | ☐ not done |
+| **st4** | E2E testing — up, running, completed (priority) | ☑ done |
 | **st5** | Hard QA — optimizer / analyst / risk property + mutation (END) | ☐ not done |
 
 Mark a slice `☑ done` here and in its §5 header when its falsifier is green on `main`.
@@ -382,7 +382,7 @@ st0 panel from `stub` to `live`.
 
 **Falsifier:** CI `test` job green; coverage artifact present on PR; seeded fake secret / known-vuln dep makes the security step **red**
 
-### st4 — E2E testing: up, running, and completed  ☐ **not done**  *(priority — do first after dashboard)*
+### st4 — E2E testing: up, running, and completed  ☑ **done**  *(priority — do first after dashboard)*
 
 **Goal:** the cross-plane smoke path is fully green and mirrored on the dashboard before any
 deep per-plane correctness work begins. Prove the wiring end-to-end first (ST4 — the thin top
@@ -507,6 +507,7 @@ panel shows stale badge and last-known metrics (do not re-run 399 tests on page 
   "git_sha": "abc123def",
   "stale": false,
   "pyramid": { "unit_pct": 70, "integration_pct": 25, "e2e_pct": 5 },
+  "e2e_smoke": { "households": 4, "passed": 4, "ok": true },
   "overall": {
     "tests": 399,
     "passed": 399,
@@ -543,8 +544,9 @@ panel shows stale badge and last-known metrics (do not re-run 399 tests on page 
 - **`coverage_status`:** `"ok"` if `coverage_pct >= coverage_floor_pct` else `"below_floor"`.
 - **`mutation_kill_pct`:** present only on planes with `report_mutation=True` (Data, Decision);
   reported, never gates.
-- **Overall:** `ok = all(plane.ok for plane in planes) and overall.failed == 0`. A red plane
-  turns the top line red — no green headline sitting over failing planes. `planes_below_floor`
+- **Overall:** `ok = all(plane.ok for plane in planes) and overall.failed == 0 and (e2e_smoke is None or e2e_smoke.ok)`. A red plane
+  or failing E2E smoke turns the top line red — no green headline sitting over
+  failing planes. `planes_below_floor`
   surfaces coverage gaps in the headline without conflating them with test failures.
 
 ---

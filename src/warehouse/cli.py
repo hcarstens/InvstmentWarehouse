@@ -324,7 +324,10 @@ def test_report() -> None:
     exit_code = generate_testing_report()
     if exit_code != 0:
         raise SystemExit(exit_code)
-    click.echo("Testing report written to runs/testing/last_report.json")
+    click.echo(
+        "Testing report written to runs/testing/last_report.json "
+        "and runs/testing/e2e_smoke.json"
+    )
 
 
 @main.command()

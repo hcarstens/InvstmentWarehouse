@@ -75,6 +75,7 @@ def _headline_metrics(report: TestingReport) -> str:
         return (
             '<div class="metrics">'
             '<div class="metric"><strong>—</strong>pass rate</div>'
+            '<div class="metric"><strong>—</strong>E2E smoke</div>'
             '<div class="metric"><strong>—</strong>planes below floor</div>'
             f'<div class="metric"><strong>{html.escape(pyramid_bits)}</strong>'
             "pyramid %</div>"
@@ -105,6 +106,12 @@ def _headline_metrics(report: TestingReport) -> str:
         if overall.coverage_pct is not None
         else "—"
     )
+    e2e_bits = "—"
+    if report.e2e_smoke is not None:
+        e2e = report.e2e_smoke
+        e2e_rate = f"{e2e.passed}/{e2e.households}"
+        e2e_kind = "ok" if e2e.ok else "err"
+        e2e_bits = badge(e2e_rate, e2e_kind)
     stale = (
         '<p><span class="badge badge-warn">stale</span> '
         "artifact git SHA differs from HEAD — "
@@ -116,6 +123,7 @@ def _headline_metrics(report: TestingReport) -> str:
         f"{stale}"
         '<div class="metrics">'
         f'<div class="metric">{rate_badge}<span>pass rate</span></div>'
+        f'<div class="metric">{e2e_bits}<span>E2E smoke</span></div>'
         f'<div class="metric">{below_badge}'
         "<span>planes below floor</span></div>"
         f'<div class="metric"><strong>{cov}</strong>'

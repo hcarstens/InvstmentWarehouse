@@ -159,6 +159,7 @@ def test_overall_ok_requires_all_planes_green(tmp_path: Path) -> None:
 
 def test_written_artifact_round_trips_through_loader(tmp_path: Path) -> None:
     artifact = tmp_path / "last_report.json"
+    e2e_path = tmp_path / "e2e_smoke.json"
     cov_path = tmp_path / "coverage.json"
     cov_path.write_text(
         json.dumps({"files": _sample_coverage_files()}),
@@ -179,15 +180,48 @@ def test_written_artifact_round_trips_through_loader(tmp_path: Path) -> None:
         coverage_path=cov_path,
         run_pytest=fake_pytest,
     )
+    from warehouse.dashboard.testing_report import attach_e2e_smoke_to_report
+    from warehouse.research.synthetic.workflow_smoke import (
+        E2eMatrixResult,
+        WorkflowSmokeCheck,
+        WorkflowSmokeResult,
+    )
+
+    def _mini_matrix() -> E2eMatrixResult:
+        return E2eMatrixResult(
+            results=[
+                WorkflowSmokeResult(
+                    cohort_id="general_hnw",
+                    seed=42,
+                    rung=3,
+                    checks=[
+                        WorkflowSmokeCheck(
+                            workflow="policy_monitoring",
+                            ok=True,
+                            detail="ok",
+                        )
+                    ],
+                )
+            ]
+        )
+
+    report = attach_e2e_smoke_to_report(
+        report,
+        e2e_artifact_path=e2e_path,
+        matrix_runner=_mini_matrix,
+    )
     write_testing_report(report, artifact_path=artifact)
     loaded = load_testing_report(artifact_path=artifact)
     assert loaded.has_report is True
     assert loaded.overall.tests == report.overall.tests
     assert len(loaded.planes) == len(report.planes)
+    assert loaded.e2e_smoke is not None
+    assert loaded.e2e_smoke.households == 1
     restored = TestingReportModel.model_validate(
         json.loads(artifact.read_text(encoding="utf-8"))
     )
     assert restored.overall.ok == loaded.overall.ok
+    assert restored.e2e_smoke is not None
 
 
 def test_generate_testing_report_propagates_pytest_exit_code(

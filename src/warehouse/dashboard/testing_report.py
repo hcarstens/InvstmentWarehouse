@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import Any
 
 from warehouse.config import repo_root
+from warehouse.dashboard.e2e_data import (
+    e2e_smoke_artifact_path,
+    generate_e2e_smoke_artifact,
+)
 from warehouse.dashboard.testing_data import (
     OverallTestSummary,
     PlaneTestResult,
@@ -289,6 +293,23 @@ def build_testing_report(
     return report, full_proc.returncode
 
 
+def attach_e2e_smoke_to_report(
+    report: TestingReport,
+    *,
+    e2e_artifact_path: Path | None = None,
+    matrix_runner: object = None,
+) -> TestingReport:
+    """Run E2E matrix, write artifact, embed summary on the report."""
+    from warehouse.research.synthetic.workflow_smoke import run_e2e_matrix
+
+    runner = matrix_runner or run_e2e_matrix
+    panel = generate_e2e_smoke_artifact(
+        artifact_path=e2e_artifact_path or e2e_smoke_artifact_path(),
+        matrix_runner=runner,
+    )
+    return report.model_copy(update={"e2e_smoke": panel.to_summary()})
+
+
 def write_testing_report(
     report: TestingReport,
     *,
@@ -309,12 +330,23 @@ def generate_testing_report(
     artifact_path: Path | None = None,
     coverage_path: Path | None = None,
     run_pytest: RunPytest = _default_run_pytest,
+    matrix_runner: object = None,
 ) -> int:
     """Build artifacts and return the full-suite pytest exit code."""
     report, exit_code = build_testing_report(
         artifact_path=artifact_path,
         coverage_path=coverage_path,
         run_pytest=run_pytest,
+    )
+    e2e_path = (
+        artifact_path.parent / "e2e_smoke.json"
+        if artifact_path is not None
+        else e2e_smoke_artifact_path()
+    )
+    report = attach_e2e_smoke_to_report(
+        report,
+        e2e_artifact_path=e2e_path,
+        matrix_runner=matrix_runner,
     )
     write_testing_report(report, artifact_path=artifact_path)
     return exit_code

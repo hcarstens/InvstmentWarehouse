@@ -397,14 +397,21 @@ def test_optimizer_panel_shows_turnover_budget_state() -> None:
     assert "alpha" not in lowered
 
 
-def test_e2e_smoke_panel_renders_on_research() -> None:
-    """End-to-end smoke matrix panel renders live on /research, all green."""
-    from warehouse.dashboard.e2e_data import load_e2e_smoke_dashboard
+def test_e2e_smoke_panel_renders_on_research(tmp_path) -> None:
+    """End-to-end smoke matrix panel renders from artifact, all green."""
+    from warehouse.dashboard.e2e_data import (
+        generate_e2e_smoke_artifact,
+        load_e2e_smoke_dashboard,
+    )
     from warehouse.dashboard.render_e2e import render_e2e_smoke_section
 
-    data = load_e2e_smoke_dashboard()
-    assert data.panel_status == "live", data.error
-    assert data.households > 0
+    artifact = tmp_path / "e2e_smoke.json"
+    generate_e2e_smoke_artifact(artifact_path=artifact)
+
+    data = load_e2e_smoke_dashboard(artifact_path=artifact)
+    assert data.panel_status == "artifact", data.error
+    assert data.households == 4
+    assert data.passed == 4
     # Every generated household passes every leg end-to-end.
     assert data.all_ok, [
         (r.cohort_id, leg.workflow, leg.detail)
@@ -420,9 +427,17 @@ def test_e2e_smoke_panel_renders_on_research() -> None:
     assert "households pass" in panel
 
 
-def test_e2e_smoke_panel_on_research_page() -> None:
+def test_e2e_smoke_panel_on_research_page(tmp_path, monkeypatch) -> None:
     """The panel is wired into the rendered /research page."""
+    from warehouse.dashboard.e2e_data import generate_e2e_smoke_artifact
     from warehouse.dashboard.pages.research import render_research_page
+
+    artifact = tmp_path / "e2e_smoke.json"
+    generate_e2e_smoke_artifact(artifact_path=artifact)
+    monkeypatch.setattr(
+        "warehouse.dashboard.e2e_data.e2e_smoke_artifact_path",
+        lambda: artifact,
+    )
 
     html = render_research_page()
     assert "End-to-end smoke matrix (synthetic)" in html
@@ -616,6 +631,7 @@ def test_testing_matrix_with_report_artifact(tmp_path) -> None:
             "planes_below_floor": 0,
             "ok": True,
         },
+        "e2e_smoke": {"households": 4, "passed": 4, "ok": True},
         "planes": [
             {
                 "plane_id": "decision",
@@ -638,5 +654,6 @@ def test_testing_matrix_with_report_artifact(tmp_path) -> None:
     report = load_testing_report(artifact_path=path)
     panel = render_testing_matrix(report)
     assert "10/10" in panel
+    assert "4/4" in panel
     assert "Decision" in panel
     assert "No report yet" not in panel

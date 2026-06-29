@@ -66,5 +66,6 @@ jobs:
           path: |
             runs/testing/coverage.json
             runs/testing/last_report.json
+            runs/testing/e2e_smoke.json
           retention-days: 7
           if-no-files-found: warn
