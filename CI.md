@@ -12,8 +12,12 @@ Docker, Postgres, or Redis** — CI and `pytest` run on SQLite and in-process jo
 ```bash
 python -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -e ".[dev]"
+make setup                         # installs .[dev] + enables the pre-push hook
 ```
+
+`make setup` wraps `pip install -e ".[dev]"` and
+`git config core.hooksPath scripts/git-hooks`. Without `make`, run both by hand.
+Run `make help` to list all targets (`ci`, `lint`, `types`, `test`, `fix`).
 
 Optional config override (committed defaults in `configs/development.toml`):
 
@@ -25,38 +29,48 @@ export WAREHOUSE_CONFIG=configs/development.toml
 
 ## GitHub Actions (canonical CI)
 
-Runs on **push** and **pull_request** to `main` (Ubuntu, Python 3.12):
+Runs on **push** and **pull_request** to `main` (Ubuntu, Python 3.12). Three
+**independent parallel jobs** so each surface reports separately — a `types`
+failure never masks a `test` regression (and vice versa):
 
-| Step | Command |
+| Job | Command(s) |
 | --- | --- |
-| Install | `pip install -e ".[dev]"` |
-| Lint | `ruff check src tests` |
-| Format | `ruff format --check src tests` |
-| Types | `mypy src/warehouse` |
-| Tests | `pytest` |
+| `lint` | `ruff check src tests` · `ruff format --check src tests` |
+| `types` | `mypy src/warehouse` |
+| `test` | `pytest` |
 
-### Replay CI locally
+All three must pass. Each job installs `.[dev]` independently (pip-cached).
 
-From repo root with the venv active:
+### Replay CI locally — `scripts/ci.sh`
+
+`scripts/ci.sh` is the **single source of truth** for the gate (local + Actions
+parity). It runs all four checks, aggregates failures (one gate never masks
+another), and prefers `.venv/bin` tools:
 
 ```bash
-pip install -e ".[dev]"
-ruff check src tests
-ruff format --check src tests
-mypy src/warehouse
-pytest
+scripts/ci.sh            # run every gate, report all failures
+scripts/ci.sh lint       # ruff check only
+scripts/ci.sh format     # ruff format --check only
+scripts/ci.sh types      # mypy only
+scripts/ci.sh test       # pytest only
+scripts/ci.sh fix        # ruff --fix + ruff format (mutating; not a gate)
 ```
 
-One-liner:
+### Pre-push hook (catch before push)
+
+A version-controlled hook runs `scripts/ci.sh` before every push, so a red
+build never reaches `main`. `make setup` enables it; or once per clone:
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
+Escape hatch (CI still runs server-side): `SKIP_CI_HOOK=1 git push`.
+
+### Raw one-liner (no script)
 
 ```bash
 ruff check src tests && ruff format --check src tests && mypy src/warehouse && pytest
-```
-
-Using venv binaries explicitly:
-
-```bash
-.venv/bin/ruff check src tests && .venv/bin/ruff format --check src tests && .venv/bin/mypy src/warehouse && .venv/bin/pytest
 ```
 
 ---

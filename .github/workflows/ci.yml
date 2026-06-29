@@ -6,27 +6,47 @@ on:
   pull_request:
     branches: [main]
 
+# Three independent jobs so lint / types / tests report separately on every
+# push — a mypy failure never masks a test regression (and vice versa). Each
+# job installs via pip cache, so the duplicated setup is cheap.
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Ruff check
+        run: ruff check src tests
+      - name: Ruff format
+        run: ruff format --check src tests
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Mypy
+        run: mypy src/warehouse
+
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
+          cache: pip
       - name: Install dependencies
         run: pip install -e ".[dev]"
-
-      - name: Ruff
-        run: ruff check src tests
-
-      - name: Ruff format
-        run: ruff format --check src tests
-
-      - name: Mypy
-        run: mypy src/warehouse
-
       - name: Pytest
         run: pytest
