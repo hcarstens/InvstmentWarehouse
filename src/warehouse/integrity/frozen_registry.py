@@ -46,6 +46,7 @@ from warehouse.reporting.performance import (
     HouseholdPerformanceReport,
     RealizedGainEvent,
 )
+from warehouse.reporting.report_writer.models import ReportBundle, ReportPeriod
 from warehouse.reporting.tax import ReportingTaxResult
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
@@ -86,6 +87,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     PositionThesis,
     RebalanceProposal,
     RealizedGainEvent,
+    ReportBundle,
     ReportingTaxResult,
     RiskDeltas,
     RiskResult,
@@ -310,6 +312,40 @@ def _sample_instance(cls: type[Any]) -> Any:
             scenario_tax=Decimal("1100"),
             tax_delta=Decimal("100"),
         )
+    if cls is ReportBundle:
+        return ReportBundle(
+            snapshot_id="rpt_test",
+            household_id="hh_test",
+            period=ReportPeriod.month_end(date(2026, 6, 24)),
+            as_of_date=date(2026, 6, 24),
+            generated_at=datetime(2026, 6, 24, tzinfo=UTC),
+            performance=HouseholdPerformanceReport(
+                household_id="hh_test",
+                as_of_date="2026-06-24",
+                total_market_value=Decimal("1000000"),
+                unrealized_gain=Decimal("50000"),
+                realized_gain_ytd=Decimal("12000"),
+            ),
+            ips_drift=IpsDriftReport(
+                household_id="hh_test",
+                rows=[],
+                alerts=[],
+                concentration_alerts=[],
+            ),
+            tax_scenarios=(
+                ReportingTaxResult(
+                    overlays=TaxScenarioOverlays(),
+                    baseline_tax=Decimal("0"),
+                    scenario_tax=Decimal("0"),
+                    tax_delta=Decimal("0"),
+                ),
+            ),
+            staged_orders=(),
+            pending_approval_count=0,
+            open_breaks=(),
+            limitations=("test limitation",),
+            data_sources=("reporting.performance:test",),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -420,6 +456,8 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "amount"
     if isinstance(instance, ReportingTaxResult):
         return "tax_delta"
+    if isinstance(instance, ReportBundle):
+        return "snapshot_id"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 
