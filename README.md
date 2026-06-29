@@ -48,10 +48,12 @@ The dashboard auto-refreshes every 30s. On first load it runs migrate + seed if 
 | `/execution` | Execution plane (recon, refresh, staged orders, solver) |
 | `/reporting` | Reporting plane (tax scenarios) |
 | `/infra` | Infrastructure (health checks, audit log) |
+| `/testing` | Testing matrix — per-plane pass/fail, coverage %, mutation kill %, pyramid mix |
 | `/risk` | Risk API + HNW synthetic build tracker |
 | `/data?q=VTI` | Security master filter by ticker, name, or CUSIP |
 | `/data?custodian=custodian_fidelity` | Custodian selector filter |
 | `/api/status` | Platform status JSON |
+| `/api/testing` | Testing report JSON (same shape as `runs/testing/last_report.json`) |
 | `/api/health` | Infrastructure checks (503 if any fail) |
 | `/api/pages/data` | Data plane JSON bundle (preferred) |
 | `/api/pages/decision` | Decision plane JSON bundle |
@@ -165,17 +167,79 @@ shipping product panels.
 ### Development
 
 ```bash
-pytest                           # full test suite
+pytest                           # full test suite (no coverage artifact)
+warehouse test report            # suite + artifacts for /testing dashboard
 pytest tests/test_frozen.py      # immutability registry
 ruff check src tests --fix && ruff format src tests   # fix and format
 ruff check src tests
 ```
 
-See [`CI.md`](CI.md) for the full CI command reference (GitHub Actions, mypy, track falsifiers).
+See [Testing platform](#testing-platform) below and [`CI.md`](CI.md) for coverage artifacts,
+security gates, and the canonical pre-push gate (`ruff` · `mypy` · `pytest`).
+
+## Testing platform
+
+The testing dashboard is **living system state**, not a separate spreadsheet. A permanent
+**scaffold** (registry, `/testing` page, per-plane QA footnotes, `GET /api/testing`) is
+continuously fed by a **single-pass artifact generator** — run locally or let CI produce it
+on each PR. You refresh the report periodically; the scaffold displays the last result.
+
+### Run locally
+
+```bash
+warehouse test report              # full pytest + coverage → runs/testing/last_report.json
+warehouse test mutation            # mutmut on Data + Decision (on-demand; minutes)
+warehouse test report --mutation   # mutation first, then full report (merges kill %)
+pytest                             # run tests only — no dashboard artifact
+```
+
+Artifacts (gitignored under `runs/testing/`):
+
+| File | Purpose |
+| --- | --- |
+| `last_report.json` | Per-plane pass/fail, coverage %, mutation kill %, pyramid mix |
+| `coverage.json` | Full `pytest-cov` JSON for drill-down |
+| `e2e_smoke.json` | E2E smoke matrix (4 cohorts) |
+| `mutation_report.json` | Kill % on critical planes (when mutation was run) |
+
+Then start the dashboard — it reads the artifact; it does **not** re-run the full suite on
+page load:
+
+```bash
+warehouse serve
+open http://127.0.0.1:8765/testing    # consolidated matrix
+```
+
+If `last_report.json` is missing, `/testing` shows an empty state with instructions to run
+`warehouse test report`. If the artifact's `git_sha` ≠ current `HEAD`, panels show a
+**stale** badge with last-known metrics until you refresh.
+
+### View results
+
+| Where | What you see |
+| --- | --- |
+| `/testing` | Consolidated matrix: pass/fail per plane, coverage % (amber if below floor), mutation kill % on Data + Decision, actual-vs-target pyramid, E2E smoke pass rate |
+| `/api/testing` | Same data as JSON for automation |
+| `/data`, `/research`, `/decision`, `/execution`, `/reporting`, `/infra` | One-line **QA footnote** at the bottom of each plane page — that plane's tests and coverage without leaving the page |
+
+**`ok` semantics:** coverage % is an amber **gap-finder badge only** — it never gates `ok`.
+`ok` flips red solely on test failures (and E2E smoke when present). Discriminating power
+comes from **mutation kill %** (report-only, not gated) and **property-based invariants**
+(`hypothesis` suites on optimizer, lot, and risk math).
+
+### CI (every PR)
+
+The `test` job runs `warehouse test report` (full `pytest --cov=warehouse`), uploads
+`coverage.json` and `last_report.json` as artifacts (7-day retention), and runs a **security
+gate** (`pip-audit` + `detect-secrets`) — high/critical vulns or leaked secrets fail the job.
+Mutation testing stays **on-demand** (not on the PR critical path).
+
+See [`CI.md`](CI.md) for the full command reference and [`docs/software_testing_implementation.md`](docs/software_testing_implementation.md) for the implementation plan.
 
 ## Project docs
 
-- `CI.md` — CI commands and pre-push checklist
+- `CI.md` — CI commands, testing artifacts, security gates, pre-push checklist
+- `docs/software_testing_implementation.md` — testing dashboard implementation plan
 - `CLAUDE.md` — architecture and conventions
 - `TODO.md` — phased deliverables
 - `JOURNAL.md` — build log
