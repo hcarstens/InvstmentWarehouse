@@ -19,8 +19,10 @@ from warehouse.dashboard.render_e2e import render_e2e_smoke_section
 from warehouse.dashboard.render_testing import render_testing_matrix
 from warehouse.dashboard.testing_data import (
     E2eSmokeSummary,
-    TestingReport as TestingReportModel,
     load_testing_report,
+)
+from warehouse.dashboard.testing_data import (
+    TestingReport as TestingReportModel,
 )
 from warehouse.dashboard.testing_report import (
     attach_e2e_smoke_to_report,
