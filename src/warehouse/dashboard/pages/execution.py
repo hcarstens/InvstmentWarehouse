@@ -17,6 +17,7 @@ from warehouse.dashboard.phase4_data import (
 )
 from warehouse.dashboard.render_phase2 import render_phase2_execution_sections
 from warehouse.dashboard.render_phase4 import render_phase4_execution_sections
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.status import build_status_report
 
 
@@ -57,5 +58,8 @@ def render_execution_page(data: ExecutionPageData | None = None) -> str:
         body=body,
         active_page_id="execution",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/execution">execution API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('execution')} · "
+            '<a href="/api/pages/execution">execution API</a>'
+        ),
     )

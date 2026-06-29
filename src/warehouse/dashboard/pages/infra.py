@@ -16,6 +16,7 @@ from warehouse.dashboard.render_infra import (
     render_infra_checks_section,
     render_planned_infra_panels,
 )
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.status import build_status_report
 from warehouse.infra.health import InfraCheck, run_infra_checks
 
@@ -63,5 +64,8 @@ def render_infra_page(data: InfraPageData | None = None) -> str:
         body=body,
         active_page_id="infra",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/infra">infra API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('infra')} · "
+            '<a href="/api/pages/infra">infra API</a>'
+        ),
     )

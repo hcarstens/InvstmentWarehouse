@@ -51,7 +51,10 @@ def render_catalog(report: StatusReport | None = None) -> str:
         body="".join(body_parts),
         active_page_id="catalog",
         generated_at=report.generated_at,
-        footer_extra='<a href="/risk">risk build</a>',
+        footer_extra=(
+            '<a href="/testing">testing matrix</a> · '
+            '<a href="/risk">risk build</a>'
+        ),
     )
 
 

@@ -19,6 +19,7 @@ from warehouse.dashboard.render_e2e import render_e2e_smoke_section
 from warehouse.dashboard.render_phase3 import render_backtest_section
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.render_risk_build import render_risk_build_link_card
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.risk_build_data import (
     RiskBuildReport,
     load_risk_build_report,
@@ -79,5 +80,8 @@ def render_research_page(data: ResearchPageData | None = None) -> str:
         body=body,
         active_page_id="research",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/research">research API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('research')} · "
+            '<a href="/api/pages/research">research API</a>'
+        ),
     )

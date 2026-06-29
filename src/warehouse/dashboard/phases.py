@@ -31,6 +31,7 @@ PHASES: list[Phase] = [
             DashboardPanel(name="Plane readiness", phase=0, status="live"),
             DashboardPanel(name="Workflow catalog", phase=0, status="live"),
             DashboardPanel(name="Infra health", phase=0, status="live"),
+            DashboardPanel(name="Testing matrix", phase=0, status="stub"),
         ],
     ),
     Phase(

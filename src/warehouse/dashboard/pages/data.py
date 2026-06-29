@@ -22,6 +22,7 @@ from warehouse.dashboard.phase4_data import (
 from warehouse.dashboard.render_phase1 import render_phase1_sections
 from warehouse.dashboard.render_phase2 import render_phase2_data_sections
 from warehouse.dashboard.render_phase4 import render_phase4_data_sections
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.status import build_status_report
 
 
@@ -78,5 +79,8 @@ def render_data_page(
         body=body,
         active_page_id="data",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/data">data API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('data')} · "
+            '<a href="/api/pages/data">data API</a>'
+        ),
     )

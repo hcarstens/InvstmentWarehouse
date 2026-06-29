@@ -33,6 +33,7 @@ from warehouse.dashboard.render_phase3 import (
     render_optimizer_rebalance_section,
     render_phase3_decision_sections,
 )
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.status import build_status_report
 
 
@@ -91,5 +92,8 @@ def render_decision_page(data: DecisionPageData | None = None) -> str:
         body=body,
         active_page_id="decision",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/decision">decision API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('decision')} · "
+            '<a href="/api/pages/decision">decision API</a>'
+        ),
     )

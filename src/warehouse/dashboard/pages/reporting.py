@@ -12,6 +12,7 @@ from warehouse.dashboard.phase4_data import (
     load_phase4_dashboard,
 )
 from warehouse.dashboard.render_phase4 import render_tax_scenario_section
+from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.status import build_status_report
 
 
@@ -43,5 +44,8 @@ def render_reporting_page(data: ReportingPageData | None = None) -> str:
         body=body,
         active_page_id="reporting",
         generated_at=bundle.generated_at,
-        footer_extra='<a href="/api/pages/reporting">reporting API</a>',
+        footer_extra=(
+            f"{render_qa_footnote('reporting')} · "
+            '<a href="/api/pages/reporting">reporting API</a>'
+        ),
     )

@@ -62,6 +62,8 @@ _INFRA_PANELS: tuple[str, ...] = (
     "Object store health",
 )
 
+_TESTING_PANELS: tuple[str, ...] = ("Testing matrix",)
+
 
 @dataclass(frozen=True)
 class DashboardPage:
@@ -140,12 +142,20 @@ PAGES: tuple[DashboardPage, ...] = (
         nav_label="Risk build",
         panel_names=_RISK_BUILD_PANELS,
     ),
+    DashboardPage(
+        page_id="testing",
+        path="/testing",
+        title="Testing matrix",
+        package="warehouse.dashboard",
+        nav_label="Testing",
+        panel_names=_TESTING_PANELS,
+    ),
 )
 
 _PLANE_PAGE_BY_PACKAGE: dict[str, DashboardPage] = {
     page.package: page
     for page in PAGES
-    if page.page_id not in ("catalog", "infra", "risk_build")
+    if page.page_id not in ("catalog", "infra", "risk_build", "testing")
 }
 
 _PANEL_TO_PAGE: dict[str, DashboardPage] = {}

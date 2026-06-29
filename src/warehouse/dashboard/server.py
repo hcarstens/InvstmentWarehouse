@@ -29,6 +29,7 @@ from warehouse.dashboard.pages.research import (
     load_research_page,
     render_research_page,
 )
+from warehouse.dashboard.pages.testing import render_testing_page
 from warehouse.dashboard.phase1_data import load_phase1_dashboard
 from warehouse.dashboard.phase2_data import load_phase2_dashboard
 from warehouse.dashboard.phase3_data import load_phase3_dashboard
@@ -37,6 +38,7 @@ from warehouse.dashboard.render_risk_build import render_risk_build_page
 from warehouse.dashboard.risk_build_data import load_risk_build_report
 from warehouse.dashboard.risk_data import load_risk_dashboard
 from warehouse.dashboard.status import build_status_report
+from warehouse.dashboard.testing_data import load_testing_report
 
 # Legacy /api/phaseN → plane page JSON (dd6). Bodies unchanged; headers mark deprecation.
 _PHASE_API_SUCCESSORS: dict[str, tuple[str, ...]] = {
@@ -115,6 +117,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path_only = self.path.split("?")[0]
         if path_only in ("/risk", "/risk/"):
             body = render_risk_build_html().encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        if path_only in ("/testing", "/testing/"):
+            body = render_testing_page().encode()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -319,6 +329,13 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif path_only == "/api/testing":
+            body = load_testing_report().model_dump_json(indent=2).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         elif self.path == "/api/risk":
             from warehouse.research.risk.api import risk_api_schema
 
@@ -369,11 +386,13 @@ def serve(
     else:
         print(f"Catalog:    {base}/")
         for page in PAGES:
-            if page.page_id in ("catalog", "risk_build"):
+            if page.page_id in ("catalog", "risk_build", "testing"):
                 continue
             print(f"{page.nav_label + ':':<11} {base}{page.path}")
     print(f"Risk build: {base}/risk")
+    print(f"Testing:    {base}/testing")
     print(f"Build API:  {base}/api/risk/build")
+    print(f"Testing API:{base}/api/testing")
     print(f"Status API: {base}/api/status")
     print(f"Risk API:   {base}/api/risk")
     try:

@@ -452,3 +452,176 @@ def test_optimizer_panel_shows_base_vs_stress() -> None:
     lowered = panel.lower()
     assert "forecast" not in lowered
     assert "alpha" not in lowered
+
+
+def test_testing_page_empty_state() -> None:
+    from warehouse.dashboard.pages.testing import render_testing_page
+
+    html = render_testing_page()
+    assert "Testing matrix" in html
+    assert "No report yet" in html
+    assert "warehouse test report" in html
+
+
+def test_api_testing_empty_state_json() -> None:
+    import json
+    from pathlib import Path
+
+    from warehouse.dashboard.testing_data import load_testing_report
+
+    report = load_testing_report(artifact_path=Path("/none"))
+    payload = json.loads(report.model_dump_json())
+    assert payload["has_report"] is False
+    assert "planes" in payload
+    assert len(payload["planes"]) >= 6
+    assert payload["overall"]["ok"] is True
+
+
+def test_testing_page_http_returns_200() -> None:
+    server = HTTPServer(("127.0.0.1", 0), DashboardHandler)
+    port = server.server_address[1]
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        import json
+        import urllib.request
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/testing",
+            timeout=30,
+        ) as resp:
+            assert resp.status == 200
+            body = resp.read().decode()
+            assert "Testing matrix" in body
+
+        with urllib.request.urlopen(
+            f"http://127.0.0.1:{port}/api/testing",
+            timeout=30,
+        ) as resp:
+            assert resp.status == 200
+            payload = json.loads(resp.read())
+            assert payload["has_report"] is False
+            assert isinstance(payload["planes"], list)
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+
+
+def test_qa_footnote_on_each_plane_page() -> None:
+    from warehouse.dashboard.pages.data import render_data_page
+    from warehouse.dashboard.pages.decision import render_decision_page
+    from warehouse.dashboard.pages.execution import render_execution_page
+    from warehouse.dashboard.pages.infra import render_infra_page
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+    from warehouse.dashboard.pages.research import render_research_page
+    from warehouse.dashboard.testing_registry import QA_FOOTNOTE_PLANE_IDS
+
+    renderers = {
+        "data": render_data_page,
+        "research": render_research_page,
+        "decision": render_decision_page,
+        "execution": render_execution_page,
+        "reporting": render_reporting_page,
+        "infra": render_infra_page,
+    }
+    for plane_id in QA_FOOTNOTE_PLANE_IDS:
+        html = renderers[plane_id]()
+        assert "qa-footnote" in html
+        assert "warehouse test report" in html
+        assert 'href="/testing"' in html
+
+
+def test_qa_footnote_with_report_artifact(tmp_path) -> None:
+    import json
+    from datetime import UTC, datetime
+
+    from warehouse.dashboard.render_testing import render_qa_footnote
+    from warehouse.dashboard.testing_data import load_testing_report
+
+    artifact = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "git_sha": "deadbeef",
+        "stale": False,
+        "has_report": True,
+        "pyramid": {"unit_pct": 72.0, "integration_pct": 23.0, "e2e_pct": 5.0},
+        "overall": {
+            "tests": 23,
+            "passed": 23,
+            "failed": 0,
+            "coverage_pct": 89.2,
+            "planes_below_floor": 1,
+            "ok": True,
+        },
+        "planes": [
+            {
+                "plane_id": "data",
+                "name": "Data",
+                "tests": 23,
+                "passed": 23,
+                "failed": 0,
+                "coverage_pct": 85.7,
+                "coverage_floor_pct": 90.0,
+                "coverage_status": "below_floor",
+                "mutation_kill_pct": 78.0,
+                "risk_tier": "critical",
+                "ok": True,
+                "pytest_paths": ["tests/test_phase1.py"],
+            }
+        ],
+    }
+    path = tmp_path / "last_report.json"
+    path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    report = load_testing_report(artifact_path=path)
+    footnote = render_qa_footnote("data", report=report)
+    assert "23/23 passing" in footnote
+    assert "85.7%" in footnote
+    assert "mutation kill 78%" in footnote
+    assert report.planes[0].ok is True
+    assert report.planes[0].coverage_status == "below_floor"
+
+
+def test_testing_matrix_with_report_artifact(tmp_path) -> None:
+    import json
+    from datetime import UTC, datetime
+
+    from warehouse.dashboard.render_testing import render_testing_matrix
+    from warehouse.dashboard.testing_data import load_testing_report
+
+    artifact = {
+        "generated_at": datetime.now(UTC).isoformat(),
+        "git_sha": "deadbeef",
+        "has_report": True,
+        "pyramid": {"unit_pct": 70.0, "integration_pct": 25.0, "e2e_pct": 5.0},
+        "overall": {
+            "tests": 10,
+            "passed": 10,
+            "failed": 0,
+            "coverage_pct": 91.0,
+            "planes_below_floor": 0,
+            "ok": True,
+        },
+        "planes": [
+            {
+                "plane_id": "decision",
+                "name": "Decision",
+                "tests": 5,
+                "passed": 5,
+                "failed": 0,
+                "coverage_pct": 94.7,
+                "coverage_floor_pct": 93.0,
+                "coverage_status": "ok",
+                "risk_tier": "critical",
+                "ok": True,
+                "pytest_paths": [],
+            }
+        ],
+    }
+    path = tmp_path / "last_report.json"
+    path.write_text(json.dumps(artifact), encoding="utf-8")
+
+    report = load_testing_report(artifact_path=path)
+    panel = render_testing_matrix(report)
+    assert "10/10" in panel
+    assert "Decision" in panel
+    assert "No report yet" not in panel

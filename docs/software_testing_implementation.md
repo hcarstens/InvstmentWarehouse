@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** planned · **nothing built yet** (dashboard panel st0, E2E st4, hard QA st5)
+**Status:** st0 shipped (stub panel) · st1–st5 planned
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -17,7 +17,7 @@ All slices **not done** — none started. Build order (dashboard first for visib
 
 | Slice | Item | Status |
 | --- | --- | --- |
-| **st0** | Dashboard panel + API + per-plane QA footnote (**top — visibility**) | ☐ not done |
+| **st0** | Dashboard panel + API + per-plane QA footnote (**top — visibility**) | ☑ done |
 | **st1** | Registry + artifact schema | ☐ not done |
 | **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☐ not done |
 | **st3** | CI coverage artifact + badges + QA7 security gate | ☐ not done |
@@ -317,7 +317,7 @@ an amber badge but does **not** render the footnote red; only test failures do (
 
 ## 5. Implementation slices
 
-### st0 — dashboard panel + API  ☐ **not done**  *(~1 PR — TOP, for phase visibility)*
+### st0 — dashboard panel + API  ☑ **done**  *(~1 PR — TOP, for phase visibility)*
 
 **Goal:** a **visible testing panel at `warehouse serve` first** (dashboard-first, CLAUDE.md) so
 current project phase is on screen from day one. Ships with the panel **wired but reading
