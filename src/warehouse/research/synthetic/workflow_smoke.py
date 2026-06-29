@@ -205,21 +205,24 @@ def _pm_advise_check(
                 household_id=payload.household_id,
             ),
         )
-        legs_ok = (
-            isinstance(out, AdviceBundle)
-            and out.risk.report is not None
-            and out.proposal.rebalance is not None
-            and out.narrative is not None
-            and out.tax is not None
-        )
-        tax_zero = out.tax.tax_delta == Decimal("0")
-        ok = legs_ok and tax_zero
-        detail = (
-            f"risk={out.risk.report is not None}; "
-            f"rebalance={out.proposal.rebalance is not None}; "
-            f"tax_delta={out.tax.tax_delta}; "
-            f"narrative={out.narrative is not None}"
-        )
+        if not isinstance(out, AdviceBundle):
+            ok = False
+            detail = f"expected AdviceBundle, got {type(out).__name__}"
+        else:
+            legs_ok = (
+                out.risk.report is not None
+                and out.proposal.rebalance is not None
+                and out.narrative is not None
+                and out.tax is not None
+            )
+            tax_zero = out.tax.tax_delta == Decimal("0")
+            ok = legs_ok and tax_zero
+            detail = (
+                f"risk={out.risk.report is not None}; "
+                f"rebalance={out.proposal.rebalance is not None}; "
+                f"tax_delta={out.tax.tax_delta}; "
+                f"narrative={out.narrative is not None}"
+            )
     except Exception as err:  # surface loudly as a failed check (no swallow)
         ok = False
         detail = f"raised {type(err).__name__}: {err}"

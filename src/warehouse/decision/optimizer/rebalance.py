@@ -14,6 +14,7 @@ Pure and advisory: it stages **no trade** and persists nothing — the v0 TLH
 from __future__ import annotations
 
 from decimal import ROUND_HALF_EVEN, Decimal
+from typing import TypedDict
 
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import LotPositionView
@@ -85,6 +86,15 @@ def _current_weights(
             weights.get(sleeve, Decimal("0")) + pos.market_value / total_mv
         )
     return weights
+
+
+class _StressOverlayKwArgs(TypedDict, total=False):
+    stress_regime: str | None
+    stress_target_weights: dict[IpsSleeve, Decimal]
+    stress_delta_w: dict[IpsSleeve, Decimal]
+    regime_gap_l1: Decimal
+    stress_objective_value: Decimal
+    stress_risk_contributions: dict[IpsSleeve, Decimal]
 
 
 def run_mv_rebalance(
@@ -317,7 +327,7 @@ def run_mv_rebalance(
     # the crisis-regime Σ, reported alongside the base w*. Additive/advisory:
     # the base fields above are byte-identical regardless. compute_stress=False
     # on the inner re-solve breaks the recursion.
-    stress_fields: dict[str, object] = {}
+    stress_fields: _StressOverlayKwArgs = {}
     if compute_stress:
         # Local import breaks the rebalance ⇆ robust import cycle.
         from warehouse.decision.optimizer.robust import compute_stress_overlay
