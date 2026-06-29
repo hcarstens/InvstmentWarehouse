@@ -42,6 +42,10 @@ from warehouse.orchestrator.models import (
     OrchestratorIntent,
     OrchestratorResponse,
 )
+from warehouse.reporting.performance import (
+    HouseholdPerformanceReport,
+    RealizedGainEvent,
+)
 from warehouse.research.backtest import BacktestResult
 from warehouse.research.risk.engine import evaluate_portfolio_risk
 from warehouse.research.risk.models import (
@@ -66,6 +70,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     BacktestResult,
     DispatchContext,
     Event,
+    HouseholdPerformanceReport,
     KillBreach,
     KillCriteria,
     Message,
@@ -79,6 +84,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     PositionAttribution,
     PositionThesis,
     RebalanceProposal,
+    RealizedGainEvent,
     RiskDeltas,
     RiskResult,
     Settings,
@@ -281,6 +287,20 @@ def _sample_instance(cls: type[Any]) -> Any:
             excess_kurtosis=1.5,
             vol_clustering=0.97,
         )
+    if cls is HouseholdPerformanceReport:
+        return HouseholdPerformanceReport(
+            household_id="hh_test",
+            as_of_date="2026-06-24",
+            total_market_value=Decimal("1000000"),
+            unrealized_gain=Decimal("50000"),
+            realized_gain_ytd=Decimal("12000"),
+        )
+    if cls is RealizedGainEvent:
+        return RealizedGainEvent(
+            event_id="evt_realized_test",
+            event_date=date(2026, 3, 1),
+            amount=Decimal("12000"),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -385,6 +405,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "actor_id"
     if isinstance(instance, PathTargets):
         return "annual_vol"
+    if isinstance(instance, HouseholdPerformanceReport):
+        return "household_id"
+    if isinstance(instance, RealizedGainEvent):
+        return "amount"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

@@ -52,7 +52,10 @@ _EXECUTION_PANELS: tuple[str, ...] = (
     "Solver comparison",
 )
 
-_REPORTING_PANELS: tuple[str, ...] = ("Tax scenario panel",)
+_REPORTING_PANELS: tuple[str, ...] = (
+    "Household performance",
+    "Tax scenario panel",
+)
 
 _INFRA_PANELS: tuple[str, ...] = (
     "Infra health",

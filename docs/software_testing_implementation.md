@@ -236,19 +236,19 @@ pytest tests/test_phase3.py tests/test_optimizer_*.py tests/test_pm_*.py \
 pytest tests/test_phase2.py tests/test_phase4.py -q
 ```
 
-### 4.5 Reporting (`warehouse.reporting`) — baseline 0% · floor 80% · readiness `partial`
+### 4.5 Reporting (`warehouse.reporting`) — floor 80% · readiness `live`
 
 **Blast radius:** Tax and performance reports wrong with no tests — **highest priority gap**.
 
 | Area | Oracle | Primary tests | Gaps |
 | --- | --- | --- | --- |
-| Performance | Known return series | **None** | Module stub only |
-| Tax scenarios | Scenario → liability | Interim via `test_phase4.py` (decision tax) | Reporting-plane ownership |
+| Performance | Known return series | `tests/test_reporting_performance.py` | YTD from persisted event stream |
+| Tax scenarios | Scenario → liability | Interim via `test_phase4.py` (decision tax) | Reporting-plane tax ownership |
 
-**Interim pass** (tax logic in decision until reporting ships):
+**Falsifier:**
 
 ```bash
-pytest tests/test_phase4.py -k tax -q
+pytest tests/test_reporting_performance.py tests/test_phase4.py -k tax -q
 ```
 
 **Rule:** Do not mark Reporting plane `live` in `status.py` until dedicated
@@ -418,7 +418,7 @@ the investment once the suite, dashboard, and E2E wiring (st0–st4) are stable.
 | **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☑ done |
 | **st5g** | Research — synthetic statistical (§4.2.1) | `pytest tests/test_synth_*.py -q` | ☑ done |
 | **st5h** | Mutation report (ST3) — `mutmut` on Data + Decision; `mutation_kill_pct` artifact | artifact shows kill % on Data + Decision rows | ☑ done |
-| **st5i** | Reporting — `tests/test_reporting_performance.py` when module ships | — | ☐ deferred |
+| **st5i** | Reporting — `tests/test_reporting_performance.py` | `pytest tests/test_reporting_performance.py -q` | ☑ done |
 
 **Sequence:** st5a first (deps + registry). st5b–st5c can land in parallel. st5d–st5f last
 (highest cost). st5g after synthetic paths stable. st5h after property suites green. st5i when
@@ -726,3 +726,4 @@ all six slices are `☐ not done`** (see top status table).
 | 2026-06-29 | **st5f shipped:** `test_risk_properties.py` — hypothesis invariants on `horizon_scale`, `parametric_var`/`parametric_es` ordering, `pairwise_correlation` bounds, wᵀΣw variance oracle, pct-variance sum, vol sub-additivity on disjoint sleeves; boundary hunts (empty states, single-asset, zero vol, ρ at ±1). |
 | 2026-06-29 | **st5g shipped:** `test_synth_{distribution,null_baseline,sdg_ablation,cross_regime}.py` — independent distributional oracles (`daily_paths.py`), shuffle/bootstrap nulls, SDG3 uniform-weight ablation vs `run_workflow_smoke`, `2022_inflation` cross-regime equity-trim rule; registry + `_SHIPPED_STATISTICAL_PATHS` wired. |
 | 2026-06-29 | **st5h shipped:** `mutmut` in `[dev]`; `warehouse test mutation` writes `runs/testing/mutation_report.json`; `generate_testing_report()` merges `mutation_kill_pct` onto Data + Decision (report-only, never gates `ok`); `tests/test_mutation_report.py` falsifiers. |
+| 2026-06-29 | **st5i shipped:** `warehouse.reporting.performance.compute` + `tests/test_reporting_performance.py` — ST2 independent MV/unrealized oracles, walk-forward and missing-mark falsifiers, metamorphic mark scaling; Reporting registry row + dashboard Household performance panel. |

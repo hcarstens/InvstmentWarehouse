@@ -61,8 +61,8 @@ PLANES: list[PlaneStatus] = [
     PlaneStatus(
         name="Reporting",
         package="warehouse.reporting",
-        readiness="partial",
-        note="Household P&L and lot positions live",
+        readiness="live",
+        note="Household performance P&L; tax scenarios; risk reporting planned",
     ),
 ]
 

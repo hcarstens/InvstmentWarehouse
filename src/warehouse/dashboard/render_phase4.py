@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import html
+from typing import TYPE_CHECKING
 
 from warehouse.dashboard.phase4_data import Phase4DashboardData
+
+if TYPE_CHECKING:
+    from warehouse.dashboard.reporting_performance_data import (
+        ReportingPerformanceData,
+    )
 
 
 def render_phase4_data_sections(
@@ -165,9 +171,51 @@ def render_tax_scenario_section(phase4: Phase4DashboardData) -> str:
   <section>
     <h2>Tax scenario panel</h2>
     <p><span class="badge badge-warn">partial</span>
-       Reporting plane — tax scenarios live; performance and risk reporting planned.</p>
+       Tax scenarios live; risk reporting planned.</p>
     <table>
       <thead><tr><th>Scenario</th><th>Baseline tax</th><th>Scenario tax</th><th>Delta</th><th>Run at</th></tr></thead>
       <tbody>{tax_rows or '<tr><td colspan="5">No tax scenarios</td></tr>'}</tbody>
+    </table>
+  </section>"""
+
+
+def render_performance_section(
+    perf: ReportingPerformanceData,
+) -> str:
+    """Household performance panel — reporting plane page."""
+    error = ""
+    if perf.error:
+        error = (
+            f'<section class="error-banner"><strong>Performance error:</strong> '
+            f"{html.escape(perf.error)}</section>"
+        )
+    if perf.report is None:
+        body = (
+            "<p>No performance snapshot — fix errors above.</p>"
+            if perf.error
+            else "<p>No performance data.</p>"
+        )
+        return f"""{error}
+  <section>
+    <h2>Household performance</h2>
+    <p><span class="badge badge-live">live</span>
+       <code>warehouse.reporting.performance</code></p>
+    {body}
+  </section>"""
+
+    r = perf.report
+    return f"""{error}
+  <section>
+    <h2>Household performance — {html.escape(perf.household_id)}</h2>
+    <p><span class="badge badge-live">live</span>
+       as of {html.escape(r.as_of_date)} ·
+       <code>build_household_performance_report</code></p>
+    <table>
+      <thead><tr><th>Total MV</th><th>Unrealized</th><th>Realized YTD</th></tr></thead>
+      <tbody><tr>
+        <td>{r.total_market_value:,.2f}</td>
+        <td>{r.unrealized_gain:,.2f}</td>
+        <td>{r.realized_gain_ytd:,.2f}</td>
+      </tr></tbody>
     </table>
   </section>"""

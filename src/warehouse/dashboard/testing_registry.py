@@ -150,11 +150,14 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         plane_id="reporting",
         name="Reporting",
         package="warehouse.reporting",
-        pytest_paths=["tests/test_phase4.py"],
+        pytest_paths=[
+            "tests/test_phase4.py",
+            "tests/test_reporting_performance.py",
+        ],
         coverage_glob="src/warehouse/reporting/**",
         coverage_floor_pct=80.0,
         risk_tier="medium",
-        note="Interim pass via decision tax until reporting ships",
+        note="Performance falsifiers (st5i); tax interim via test_phase4.py",
     ),
     PlaneTestSlice(
         plane_id="infra",

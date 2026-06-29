@@ -11,29 +11,42 @@ from warehouse.dashboard.phase4_data import (
     Phase4DashboardData,
     load_phase4_dashboard,
 )
-from warehouse.dashboard.render_phase4 import render_tax_scenario_section
+from warehouse.dashboard.render_phase4 import (
+    render_performance_section,
+    render_tax_scenario_section,
+)
 from warehouse.dashboard.render_testing import render_qa_footnote
+from warehouse.dashboard.reporting_performance_data import (
+    ReportingPerformanceData,
+    load_reporting_performance,
+)
 from warehouse.dashboard.status import build_status_report
 
 
 class ReportingPageData(BaseModel):
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     phase4: Phase4DashboardData
+    performance: ReportingPerformanceData
     error: str | None = None
 
 
 def load_reporting_page() -> ReportingPageData:
     phase4 = load_phase4_dashboard()
+    performance = load_reporting_performance()
+    error = phase4.error or performance.error
     return ReportingPageData(
         phase4=phase4,
-        error=phase4.error,
+        performance=performance,
+        error=error,
     )
 
 
 def render_reporting_page(data: ReportingPageData | None = None) -> str:
     bundle = data or load_reporting_page()
     report = build_status_report()
-    body = render_tax_scenario_section(bundle.phase4)
+    body = render_performance_section(
+        bundle.performance
+    ) + render_tax_scenario_section(bundle.phase4)
     subtitle = (
         f"Reporting plane · {report.version} · {report.app_env} · "
         f"<code>warehouse.reporting</code>"

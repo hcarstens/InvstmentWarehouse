@@ -126,6 +126,9 @@ PHASES: list[Phase] = [
             DashboardPanel(name="Custodian selector", phase=4, status="live"),
             DashboardPanel(name="Alternatives panel", phase=4, status="live"),
             DashboardPanel(name="Tax scenario panel", phase=4, status="live"),
+            DashboardPanel(
+                name="Household performance", phase=4, status="live"
+            ),
         ],
     ),
     Phase(

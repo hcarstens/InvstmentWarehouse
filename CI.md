@@ -207,6 +207,7 @@ when populated; empty-state shape is valid before the first `warehouse test repo
 | HNW synthetic | `pytest tests/test_hnw_synthetic.py tests/test_risk_hnw_combinations.py tests/test_risk_asset_test_suite.py` |
 | Synthetic IPS (si0–si3) | `pytest tests/test_ips_sleeves.py tests/test_ips_policy_fields.py tests/test_synthetic_ips.py tests/test_synthetic_ips_workflow.py` |
 | Build tracker UI | `pytest tests/test_risk_build_dashboard.py` |
+| Reporting performance (st5i) | `pytest tests/test_reporting_performance.py -q` |
 
 ### Track falsifiers (before marking deliverables shipped)
 
