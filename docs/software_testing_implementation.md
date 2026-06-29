@@ -158,7 +158,7 @@ stress bindings.
 | Area | Oracle | Primary tests | Gaps |
 | --- | --- | --- | --- |
 | Risk API v0/v1 | Contract envelopes | `test_risk_*.py` (12 files) | Overlay edge cases |
-| **Risk math (property)** | **Invariants: vol ≥ 0, corr ∈ [−1, 1], VaR ≤ CVaR, sub-additivity of diversified risk** | **`test_risk_properties.py` (hypothesis, ST6)** | **Degenerate covariance, single-asset book** |
+| **Risk math (property)** | **Invariants: vol ≥ 0, corr ∈ [−1, 1], VaR ≤ CVaR, sub-additivity of diversified risk** | **`test_risk_properties.py` (hypothesis, ST6)** | — |
 | HNW synthetic | SDG axioms, cohort matrix | `test_hnw_synthetic.py`, asset suite | New asset types |
 | Synthetic IPS | `validate_ips`, binding matrix | `test_synthetic_ips*.py`, IPS tests | si5+ as shipped |
 | Walk-forward | Purge days, no future data | Config + partial tests | Explicit `WalkForwardError` |
@@ -414,8 +414,8 @@ the investment once the suite, dashboard, and E2E wiring (st0–st4) are stable.
 | **st5b** | Data — lot properties (ST6); ingest error propagation (§4.1) | `pytest tests/test_lot_properties.py tests/test_phase2.py -q` | ☑ done |
 | **st5c** | Execution + cross-cutting — recon break taxonomy; `/testing` + QA footnote depth | `pytest tests/test_phase2.py tests/test_phase4.py tests/test_dashboard.py -q` | ☑ done |
 | **st5d** | Decision — optimizer properties (ST6) | `pytest tests/test_optimizer_properties.py tests/test_optimizer_*.py -q` | ☑ done |
-| **st5e** | Decision — analyst/PM depth | `pytest tests/test_analyst_*.py tests/test_pm_*.py -q` | ☐ not done |
-| **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☐ not done |
+| **st5e** | Decision — analyst/PM depth | `pytest tests/test_analyst_*.py tests/test_pm_*.py -q` | ☑ done |
+| **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☑ done |
 | **st5g** | Research — synthetic statistical (§4.2.1) | `pytest tests/test_synth_*.py -q` | ☐ not done |
 | **st5h** | Mutation report (ST3) — `mutmut` on Data + Decision; `mutation_kill_pct` artifact | artifact shows kill % on Data + Decision rows | ☐ not done |
 | **st5i** | Reporting — `tests/test_reporting_performance.py` when module ships | — | ☐ deferred |
@@ -721,3 +721,5 @@ all six slices are `☐ not done`** (see top status table).
 | 2026-06-29 | Added §4.2.1 synthetic portfolio + IPS builder acceptance items: **structural** (per-SDG-axiom, emit→validate round-trip, cohort coverage, determinism, error-surfacing) gate E2E in st4; **statistical** (distributional checks, null baselines, SDG3 ablation falsifier, 2022–2025 cross-regime) land in st5. Sourced from `research/software_testing.md`; split by cost per Simplicity (S1/S3). |
 | 2026-06-29 | **st5a–st5c shipped:** `hypothesis` in `[dev]` with derandomize profile; `collect_pytest_paths` merges property suites; `test_lot_properties.py` (ST6 lot invariants + ingest errors); recon break taxonomy tests; `/testing` matrix section depth in `test_dashboard.py`. |
 | 2026-06-29 | **st5d shipped:** `test_optimizer_properties.py` — hypothesis invariants on `solve_qp`, `project_capped_simplex`, and `run_mv_rebalance` (budget, box, infeasibility raises, turnover ≤ bound, monotone risk-aversion); Decision registry `pytest_paths` updated. |
+| 2026-06-29 | **st5e shipped:** `test_analyst_depth.py` — kill-criteria edges, NPA boundaries, attribution oracles; PM depth in `test_pm_narrative.py` (HNW attribution oracle, zero-residual checkpoint probe). |
+| 2026-06-29 | **st5f shipped:** `test_risk_properties.py` — hypothesis invariants on `horizon_scale`, `parametric_var`/`parametric_es` ordering, `pairwise_correlation` bounds, wᵀΣw variance oracle, pct-variance sum, vol sub-additivity on disjoint sleeves; boundary hunts (empty states, single-asset, zero vol, ρ at ±1). |

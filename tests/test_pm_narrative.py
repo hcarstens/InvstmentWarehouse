@@ -1,11 +1,19 @@
 """pm0 — PM narrative, axiom scoring, specialist liveness."""
 
 from collections.abc import Iterator
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
 import warehouse.messaging.handlers  # noqa: F401 — register catalog ops
+from warehouse.data.ledger.views import LotPositionView
+from warehouse.data.security_master import AssetClass as SecClass
+from warehouse.decision.analyst import (
+    AnalystCheckpointScore,
+    risk_class_for,
+    score_analyst_checkpoints,
+)
 from warehouse.decision.pm import (
     build_working_set,
     build_working_set_from_bundle,
@@ -22,10 +30,31 @@ from warehouse.messaging import (
     dispatch_message,
     observability,
 )
-from warehouse.messaging.payloads import AdviceBundle, AxiomScore
+from warehouse.messaging.payloads import (
+    AdviceBundle,
+    AxiomScore,
+    PmAdvisePayload,
+)
+from warehouse.research.risk.scenarios import assumptions_for
 from warehouse.research.synthetic import emit_synthetic_household
 
 DEMO = DEMO_HOUSEHOLD_ID
+_ONE = Decimal("1")
+_QUANTUM = Decimal("0.000001")
+
+
+def _oracle_expected_cumulative(
+    class_expected: Decimal,
+    holding_years: Decimal,
+) -> Decimal:
+    return (_ONE + class_expected) ** holding_years - _ONE
+
+
+def _oracle_active_return(
+    total_return: Decimal,
+    expected_cumulative: Decimal,
+) -> Decimal:
+    return total_return - expected_cumulative
 
 
 @pytest.fixture
@@ -132,3 +161,78 @@ def test_score_pm_axioms_direct(seeded: None) -> None:
     )
     narrative = score_pm_axioms(bundle, payload, correlation_id="direct-score")
     assert narrative.axioms_scored["axiom_5"] == AxiomScore.NOT_COMPUTED
+
+
+def test_pm_attribution_oracle_on_hnw_path() -> None:
+    """PM nest-dispatch: each lot decomposes with independent oracle (ST2)."""
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="hnw-oracle",
+            household_id=payload.household_id,
+        ),
+    )
+    assert out.attribution is not None
+    for pa in out.attribution.positions:
+        if pa.holding_years <= 0:
+            continue
+        recombined = pa.expected_cumulative + pa.active_return
+        assert abs(recombined - pa.total_return) <= _QUANTUM
+        expected = _oracle_expected_cumulative(
+            pa.class_expected,
+            pa.holding_years,
+        ).quantize(_QUANTUM)
+        assert abs(pa.expected_cumulative - expected) <= _QUANTUM
+
+
+def test_pm_zero_residual_probe_checkpoint_pass() -> None:
+    """§9 zero-residual probe — class-par lot → checkpoint 2 PASS via PM."""
+    eq_exp = assumptions_for("base").class_expected_return[
+        risk_class_for(SecClass.EQUITY)
+    ]
+    cost = Decimal("100")
+    mv = cost * (_ONE + eq_exp)
+    lot = LotPositionView(
+        lot_id="probe",
+        account_id="acct",
+        account_name="Account",
+        security_id="VTI",
+        ticker="VTI",
+        security_name="VTI",
+        security_asset_class=SecClass.EQUITY,
+        liquidity_tier=1,
+        quantity=Decimal("1"),
+        cost_basis_per_share=cost,
+        total_cost_basis=cost,
+        market_price=mv,
+        market_value=mv,
+        unrealized_gain=mv - cost,
+        acquisition_date=date(2025, 6, 28),
+        is_restricted=False,
+        wash_sale_substitute_group=None,
+    )
+    bundle = emit_synthetic_household(cohort_id="general_hnw", seed=42, rung=3)
+    payload = build_working_set_from_bundle(bundle)
+    payload = payload.model_copy(update={"positions": [lot]})
+    ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+    out = dispatch_message(
+        ctx,
+        Message(
+            op="pm.advise",
+            kind=Kind.EVALUATE,
+            payload=PmAdvisePayload.model_validate(payload.model_dump()),
+            correlation_id="zero-residual",
+            household_id=payload.household_id,
+        ),
+    )
+    assert out.attribution is not None
+    pa = out.attribution.positions[0]
+    assert abs(pa.active_return) < Decimal("0.01")
+    review = score_analyst_checkpoints(out.attribution)
+    assert review.checkpoints["checkpoint_2"] == AnalystCheckpointScore.PASS

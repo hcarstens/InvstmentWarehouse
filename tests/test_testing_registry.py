@@ -73,6 +73,7 @@ def test_collect_pytest_paths_includes_property_paths(slice_row) -> None:
 _SHIPPED_PROPERTY_PATHS = (
     "tests/test_lot_properties.py",
     "tests/test_optimizer_properties.py",
+    "tests/test_risk_properties.py",
 )
 
 

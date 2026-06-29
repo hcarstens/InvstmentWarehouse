@@ -117,6 +117,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_pm_narrative.py",
             "tests/test_pm_workflow.py",
             "tests/test_analyst_attribution.py",
+            "tests/test_analyst_depth.py",
             "tests/test_analyst_npa.py",
             "tests/test_analyst_review.py",
             "tests/test_analyst_thesis.py",
