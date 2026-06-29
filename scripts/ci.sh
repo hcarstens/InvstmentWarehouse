@@ -10,7 +10,8 @@
 #   scripts/ci.sh lint       # ruff check only
 #   scripts/ci.sh format     # ruff format --check only
 #   scripts/ci.sh types      # mypy only
-#   scripts/ci.sh test       # pytest only
+#   scripts/ci.sh test       # pytest + coverage report + security gates
+#   scripts/ci.sh security   # pip-audit + detect-secrets only
 #   scripts/ci.sh fix        # ruff --fix + ruff format (mutating; not a gate)
 #
 # Prefers .venv/bin tools when present, else falls back to PATH.
@@ -26,7 +27,8 @@ else
 fi
 RUFF="${BIN}ruff"
 MYPY="${BIN}mypy"
-PYTEST="${BIN}pytest"
+PYTHON="${BIN}python"
+WAREHOUSE="${BIN}warehouse"
 
 failures=()
 
@@ -48,12 +50,27 @@ gate_format() {
   run_gate "format (ruff format --check)" "$RUFF" format --check src tests
 }
 gate_types() { run_gate "types (mypy)" "$MYPY" src/warehouse; }
-gate_test() { run_gate "tests (pytest)" "$PYTEST"; }
+gate_security() {
+  if [[ -x ${BIN}pip ]]; then
+    run_gate "security (pip upgrade)" \
+      "$PYTHON" -m pip install --upgrade 'pip>=26.1.2' -q
+  fi
+  run_gate "security (pip-audit HIGH/CRITICAL)" \
+    "$PYTHON" -m warehouse.infra.security_gate pip-audit
+  run_gate "security (detect-secrets)" \
+    "$PYTHON" -m warehouse.infra.security_gate detect-secrets
+}
+gate_test() {
+  mkdir -p runs/testing
+  run_gate "tests (pytest + coverage + report)" "$WAREHOUSE" test report
+  gate_security
+}
 
 case "${1:-all}" in
   lint) gate_lint ;;
   format) gate_format ;;
   types) gate_types ;;
+  security) gate_security ;;
   test | tests) gate_test ;;
   fix)
     # Mutating convenience — auto-fix then format. Not a gate; run before push.
@@ -67,7 +84,7 @@ case "${1:-all}" in
     gate_test
     ;;
   *)
-    echo "unknown gate: $1 (use: all|lint|format|types|test|fix)" >&2
+    echo "unknown gate: $1 (use: all|lint|format|types|test|security|fix)" >&2
     exit 2
     ;;
 esac

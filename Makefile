@@ -25,7 +25,7 @@ format:  ## Ruff format --check only
 types:  ## Mypy only
 	scripts/ci.sh types
 
-test:  ## Pytest only
+test:  ## Pytest + coverage report + security gates
 	scripts/ci.sh test
 
 fix:  ## Auto-fix: ruff --fix + ruff format (mutating)

@@ -37,9 +37,11 @@ failure never masks a `test` regression (and vice versa):
 | --- | --- |
 | `lint` | `ruff check src tests` · `ruff format --check src tests` |
 | `types` | `mypy src/warehouse` |
-| `test` | `pytest` |
+| `test` | `warehouse test report` · `python -m warehouse.infra.security_gate pip-audit` · `python -m warehouse.infra.security_gate detect-secrets` · upload `runs/testing/*` artifacts |
 
 All three must pass. Each job installs `.[dev]` independently (pip-cached).
+The `test` job upgrades `pip` before install, then runs the full suite with
+coverage, writes the testing report artifacts, and runs the QA7 security gates.
 
 ### Replay CI locally — `scripts/ci.sh`
 
@@ -52,7 +54,8 @@ scripts/ci.sh            # run every gate, report all failures
 scripts/ci.sh lint       # ruff check only
 scripts/ci.sh format     # ruff format --check only
 scripts/ci.sh types      # mypy only
-scripts/ci.sh test       # pytest only
+scripts/ci.sh test       # pytest + coverage report + security gates
+scripts/ci.sh security   # pip-audit + detect-secrets only
 scripts/ci.sh fix        # ruff --fix + ruff format (mutating; not a gate)
 ```
 
@@ -70,7 +73,7 @@ Escape hatch (CI still runs server-side): `SKIP_CI_HOOK=1 git push`.
 ### Raw one-liner (no script)
 
 ```bash
-ruff check src tests && ruff format --check src tests && mypy src/warehouse && pytest
+ruff check src tests && ruff format --check src tests && mypy src/warehouse && scripts/ci.sh test
 ```
 
 ---
@@ -128,11 +131,47 @@ Config: `[tool.pytest.ini_options]` — `testpaths = ["tests"]`, `pythonpath = [
 
 | Command | Purpose |
 | --- | --- |
-| `pytest` | Full suite — **required in CI** |
+| `warehouse test report` | Full suite + coverage JSON + `last_report.json` — **CI test job** |
+| `pytest` | Full suite (no coverage artifact) |
 | `pytest -q` | Quiet summary |
 | `pytest -x` | Stop on first failure |
 | `pytest tests/test_frozen.py` | Immutability registry (`FROZEN_TYPES`) |
-| `pytest --cov=warehouse --cov-report=term-missing` | Coverage (optional; not in CI) |
+| `pytest --cov=warehouse --cov-report=term-missing` | Coverage terminal report |
+| `pytest --cov=warehouse --cov-report=json:runs/testing/coverage.json` | Coverage JSON only (same path as CI) |
+
+### Testing artifacts (st3)
+
+Written by `warehouse test report` (gitignored under `runs/`):
+
+| Path | Purpose |
+| --- | --- |
+| `runs/testing/coverage.json` | Full `pytest-cov` JSON — per-plane bucket source |
+| `runs/testing/last_report.json` | `TestingReport` for `/testing` and `GET /api/testing` |
+
+CI uploads both files as GitHub Actions artifacts (7-day retention). Coverage
+**never gates** `ok` on the dashboard (ST3) — amber badges only when below floor.
+
+### Security gates (QA7, st3)
+
+Run on every PR in the `test` job and via `scripts/ci.sh test` / `security`:
+
+| Command | Purpose |
+| --- | --- |
+| `python -m warehouse.infra.security_gate pip-audit` | Fail on **HIGH/CRITICAL** dependency vulns (OSV severity) |
+| `python -m warehouse.infra.security_gate detect-secrets` | Fail when new secrets appear vs `.secrets.baseline` |
+
+Dev dependencies: `pip-audit`, `detect-secrets` in `[project.optional-dependencies] dev`.
+
+### `/api/testing` smoke
+
+With `warehouse serve` running:
+
+```bash
+curl -s http://127.0.0.1:8765/api/testing | python -m json.tool
+```
+
+Returns the same `TestingReport` JSON shape as `runs/testing/last_report.json`
+when populated; empty-state shape is valid before the first `warehouse test report`.
 
 ### By plane / phase
 
@@ -221,7 +260,7 @@ Minimum (matches GitHub Actions):
 1. `ruff check src tests`
 2. `ruff format --check src tests`
 3. `mypy src/warehouse`
-4. `pytest`
+4. `scripts/ci.sh test` (pytest + coverage report + security gates)
 
 Recommended before a PR that touches immutable types:
 

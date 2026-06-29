@@ -27,6 +27,8 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.9",
+    "pip-audit>=2.7",
+    "detect-secrets>=1.5",
 ]
 infra = [
     "psycopg[binary]>=3.1",

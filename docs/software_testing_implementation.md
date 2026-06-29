@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** st0–st1 shipped · st2–st5 planned
+**Status:** st0–st3 shipped · st4–st5 planned
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -19,8 +19,8 @@ All slices **not done** — none started. Build order (dashboard first for visib
 | --- | --- | --- |
 | **st0** | Dashboard panel + API + per-plane QA footnote (**top — visibility**) | ☑ done |
 | **st1** | Registry + artifact schema | ☑ done |
-| **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☐ not done |
-| **st3** | CI coverage artifact + badges + QA7 security gate | ☐ not done |
+| **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☑ done |
+| **st3** | CI coverage artifact + badges + QA7 security gate | ☑ done |
 | **st4** | E2E testing — up, running, completed (priority) | ☐ not done |
 | **st5** | Hard QA — optimizer / analyst / risk property + mutation (END) | ☐ not done |
 
@@ -352,7 +352,7 @@ footnote render with and without a report present
 
 **Falsifier:** `pytest tests/test_testing_registry.py`
 
-### st2 — `warehouse test report` CLI  ☐ **not done**  *(~1 PR)*
+### st2 — `warehouse test report` CLI  ☑ **done**  *(~1 PR)*
 
 **Goal:** generate `runs/testing/last_report.json` without starting the HTTP server; flips the
 st0 panel from `stub` to `live`.
@@ -367,7 +367,7 @@ st0 panel from `stub` to `live`.
 
 **Falsifier:** `pytest tests/test_testing_report.py` — CLI produces valid report on fixture subset
 
-### st3 — CI coverage artifact + soft floors  ☐ **not done**  *(~1 PR)*
+### st3 — CI coverage artifact + soft floors  ☑ **done**  *(~1 PR)*
 
 **Goal:** CI uploads coverage; warn when plane below floor.
 
