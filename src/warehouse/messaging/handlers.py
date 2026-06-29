@@ -12,7 +12,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import cast
+from typing import TypeVar
 
 from pydantic import BaseModel
 
@@ -47,7 +47,7 @@ from warehouse.decision.tax.scenarios import (
 )
 from warehouse.execution.oms.service import stage_orders_from_approval
 from warehouse.execution.reconciliation.service import reconcile_ingest
-from warehouse.messaging.core import dispatch_message, register
+from warehouse.messaging.core import dispatch_typed, register
 from warehouse.messaging.models import DispatchContext, Kind, Message
 from warehouse.messaging.payloads import (
     AdviceBundle,
@@ -73,6 +73,9 @@ from warehouse.messaging.payloads import (
 from warehouse.research.risk import evaluate_risk
 from warehouse.research.risk.models import RiskResult
 from warehouse.research.risk.scenarios import assumptions_for
+
+_R = TypeVar("_R", bound=BaseModel)
+
 
 # --- QUERY ------------------------------------------------------------------
 
@@ -149,8 +152,8 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
     """
     cid = ctx.correlation_id
 
-    def _eval(op: str, payload: BaseModel) -> BaseModel:
-        return dispatch_message(
+    def _eval(op: str, payload: BaseModel, result_type: type[_R]) -> _R:
+        return dispatch_typed(
             ctx,
             Message(
                 op=op,
@@ -159,23 +162,27 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
                 correlation_id=cid,
                 household_id=p.household_id,
             ),
+            result_type,
         )
 
     risk = _eval(
         "risk.evaluate",
         RiskEvaluatePayload(request=p.request, manifest=p.manifest),
+        RiskResult,
     )
     drift = _eval(
         "policy.check",
         PolicyCheckPayload(
             household_id=p.household_id, positions=p.positions, ips=p.ips
         ),
+        IpsDriftReport,
     )
     proposal = _eval(
         "optimizer.propose",
         OptimizePayload(
             household_id=p.household_id, positions=p.positions, ips=p.ips
         ),
+        OptimizationResult,
     )
     attribution = _eval(
         "attribution.evaluate",
@@ -184,17 +191,19 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
             positions=p.positions,
             as_of_date=p.as_of_date,
         ),
+        AttributionReport,
     )
     tax = _eval(
         "tax.scenario",
         TaxScenarioPayload(positions=p.positions, overlays=p.tax_overlays),
+        TaxScenarioResult,
     )
     bundle = AdviceBundle(
-        risk=cast(RiskResult, risk),
-        proposal=cast(OptimizationResult, proposal),
-        tax=cast(TaxScenarioResult, tax),
-        drift=cast(IpsDriftReport, drift),
-        attribution=cast(AttributionReport, attribution),
+        risk=risk,
+        proposal=proposal,
+        tax=tax,
+        drift=drift,
+        attribution=attribution,
     )
     narrative = score_pm_axioms(bundle, p, correlation_id=cid)
     return bundle.model_copy(update={"narrative": narrative})

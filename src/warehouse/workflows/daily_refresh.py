@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -19,7 +18,7 @@ from warehouse.messaging import (
     DispatchContext,
     Kind,
     Message,
-    dispatch_message,
+    dispatch_typed,
     emit_event,
 )
 from warehouse.messaging.models import BreakOpened, IngestCompleted
@@ -117,22 +116,20 @@ def run_daily_refresh(
 
     try:
         step = _start_step(session, run_id, "custodian_ingest")
-        ingest = cast(
-            IngestRunSummary,
-            dispatch_message(
-                ctx,
-                Message(
-                    op="ingest.run",
-                    kind=Kind.COMMAND,
-                    payload=IngestRunPayload(
-                        household_id=household_id,
-                        custodian_id=custodian_id,
-                        path=str(ingest_path),
-                    ),
-                    correlation_id=run_id,
+        ingest = dispatch_typed(
+            ctx,
+            Message(
+                op="ingest.run",
+                kind=Kind.COMMAND,
+                payload=IngestRunPayload(
                     household_id=household_id,
+                    custodian_id=custodian_id,
+                    path=str(ingest_path),
                 ),
+                correlation_id=run_id,
+                household_id=household_id,
             ),
+            IngestRunSummary,
         )
         ingest_run_id = ingest.run_id
         emit_event(
@@ -165,21 +162,19 @@ def run_daily_refresh(
         )
 
         step = _start_step(session, run_id, "reconcile")
-        recon = cast(
-            ReconcileResult,
-            dispatch_message(
-                ctx,
-                Message(
-                    op="ledger.reconcile",
-                    kind=Kind.COMMAND,
-                    payload=ReconcilePayload(
-                        household_id=household_id,
-                        ingest_run_id=ingest_run_id,
-                    ),
-                    correlation_id=run_id,
+        recon = dispatch_typed(
+            ctx,
+            Message(
+                op="ledger.reconcile",
+                kind=Kind.COMMAND,
+                payload=ReconcilePayload(
                     household_id=household_id,
+                    ingest_run_id=ingest_run_id,
                 ),
+                correlation_id=run_id,
+                household_id=household_id,
             ),
+            ReconcileResult,
         )
         breaks = recon.breaks
         for brk in breaks:

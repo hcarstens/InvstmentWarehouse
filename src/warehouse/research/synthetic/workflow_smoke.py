@@ -189,13 +189,16 @@ def _pm_advise_check(
             DispatchContext,
             Kind,
             Message,
-            dispatch_message,
+            dispatch_typed,
         )
         from warehouse.messaging.payloads import AdviceBundle, PmAdvisePayload
 
         payload = build_working_set_from_bundle(bundle)
         ctx = DispatchContext(session=None)  # type: ignore[arg-type]
-        out = dispatch_message(
+        # dispatch_typed narrows to AdviceBundle or raises loudly — a wrong
+        # type surfaces through the except below as a failed check (no
+        # swallow).
+        out = dispatch_typed(
             ctx,
             Message(
                 op="pm.advise",
@@ -204,25 +207,22 @@ def _pm_advise_check(
                 correlation_id=f"e2e-{bundle.fixture.household_id}",
                 household_id=payload.household_id,
             ),
+            AdviceBundle,
         )
-        if not isinstance(out, AdviceBundle):
-            ok = False
-            detail = f"expected AdviceBundle, got {type(out).__name__}"
-        else:
-            legs_ok = (
-                out.risk.report is not None
-                and out.proposal.rebalance is not None
-                and out.narrative is not None
-                and out.tax is not None
-            )
-            tax_zero = out.tax.tax_delta == Decimal("0")
-            ok = legs_ok and tax_zero
-            detail = (
-                f"risk={out.risk.report is not None}; "
-                f"rebalance={out.proposal.rebalance is not None}; "
-                f"tax_delta={out.tax.tax_delta}; "
-                f"narrative={out.narrative is not None}"
-            )
+        legs_ok = (
+            out.risk.report is not None
+            and out.proposal.rebalance is not None
+            and out.narrative is not None
+            and out.tax is not None
+        )
+        tax_zero = out.tax.tax_delta == Decimal("0")
+        ok = legs_ok and tax_zero
+        detail = (
+            f"risk={out.risk.report is not None}; "
+            f"rebalance={out.proposal.rebalance is not None}; "
+            f"tax_delta={out.tax.tax_delta}; "
+            f"narrative={out.narrative is not None}"
+        )
     except Exception as err:  # surface loudly as a failed check (no swallow)
         ok = False
         detail = f"raised {type(err).__name__}: {err}"

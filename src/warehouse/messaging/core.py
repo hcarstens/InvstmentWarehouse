@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any
+from typing import Any, TypeVar
 
 import structlog
 from pydantic import BaseModel
@@ -18,6 +18,8 @@ from warehouse.messaging import observability
 from warehouse.messaging.models import DispatchContext, Kind, Message
 
 logger = structlog.get_logger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 # Payload typed ``Any`` so concrete-payload wrappers register cleanly; the
 # runtime isinstance check in dispatch enforces the declared payload type.
@@ -72,6 +74,26 @@ def dispatch_message(ctx: DispatchContext, msg: Message) -> BaseModel:
             f"household_id={msg.household_id} message_id={msg.message_id}"
         )
         raise
+
+
+def dispatch_typed(
+    ctx: DispatchContext, msg: Message, result_type: type[T]
+) -> T:
+    """Dispatch and assert the result is ``result_type`` — typed, checked.
+
+    The registry erases handler returns to ``BaseModel`` (S5), so callers that
+    touch concrete fields would otherwise need a ``cast`` (no runtime check,
+    silences mypy) or a hand-rolled isinstance guard. This helper is the one
+    safe path: mypy narrows to ``T`` and a mismatch raises loudly rather than
+    flowing a wrong-typed result downstream (no silent failures).
+    """
+    out = dispatch_message(ctx, msg)
+    if not isinstance(out, result_type):
+        raise TypeError(
+            f"{msg.op}: expected {result_type.__name__}, "
+            f"got {type(out).__name__}"
+        )
+    return out
 
 
 def emit_event(ctx: DispatchContext, event: Message) -> None:

@@ -85,7 +85,7 @@ def test_failure_containment_structured_error(seeded: None) -> None:
     with (
         session_scope() as session,
         patch(
-            "warehouse.orchestrator.gate.dispatch_message",
+            "warehouse.orchestrator.gate.dispatch_typed",
             side_effect=RuntimeError("internal pm leg failed"),
         ),
     ):

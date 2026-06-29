@@ -1,13 +1,13 @@
 """Office Manager gate — receive, route, respond (ℍ_OM / messaging §4.1).
 
 Single entry for external callers. Routes to the Portfolio Manager via
-``dispatch_message`` only — hub-and-spoke, no peer actor calls (OM5).
+``dispatch_typed`` (the checked ``dispatch_message`` wrapper) only —
+hub-and-spoke, no peer actor calls (OM5).
 """
 
 from __future__ import annotations
 
 import time
-from typing import cast
 from uuid import uuid4
 
 import structlog
@@ -19,7 +19,7 @@ from warehouse.messaging import (
     DispatchContext,
     Kind,
     Message,
-    dispatch_message,
+    dispatch_typed,
 )
 from warehouse.messaging.payloads import (
     AdviceBundle,
@@ -121,18 +121,16 @@ def _send_to_portfolio_manager(
     )
     household_id = request.household_id
 
-    position_set = cast(
-        PositionSet,
-        dispatch_message(
-            ctx,
-            Message(
-                op="ledger.positions",
-                kind=Kind.QUERY,
-                payload=LedgerPositionsPayload(household_id=household_id),
-                correlation_id=correlation_id,
-                household_id=household_id,
-            ),
+    position_set = dispatch_typed(
+        ctx,
+        Message(
+            op="ledger.positions",
+            kind=Kind.QUERY,
+            payload=LedgerPositionsPayload(household_id=household_id),
+            correlation_id=correlation_id,
+            household_id=household_id,
         ),
+        PositionSet,
     )
     payload = build_working_set(
         session,
@@ -143,7 +141,7 @@ def _send_to_portfolio_manager(
     if request.cohort_id is not None:
         payload = payload.model_copy(update={"cohort_id": request.cohort_id})
 
-    bundle = dispatch_message(
+    return dispatch_typed(
         ctx,
         Message(
             op="pm.advise",
@@ -152,13 +150,8 @@ def _send_to_portfolio_manager(
             correlation_id=correlation_id,
             household_id=household_id,
         ),
+        AdviceBundle,
     )
-    if not isinstance(bundle, AdviceBundle):
-        raise TypeError(
-            f"pm.advise returned {type(bundle).__name__}, "
-            f"expected AdviceBundle"
-        )
-    return bundle
 
 
 def _failed_response(
