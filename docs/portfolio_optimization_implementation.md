@@ -1,9 +1,12 @@
 # Portfolio Optimization — Implementation Plan
 
 **Status:** **po0 shipped**; **po1 turnover-budget half shipped** — hard
-`‖Δw‖₁ ≤ τ` constraint behind `optimizer.propose` (ROUTE B convex step). The
+`‖Δw‖₁ ≤ τ` constraint behind `optimizer.propose` (ROUTE B convex step);
+**po2 scenario-robust stress overlay shipped** — second solve under the
+`high_risk` crisis Σ behind the same op (Option A; honesty #8 flipped). The
 po1 **after-tax μ overlay** ("po1-tax") stays deferred, gated on the tax
-estimate engine (tax leg pinned at $0). po2–po3 remain planned.
+estimate engine (tax leg pinned at $0; honesty #5 stays `not_computed`).
+po3 (lot-discrete MIQP) remains doc-only.
 **Date:** 2026-06-28
 **Owner:** decision plane / `warehouse.decision.optimizer` (existing package — upgrade in place)
 **Inputs:** [`research/portfolio_optimization.md`](research/portfolio_optimization.md) (DHA run, credence 0.70 — after-tax utility > unconstrained max-Sharpe; Σ regime-conditional; weight ≠ risk; μ estimation error dominates MV theory),
@@ -74,7 +77,7 @@ never faked. μ is labelled an **ex-ante class assumption**, never a forecast or
 | 5 | After-tax effective μ (TLH / asset-location / gain-deferral) | `TaxEstimator` seam; default `ZeroTaxEstimator` → tax leg `$0` (identity overlay) | **`not_computed`** under the $0 seam; **flips → computed at the Quantile estimator stage** (§14 Addendum C) |
 | 6 | Turnover `‖Δw‖₁` / budget `τ` | `RebalanceProposal.turnover_l1` (po0) **+ hard `‖Δw‖₁ ≤ τ` cap from `turnover_budget_pct`** (po1, ROUTE B) | **reported po0 → constrained po1 (within budget)** ✓ (§B.3) |
 | 7 | Lot-discrete sell/hold binaries `x_l` + wash-sale graph | MIQP, no external solver allowed | **`not_computed`** (deferred po3) |
-| 8 | Regime-conditional / scenario-robust Σ | only base-regime Σ; stress is a separate overlay | **`not_computed`** (deferred po2) |
+| 8 | Regime-conditional / scenario-robust Σ | second solve under the `high_risk` crisis Σ; base-MV w\* vs stress-robust w\* + regime gap `‖w*_base − w*_stress‖₁` (§B.8 Option A) | **po2 — computed** ✓ |
 | 9 | Factor-model Σ (n > 50 sleeves) | class-block Σ only (6 sleeves) | **`not_computed`** (out of scope) |
 | 10 | OOS validation of μ/Σ | no signal/screen pipeline (shared gap w/ analyst checkpoint 4) | **`not_computed`** |
 | 11 | Risk-free blend / CML leverage (PO3), Kelly sizing (PO4) | no cash-leverage or edge-estimate layer | **`not_computed`** (out of scope) |
@@ -85,9 +88,12 @@ never faked. μ is labelled an **ex-ante class assumption**, never a forecast or
   amplify input error and overweight high-μ sleeves that are often noise. po0's defense is the
   **box constraints `w_min ≤ w ≤ w_max` as diversification floors/caps** (PO6 last sentence), not
   μ-shrinkage; shrinkage toward an equilibrium prior is deferred and labelled as such.
-- **Base-regime Σ only** (PO7 non-stationarity): correlations spike toward 1 in crises and the
-  diversification benefit collapses exactly when needed. po0 optimizes on the normal-regime prior
-  and **says so**; the scenario-robust overlay is po2, not a silent assumption.
+- **Base regime + crisis regime** (PO7 non-stationarity): correlations spike toward 1 in crises and
+  the diversification benefit collapses exactly when needed. po0/po1 optimized on the normal-regime
+  prior and **said so**; **po2 now ships the scenario-robust overlay** — a second solve under the
+  `high_risk` crisis Σ, reporting base-MV w\* vs stress-robust w\* and the regime gap
+  `‖w*_base − w*_stress‖₁` (§B.8 Option A). Honest caveat: `high_risk` crisis-blends ρ **and** scales
+  vols ×1.4 — a crisis *regime*, not a correlation-only shock; the panel + docs say so.
 - **Weight ≠ risk** (research §"Multi-Asset Specifics" #2): equal sleeve weights carry unequal
   `RC_i`. po0 therefore reports `RC_i` next to w\*, so the advisor reads risk space, not just
   weight space.
@@ -254,17 +260,40 @@ Falsifiers: `tests/test_optimizer_turnover.py` (`test_turnover_budget_binds`,
 **only** when the tax leg is live; analyst tilt changes w\* but never forces a bound. **Not shipped
 this window** — gated on the tax estimate engine.
 
-### po2 — scenario-robust stress overlay *(~1 PR)*
+### po2 — scenario-robust stress overlay *(shipped)*
 
-**Goal:** complement base-regime MV with a worst-case-over-`STRESS_SCENARIOS` objective (PO7).
+**Goal:** complement base-regime MV with a crisis-regime re-solve (PO7).
 
-| Task | File(s) |
-| --- | --- |
-| Robust objective: penalize / report w\* under crisis-correlation Σ (`2008`, `2020`, `2022` packs) | `decision/optimizer/robust.py` *(new)* |
-| Surface the regime-conditional gap: base-MV w\* vs stress-robust w\* side by side | `dashboard/render_phase3.py` |
+**Shipped Option A (§B.8 RECOMMENDED):** a SECOND constrained MV QP under the `high_risk`
+crisis-correlation Σ, reported beside the base solve with the regime gap
+`‖w*_base − w*_stress‖₁`. It reuses `solve_qp` / the Σ-build / the turnover treatment **verbatim**
+on an alternate Σ (the overlay re-enters `run_mv_rebalance` with the crisis priors and
+`compute_stress=False` to break the recursion), is the lightest route, and flips honesty #8 cleanly.
+Option C (scenario P&L via `evaluate_stress` over the `STRESS_SCENARIOS` return-shock packs) is the
+documented richer upgrade; Option B (a single objective with a `max_s w'Σ_s w` penalty) the
+alternative single-objective form.
 
-**Acceptance:** flip honesty-matrix #8 from `not_computed` to computed; stress-robust w\* differs
-from base-MV w\* on the concentrated fixture (PO7 — diversification collapses under crisis ρ).
+| Task | File(s) | Status |
+| --- | --- | --- |
+| Crisis-regime re-solve + regime gap + stress RC/objective (Option A) | `decision/optimizer/robust.py` *(new)* | **shipped** |
+| Additive frozen `RebalanceProposal` fields (`stress_regime`, `stress_target_weights`, `stress_delta_w`, `regime_gap_l1`, `stress_objective_value`, `stress_risk_contributions`) | `decision/optimizer/models.py` | **shipped** |
+| `optimizer_stress_regime` pin (`high_risk`) | `config.py` | **shipped** |
+| Panel: base-vs-stress w\* side by side + regime-gap line (material badge) | `dashboard/optimizer_data.py`, `dashboard/render_phase3.py` | **shipped** |
+
+**Acceptance (met):** honesty-matrix #8 flipped `not_computed` → computed; on a SLACK-bound synthetic
+fixture (wide bounds, base LOW ρ vs crisis HIGH ρ) stress-robust w\* differs from base-MV w\* with
+`regime_gap_l1 > 0` (PO7 — diversification collapses under crisis ρ), both Σw=1 + box-feasible; the
+`concentrated_stress` rung-4 seed-42 fixture produces both solves with the gap reported. Base path
+byte-identical to po1 (overlay additive). #5 (after-tax μ) stays `not_computed` (tax seam $0).
+Falsifiers: `tests/test_optimizer_robust.py` (`test_stress_w_star_differs_from_base`,
+`test_concentrated_fixture_regime_gap`, `test_base_path_byte_identical_to_po1`,
+`test_robust_advisory_no_trade`, `test_after_tax_mu_still_not_computed`, `test_robust_no_new_ops`) +
+`test_optimizer_panel_shows_base_vs_stress`.
+
+**Honest limitation:** bound-determined fixtures (tight IPS boxes) pin both optima to the same
+bounds → regime gap ~0; the binding "stress ≠ base" acceptance therefore runs on a slack-bound
+synthetic fixture (mirrors po0/po1's solve-level property tests). `high_risk` scales vols ×1.4 as
+well as ρ — a crisis regime, not correlation-only.
 
 ### po3 — lot-discrete MIQP (documented upgrade path) *(deferred — doc only)*
 
@@ -323,9 +352,9 @@ TLH coexistence, μ source label).
 
 ```text
 risk Σ/μ (portfolio_covariance, assumptions_for) + IPS allocation_targets + analyst pa0–pa2   [shipped]
-  └─ po0 (constrained MV QP; advisory w*/Δw/RC behind optimizer.propose)        [planned — NEXT]
-       └─ po1 (turnover ‖Δw‖₁≤τ + after-tax TLH overlay inside IPS bounds)      [planned]
-            └─ po2 (scenario-robust stress overlay — PO7)                        [planned]
+  └─ po0 (constrained MV QP; advisory w*/Δw/RC behind optimizer.propose)        [shipped]
+       └─ po1 (turnover ‖Δw‖₁≤τ shipped; after-tax TLH overlay $0 seam)         [turnover shipped]
+            └─ po2 (scenario-robust stress overlay — PO7, Option A)             [shipped]
                  └─ po3 (lot-discrete MIQP — documented upgrade path)            [deferred — doc only]
 
 Held on purpose (non-blocking):
@@ -652,11 +681,15 @@ Household-specific λ / frontier tracing is out of scope until a future slice ju
 | Native sensitivity units (beta, DV01, greeks) | **`not_computed`** — class-block Σ only; no unified greek stack |
 | PO3 CML / cash-leverage blend, PO4 Kelly sizing | Out of scope (honesty matrix #11) |
 
-### B.8 po2 robust objective — pin before po2 code (not po0)
+### B.8 po2 robust objective — **SHIPPED Option A**
 
 po2 complements base-regime MV with crisis stress (PO7 — correlations spike toward 1 in a crisis
-and the diversification benefit collapses exactly when needed). **Do not implement until this
-objective is chosen** (po2 kickoff).
+and the diversification benefit collapses exactly when needed). **Shipped Option A**: a second
+constrained MV QP under the `high_risk` crisis-correlation Σ, reporting base-MV w\* vs stress-robust
+w\* + the regime gap `‖w*_base − w*_stress‖₁`. Chosen because it reuses `solve_qp`/the Σ-build
+verbatim (lightest), drops straight into `run_mv_rebalance(..., assumptions=...)`, and flips
+honesty #8 cleanly. Option C (scenario P&L) named as the documented richer upgrade; Option B as the
+single-objective alternative.
 
 **Grounding — two distinct stress representations already ship; do not conflate them:**
 
@@ -676,7 +709,8 @@ objective is chosen** (po2 kickoff).
 register a correlation-only regime in `scenarios.py` and label it; otherwise reuse `high_risk` and
 say so in the panel + docs. Do not imply "correlation-only".
 
-po0/po1 dashboard label "base-regime Σ only" remains until po2 ships and honesty matrix #8 flips.
+The po0/po1 dashboard label "base-regime Σ only" has been **replaced** with a live base-vs-stress
+comparison + regime-gap line now that po2 has shipped and honesty matrix #8 is flipped.
 
 ### B.9 po0 acceptance additions (from review)
 
@@ -783,5 +817,6 @@ drop in later behind the same interface.
 | 2026-06-28 | **Addendum B** — pre-implementation review deltas: v0 TLH trades vs po0 advisory rebalance split (B.1); canonical `RebalanceProposal` fields (B.2); turnover report po0 / constrain po1 (B.3); policy drift reported not optimized (B.4); `illiquid_advisory_sleeves` pinned for PM axiom 6 (B.5); λ as platform prior (B.6); named out-of-scope objectives (B.7); po2 robust objective options pinned for po2 kickoff (B.8); po0 acceptance tests (B.9). §1–§7 cross-refs updated. |
 | 2026-06-28 | **po0 shipped (Claude).** Constrained mean-variance QP landed behind the existing `optimizer.propose` op — **no new atomic op** (`test_pm_no_new_ops` green). New `decision/optimizer/models.py` (`RebalanceProposal` frozen + canonical §B.2 fields, `OptimizerMappingError`/`OptimizerInfeasibleError`), `qp.py` (pure-Python projected-gradient ascent + capped-simplex/quadratic-knapsack projection, Gershgorin step `1/L`, feasibility guard raises), `rebalance.py` (explicit raising `_SLEEVE_TO_RISK` map per §A.1, Σ/μ built once per §A.2, RC via one `portfolio_covariance` call at w\*, clip-dust→quantize→re-assert Σw=1 within 0.0001). `OptimizationResult` is now **frozen** with an additive `rebalance` field; `_optimizer_propose` carries it via `model_copy(update=…)` (v0 TLH `trades` unchanged — §B.1). Config pins `optimizer_config_version="2026.06"`, `risk_aversion_lambda=6.0`, `qp_tolerance=1e-9`, `qp_max_iters=5000` (λ is a **platform prior** §B.6). New dashboard panel "MV rebalance (target weights w\*)" off `general_hnw` rung-3 in-process (no DB), μ labelled "ex-ante class assumption". Falsifiers: `test_optimizer_qp` (zero-Δ, binding clip, λ-monotone, infeasible raise, Σ-built-once, Σw=1), `test_optimizer_mapping` (total + raises), `test_optimizer_rebalance` (universe union, RC rollup, advisory-no-trade, TLH coexistence, turnover_l1, policy_drift, illiquid/unbounded flags), `test_mu_not_named_forecast` + `test_optimizer_panel_shows_mu_source_label` (scan rendered copy), extended `test_pm_workflow`/`test_synthetic_ips_workflow`/`test_dashboard`/`test_messaging_handlers`. **Suite green: 340 passed.** Honest limitation: the rung-3 IPS bounds are tight enough that w\* is essentially bound-determined (λ-invariant on that fixture) — the λ-monotonicity property is therefore exercised at the `solve_qp` level with wide synthetic bounds, not on the real fixture. |
 | 2026-06-28 | **po1-tax staged-estimator decision (Claude, plan-only).** Split the gated after-tax μ overlay into a **seam now** + **estimates later** so $0 tax unblocks the whole non-tax pipeline (po2 stress, execution, reporting, end-to-end stress testing) without faking honesty #5. Added **§14 Addendum C** (authoritative for the po1-tax seam): a swappable `TaxEstimator` protocol with per-sleeve `sleeve_mu_drag` granularity (finer than the portfolio-level `evaluate_tax_scenario`), default `ZeroTaxEstimator` (identity overlay, `is_zero` marker). Key honesty call: under the $0 seam the overlay is an **identity** (after-tax μ ≡ pre-tax μ; TLH/gain-deferral/asset-location value all 0), so $0 completes the overlay's **structure, not its behavior** — **#5 stays `not_computed`** and flips to `computed` only at the `QuantileTaxEstimator` stage (ladder: Zero → Quantile → LLM, same upgrade-path ethos as ROUTE B → ROUTE A). Honesty matrix #5, §8 dependency block, and the §5 po1-tax row updated to reference the seam. Falsifier set pinned (C.4): zero-estimator no-op, #5-stays-not_computed, and a **non-zero-stub test that moves w\*** (proves the seam carries a drag without shipping tax magnitudes). No code this entry — design pinned before implementation (same discipline as B.8). |
+| 2026-06-28 | **po2 scenario-robust stress overlay shipped (Claude).** Shipped **Option A** (§B.8 RECOMMENDED): a SECOND constrained MV QP under the version-pinned `high_risk` crisis-correlation Σ behind the existing `optimizer.propose` op — **no new atomic op** (`test_robust_no_new_ops` green; `pm.* == {pm.advise}`, `optimizer.* == {propose, persist}`). New `decision/optimizer/robust.py` (`compute_stress_overlay` re-enters `run_mv_rebalance` with the crisis priors and `compute_stress=False` to break the recursion → reuses `solve_qp`/the Σ-build/the turnover treatment **verbatim** on an alternate Σ). Additive frozen `RebalanceProposal` fields (`stress_regime`, `stress_target_weights`, `stress_delta_w` = w\*_stress − w\*_base, `regime_gap_l1` = ‖w\*_base − w\*_stress‖₁, `stress_objective_value`, `stress_risk_contributions`) — all defaulted so the frozen-registry sample + re-freeze stay green. **honesty matrix #8 FLIPPED** `not_computed` → computed; **#5 (after-tax μ) stays `not_computed`** (tax seam $0, untouched). Config pins `optimizer_stress_regime="high_risk"`; **`optimizer_config_version` stays `2026.06`** (base solve byte-identical — `test_base_path_byte_identical_to_po1`). Dashboard panel "MV rebalance (target weights w\*)" **replaces** "(base-regime Σ only)" with a live base-vs-stress side-by-side (Stress w\*, regime shift, Stress RC columns) + a regime-gap line that badges "material" at ‖Δw‖₁ ≥ 0.05. **Chose A over B/C**: A reuses the solver/Σ-build verbatim, is lightest, drops into `assumptions=`, flips #8 cleanly; C (scenario P&L via `evaluate_stress`) named as the richer upgrade, B (penalty `max_s w'Σ_s w`) as the single-objective alternative. **Limitations stated honestly:** (1) `high_risk` crisis-blends ρ toward 0.85 **and** scales vols ×1.4 — a crisis *regime*, not correlation-only (panel + docs say so); (2) bound-determined fixtures pin both optima → regime gap ~0, so the binding "stress ≠ base" acceptance runs on a slack-bound synthetic fixture (base LOW ρ vs crisis HIGH ρ), mirroring po0/po1's solve-level property tests. Falsifiers: `tests/test_optimizer_robust.py` (6 tests) + `test_optimizer_panel_shows_base_vs_stress`; `test_sigma_built_once` now isolates the base solve via `compute_stress=False` (the overlay adds a second `portfolio_covariance` call). **Suite green: 386 passed.** |
 | 2026-06-28 | **po1 turnover-budget half shipped (Claude).** Hard `‖Δw‖₁ ≤ τ` cap behind the existing `optimizer.propose` op — **no new atomic op** (`test_turnover_no_new_ops` green; `pm.* == {pm.advise}`, `optimizer.* == {propose, persist}`). **Shipped ROUTE B** (budget-scaled convex step `w_budget = w_current + (τ/‖Δw‖₁)·(w*−w_current)`) over ROUTE A (Dykstra L1-ball projection): B matches the staged-heuristic ethos, is exact on the budget (`‖Δw‖₁ = τ`), and preserves every po0 invariant cheaply on a box-feasible `w_current`; **A named as the documented upgrade**. Additive frozen fields on `RebalanceProposal`: `turnover_budget`, `turnover_binding`, `unconstrained_turnover_l1` (the "capped from X to τ" story) — all defaulted so the frozen-registry sample and re-freeze test stay green. `turnover_budget_pct is None` is a **strict no-op** (every po0 field byte-identical; existing po0 suite untouched and green). Dashboard flips the turnover line "reported" → "within budget"/"capped at budget" with pre-cap vs post-cap when it binds; demo-only budget pin `optimizer_demo_turnover_budget_pct=0.15` injected by the loader (`model_copy` on the IPS), labelled "demo". **Limitations stated honestly:** (1) `‖Δw‖₁` is **two-way** turnover; (2) `turnover_budget_pct` is "annual" in the IPS but po1 treats it as a **per-rebalance** cap; (3) when `w_current` breaches the IPS box, `w_budget` is projected back onto box ∩ simplex (`project_capped_simplex`) and turnover can drift slightly off `τ` — visible on the demo rung-3 fixture (capped 0.217 → 0.157 vs τ=0.15). **`optimizer_config_version` stays `2026.06`** — the solver/objective are unchanged; the budget adds an optional convex projection that is a no-op without a budget. **After-tax μ overlay (#5) and the analyst μ-tilt remain deferred as "po1-tax", gated on the tax estimate engine** (tax leg pinned $0; honesty #5 stays `not_computed`, not faked). **Suite green: 375 passed.** |
 | 2026-06-28 | **Addendum review fixes (Claude).** Six corrections: (1) B.5 illiquid flag is **sleeve-level, not magnitude-gated** — dropped the `\|Δw\| > qp_tolerance` predicate that contradicted `test_illiquid_sleeve_flagged` and the zero-Δ probe. (2) A.2 — po0 builds `SleeveRiskState`/`AllocationSlot` directly and never constructs an `AssetPortfolio`, so its sum=1 validator is **not** in the path; made the `Σw=1` re-assertion an explicit po0 guard and added a **clip-float-dust-into-`[w_min,w_max]`** step (avoids `AllocationSlot.weight ge=0/le=1` raises). (3) Freezing `OptimizationResult` blocks post-hoc `result.rebalance = …`; §5/§B.1/risk-table now specify **construct-with-`rebalance=` or `model_copy(update=…)`**. (4) `test_mu_not_named_forecast` retargeted to **scan rendered copy** (the single-value `mu_source` Literal is trivially safe by typing; mirrors analyst `test_residual_not_named_alpha`). (5) projection citation corrected — capped-simplex / continuous quadratic-knapsack (Held–Wolfe–Crowder / Pardalos–Kovoor); Michelot 1986 is unit-simplex-only. (6) coined "PM enrich-1" → grounded "PM axiom enrichment (Addendum C)". No code; suite green. |

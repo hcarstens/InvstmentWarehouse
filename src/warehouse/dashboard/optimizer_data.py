@@ -36,6 +36,11 @@ _OPT_RUNG = 3
 MU_SOURCE_LABEL = "ex-ante class assumption"
 
 
+# A regime gap at or above this ‖Δw‖₁ flips the panel badge to "material"
+# (PO7 — the crisis optimum has moved materially off the base optimum).
+_MATERIAL_REGIME_GAP = Decimal("0.05")
+
+
 class OptimizerSleeveRow(BaseModel):
     sleeve: str
     current_weight: Decimal
@@ -43,6 +48,11 @@ class OptimizerSleeveRow(BaseModel):
     delta_w: Decimal
     policy_drift: Decimal
     risk_contribution: Decimal
+    # po2 stress overlay (§B.8): the crisis-regime target + its shift vs base
+    # w* and the crisis-regime RC, shown side by side with the base columns.
+    stress_target_weight: Decimal = Decimal("0")
+    stress_delta_w: Decimal = Decimal("0")
+    stress_risk_contribution: Decimal = Decimal("0")
     illiquid: bool = False
     unbounded: bool = False
 
@@ -67,6 +77,14 @@ class OptimizerPanelData(BaseModel):
     unconstrained_turnover_l1: Decimal = Decimal("0")
     turnover_budget_is_demo: bool = False
     objective_value: Decimal
+    # po2 scenario-robust stress overlay (§B.8 Option A): the crisis-regime
+    # re-solve, reported beside the base solve. ``stress_regime`` is None when
+    # the overlay was not computed. ``regime_gap_l1`` = ‖w*_base − w*_stress‖₁
+    # (PO7). ``stress_objective_value`` is the objective at w*_stress under the
+    # crisis Σ.
+    stress_regime: str | None = None
+    regime_gap_l1: Decimal = Decimal("0")
+    stress_objective_value: Decimal = Decimal("0")
     panel_status: str = "live"
     error: str | None = None
 
@@ -78,6 +96,18 @@ class OptimizerPanelData(BaseModel):
         if self.turnover_binding:
             return "capped at budget"
         return "within budget"
+
+    @property
+    def regime_gap_is_material(self) -> bool:
+        """True when the crisis optimum moved materially off base (PO7)."""
+        return self.regime_gap_l1 >= _MATERIAL_REGIME_GAP
+
+    @property
+    def stress_status(self) -> str:
+        """Human label for the regime-gap line."""
+        if self.stress_regime is None:
+            return "not computed"
+        return "material" if self.regime_gap_is_material else "small"
 
 
 def load_optimizer_dashboard() -> OptimizerPanelData:
@@ -106,6 +136,7 @@ def load_optimizer_dashboard() -> OptimizerPanelData:
 
         illiquid = set(proposal.illiquid_advisory_sleeves)
         unbounded = set(proposal.unbounded_sleeves)
+        zero = Decimal("0")
         rows = [
             OptimizerSleeveRow(
                 sleeve=sleeve.value,
@@ -114,6 +145,13 @@ def load_optimizer_dashboard() -> OptimizerPanelData:
                 delta_w=proposal.delta_w[sleeve],
                 policy_drift=proposal.policy_drift[sleeve],
                 risk_contribution=proposal.risk_contributions[sleeve],
+                stress_target_weight=proposal.stress_target_weights.get(
+                    sleeve, zero
+                ),
+                stress_delta_w=proposal.stress_delta_w.get(sleeve, zero),
+                stress_risk_contribution=(
+                    proposal.stress_risk_contributions.get(sleeve, zero)
+                ),
                 illiquid=sleeve in illiquid,
                 unbounded=sleeve in unbounded,
             )
@@ -135,6 +173,9 @@ def load_optimizer_dashboard() -> OptimizerPanelData:
             unconstrained_turnover_l1=proposal.unconstrained_turnover_l1,
             turnover_budget_is_demo=True,
             objective_value=proposal.objective_value,
+            stress_regime=proposal.stress_regime,
+            regime_gap_l1=proposal.regime_gap_l1,
+            stress_objective_value=proposal.stress_objective_value,
         )
     except Exception as err:
         return OptimizerPanelData(

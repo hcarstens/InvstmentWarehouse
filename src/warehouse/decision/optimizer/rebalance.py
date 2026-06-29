@@ -94,6 +94,8 @@ def run_mv_rebalance(
     assumptions: RiskAssumptions | None = None,
     settings: Settings | None = None,
     tax_estimator: TaxEstimator | None = None,
+    compute_stress: bool = True,
+    stress_assumptions: RiskAssumptions | None = None,
 ) -> RebalanceProposal:
     """Constrained MV QP over sleeve weights → advisory ``RebalanceProposal``.
 
@@ -107,6 +109,15 @@ def run_mv_rebalance(
     ``not_computed`` — never faked. A non-zero estimator subtracts a per-sleeve
     drag from the ex-ante μ **before** the solve (overlay inside the IPS box,
     not a substitute).
+
+    ``compute_stress`` enables the po2 scenario-robust overlay (§B.8 Option A):
+    a SECOND solve under a crisis-regime Σ, reported alongside the base w* with
+    the regime gap ``‖w*_base − w*_stress‖₁`` (PO7). It is additive — every
+    base-path field is byte-identical whether or not it runs. ``False`` breaks
+    the recursion when the overlay re-enters this function with the crisis
+    priors. ``stress_assumptions`` overrides the crisis priors (tests inject a
+    controlled high-ρ Σ); otherwise the version-pinned
+    ``settings.optimizer_stress_regime`` (``high_risk``) is used.
     """
     cfg = settings or get_settings()
     priors = assumptions or assumptions_for("base")
@@ -302,6 +313,31 @@ def run_mv_rebalance(
     linear = sum(w_vec[i] * mu[i] for i in range(n))
     objective = linear - 0.5 * lam * quad
 
+    # po2 scenario-robust stress overlay (§B.8 Option A) — a SECOND solve under
+    # the crisis-regime Σ, reported alongside the base w*. Additive/advisory:
+    # the base fields above are byte-identical regardless. compute_stress=False
+    # on the inner re-solve breaks the recursion.
+    stress_fields: dict[str, object] = {}
+    if compute_stress:
+        # Local import breaks the rebalance ⇆ robust import cycle.
+        from warehouse.decision.optimizer.robust import compute_stress_overlay
+
+        overlay = compute_stress_overlay(
+            positions,
+            ips,
+            base_target_weights=target_weights,
+            settings=cfg,
+            stress_assumptions=stress_assumptions,
+        )
+        stress_fields = {
+            "stress_regime": overlay.stress_regime,
+            "stress_target_weights": overlay.stress_target_weights,
+            "stress_delta_w": overlay.stress_delta_w,
+            "regime_gap_l1": overlay.regime_gap_l1,
+            "stress_objective_value": overlay.stress_objective_value,
+            "stress_risk_contributions": overlay.stress_risk_contributions,
+        }
+
     return RebalanceProposal(
         target_weights=target_weights,
         current_weights=current_weights,
@@ -318,4 +354,5 @@ def run_mv_rebalance(
         objective_value=Decimal(str(round(objective, 8))),
         lam=Decimal(str(cfg.risk_aversion_lambda)),
         config_version=cfg.optimizer_config_version,
+        **stress_fields,
     )

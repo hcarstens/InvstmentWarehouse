@@ -174,5 +174,10 @@ def test_sigma_built_once(monkeypatch: pytest.MonkeyPatch) -> None:
         _lot("BND", SecClass.FIXED_INCOME, Decimal("40")),
     ]
     ips = _wide_ips(["equity", "fixed_income"])
-    run_mv_rebalance(positions, ips, settings=get_settings())
+    # compute_stress=False isolates the base solve — the po2 overlay adds a
+    # SECOND solve (one more portfolio_covariance call), so the "once per
+    # solve, never inside the loop" invariant is checked on a single solve.
+    run_mv_rebalance(
+        positions, ips, settings=get_settings(), compute_stress=False
+    )
     assert calls["n"] == 1

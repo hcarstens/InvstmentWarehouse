@@ -50,16 +50,37 @@ def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
             f"<tr><td>{html.escape(r.sleeve)}</td>"
             f"<td>{_pct(r.current_weight)}</td>"
             f"<td>{_pct(r.target_weight)}</td>"
+            f"<td>{_pct(r.stress_target_weight)}</td>"
+            f"<td>{_signed_pct(r.stress_delta_w)}</td>"
             f"<td>{_signed_pct(r.delta_w)}</td>"
             f"<td>{_signed_pct(r.policy_drift)}</td>"
             f"<td>{_pct(r.risk_contribution)}</td>"
+            f"<td>{_pct(r.stress_risk_contribution)}</td>"
             f"<td>{flag_html}</td></tr>"
         )
 
     rows = "".join(_row(r) for r in data.rows) or (
-        '<tr><td colspan="7">No rebalance computed</td></tr>'
+        '<tr><td colspan="10">No rebalance computed</td></tr>'
     )
     binding = ", ".join(data.binding_bounds) or "none"
+
+    # po2 scenario-robust stress overlay (§B.8 Option A): base-MV w* vs the
+    # crisis-regime re-solve + the regime gap ‖w*_base − w*_stress‖₁ (PO7 —
+    # diversification collapses under crisis ρ). Honest caveat: high_risk
+    # crisis-blends ρ AND scales vols ×1.4 (a crisis regime, not ρ-only).
+    if data.stress_regime is None:
+        stress_html = "stress overlay: not computed"
+    else:
+        gap_badge = "badge-warn" if data.regime_gap_is_material else "badge-ok"
+        stress_html = (
+            f"stress regime <code>{html.escape(data.stress_regime)}</code> "
+            f"(crisis ρ + vols ×1.4 — a regime, not ρ-only) · "
+            f"regime gap ‖w*<sub>base</sub> − w*<sub>stress</sub>‖₁ = "
+            f"{_pct(data.regime_gap_l1)} "
+            f'<span class="badge {gap_badge}">'
+            f"{html.escape(data.stress_status)}</span> · "
+            f"stress objective = {data.stress_objective_value}"
+        )
 
     # Turnover line — po1 flips "reported" → "within budget"/"capped" (§B.3).
     if data.turnover_budget is None:
@@ -93,15 +114,21 @@ def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
        as of {data.as_of_date.isoformat()} ·
        config <code>{html.escape(data.config_version)}</code></p>
     <p>μ source: <strong>{html.escape(data.mu_source_label)}</strong>
-       (base-regime Σ only) · risk aversion λ = {data.lam} ·
+       · risk aversion λ = {data.lam} ·
        {turnover_html} ·
        objective = {data.objective_value}</p>
+    <p>{stress_html}</p>
     <p>Binding IPS bounds at w*: {html.escape(binding)}</p>
     <p><em>Advisory only — w*/Δw are proposals; the constrained MV QP stages
-       no trade and executes nothing (human gate). Weight ≠ risk: read RC.</em></p>
+       no trade and executes nothing (human gate). Weight ≠ risk: read RC.
+       Stress w* re-solves the same QP under the crisis regime (PO7):
+       diversification collapses as correlations spike, so the stress optimum
+       de-risks relative to the base optimum.</em></p>
     <table>
       <thead><tr><th>Sleeve</th><th>Current</th><th>Target w*</th>
-        <th>Δw</th><th>Policy drift</th><th>RC</th><th>Flags</th></tr></thead>
+        <th>Stress w*</th><th>Regime shift</th>
+        <th>Δw</th><th>Policy drift</th><th>RC</th><th>Stress RC</th>
+        <th>Flags</th></tr></thead>
       <tbody>{rows}</tbody>
     </table>
   </section>"""

@@ -395,3 +395,29 @@ def test_optimizer_panel_shows_turnover_budget_state() -> None:
     lowered = panel.lower()
     assert "forecast" not in lowered
     assert "alpha" not in lowered
+
+
+def test_optimizer_panel_shows_base_vs_stress() -> None:
+    """po2 §B.8: panel shows base-vs-stress w* + the regime gap (PO7)."""
+    from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
+    from warehouse.dashboard.render_phase3 import (
+        render_optimizer_rebalance_section,
+    )
+
+    data = load_optimizer_dashboard()
+    assert data.panel_status == "live", data.error
+    # The stress overlay genuinely ran — a second solve under the crisis Σ.
+    assert data.stress_regime == "high_risk"
+    assert data.rows
+    panel = render_optimizer_rebalance_section(data)
+    # Base-vs-stress side by side + the regime gap line, no longer "Σ only".
+    assert "Stress w*" in panel
+    assert "regime gap" in panel
+    assert "high_risk" in panel
+    assert "base-regime Σ only" not in panel
+    # Honest caveat: high_risk is a crisis regime (ρ + vols), not ρ-only.
+    assert "not ρ-only" in panel
+    # μ honesty preserved — never "forecast"/"alpha".
+    lowered = panel.lower()
+    assert "forecast" not in lowered
+    assert "alpha" not in lowered

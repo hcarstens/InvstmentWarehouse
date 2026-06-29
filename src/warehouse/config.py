@@ -77,6 +77,17 @@ class Settings(BaseSettings):
     # at 2026.06 — the solver/objective are unchanged; the budget adds an
     # optional convex projection (ROUTE B), a no-op without a budget.
     optimizer_demo_turnover_budget_pct: float = 0.15
+    # po2 scenario-robust stress overlay (§B.8, Option A): the second solve
+    # re-runs the SAME constrained MV QP under a crisis-regime Σ and reports
+    # base-MV w* vs stress-robust w* + the regime gap ‖w*_base − w*_stress‖₁
+    # (PO7 — correlations spike toward 1 in a crisis and the diversification
+    # benefit collapses exactly when needed). The regime is the version-pinned
+    # ``high_risk`` scenario (research/risk/scenarios.py): it crisis-blends ρ
+    # toward 0.85 AND scales vols ×1.4 — a crisis *regime*, not a
+    # correlation-only shock (the panel + docs say so). Base solve stays
+    # byte-identical → optimizer_config_version unchanged at 2026.06; the
+    # overlay is additive and advisory (no new op).
+    optimizer_stress_regime: str = "high_risk"
 
     research_sandbox_path: str = "./runs/research"
     walk_forward_purge_days: int = 5

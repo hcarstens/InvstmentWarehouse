@@ -289,6 +289,13 @@ def _sample_rebalance_proposal() -> RebalanceProposal:
         objective_value=Decimal("0.07"),
         lam=Decimal("6.0"),
         config_version="2026.06",
+        # po2 scenario-robust stress overlay (§B.8) — additive fields.
+        stress_regime="high_risk",
+        stress_target_weights={IpsSleeve.EQUITY: Decimal("1")},
+        stress_delta_w={IpsSleeve.EQUITY: Decimal("0")},
+        regime_gap_l1=Decimal("0"),
+        stress_objective_value=Decimal("0.05"),
+        stress_risk_contributions={IpsSleeve.EQUITY: Decimal("1")},
     )
 
 

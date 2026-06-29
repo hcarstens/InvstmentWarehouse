@@ -68,3 +68,24 @@ class RebalanceProposal(BaseModel):
     mu_source: Literal["ex_ante_class_assumption"] = "ex_ante_class_assumption"
     lam: Decimal
     config_version: str
+    # po2 scenario-robust stress overlay (§B.8, Option A) — additive, advisory.
+    # A SECOND solve re-runs the constrained MV QP under a crisis-regime Σ
+    # (default the version-pinned ``high_risk`` regime: ρ crisis-blended toward
+    # 0.85 AND vols ×1.4 — a crisis *regime*, not a correlation-only shock).
+    # ``stress_regime`` is ``None`` when the overlay was not computed → every
+    # field above is byte-identical to po1. ``stress_delta_w`` is the
+    # per-sleeve regime shift vs base-MV w* (w*_stress − w*_base);
+    # ``regime_gap_l1`` is its L1 norm ‖w*_base − w*_stress‖₁ (PO7 — how far
+    # the crisis optimum moves off the base optimum). On bound-determined
+    # fixtures both optima are bound-pinned → the gap is ~0 (honest, not
+    # faked).
+    stress_regime: str | None = None
+    stress_target_weights: dict[IpsSleeve, Decimal] = Field(
+        default_factory=dict
+    )
+    stress_delta_w: dict[IpsSleeve, Decimal] = Field(default_factory=dict)
+    regime_gap_l1: Decimal = Decimal("0")
+    stress_objective_value: Decimal = Decimal("0")
+    stress_risk_contributions: dict[IpsSleeve, Decimal] = Field(
+        default_factory=dict
+    )
