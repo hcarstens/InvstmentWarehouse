@@ -68,6 +68,15 @@ class Settings(BaseSettings):
     risk_aversion_lambda: float = 6.0
     qp_tolerance: float = 1e-9
     qp_max_iters: int = 5000
+    # po1 turnover budget (§B.3): the hard ‖Δw‖₁ ≤ τ cap reads
+    # ``ips.turnover_budget_pct`` per household (no-op when unset → byte-
+    # identical po0). The pin below is DEMO-ONLY: the §9 cohort IPS leaves
+    # turnover_budget_pct unset, so the dashboard loader injects this labelled
+    # budget (model_copy on the IPS) to show a live "within budget"/"capped"
+    # state. It is not a household policy. po1 leaves optimizer_config_version
+    # at 2026.06 — the solver/objective are unchanged; the budget adds an
+    # optional convex projection (ROUTE B), a no-op without a budget.
+    optimizer_demo_turnover_budget_pct: float = 0.15
 
     research_sandbox_path: str = "./runs/research"
     walk_forward_purge_days: int = 5

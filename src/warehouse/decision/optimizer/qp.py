@@ -20,6 +20,23 @@ from warehouse.decision.optimizer.models import OptimizerInfeasibleError
 _FEASIBILITY_SLACK = 1e-9
 
 
+def project_capped_simplex(
+    v: list[float],
+    w_min: list[float],
+    w_max: list[float],
+    *,
+    total: float = 1.0,
+    iters: int = 200,
+) -> list[float]:
+    """Public alias — Euclidean projection onto ``{Σw=total, lo≤w≤hi}``.
+
+    po1 reuses the solver's box∩simplex projection to keep the budget-scaled
+    convex step feasible when ``w_current`` itself breaches the IPS box (the
+    projection is the identity on an already-feasible point).
+    """
+    return _project_capped_simplex(v, w_min, w_max, total=total, iters=iters)
+
+
 def _project_capped_simplex(
     v: list[float],
     w_min: list[float],

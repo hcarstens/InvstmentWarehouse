@@ -18,6 +18,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel
 
+from warehouse.config import get_settings
 from warehouse.decision.optimizer.rebalance import run_mv_rebalance
 from warehouse.research.synthetic import emit_synthetic_household
 from warehouse.research.synthetic.fixture_views import (
@@ -57,9 +58,26 @@ class OptimizerPanelData(BaseModel):
     rows: list[OptimizerSleeveRow]
     binding_bounds: list[str]
     turnover_l1: Decimal
+    # po1 turnover budget (§B.3): the hard ‖Δw‖₁ ≤ τ cap. ``turnover_budget``
+    # here is a DEMO-ONLY pin injected by the loader (the cohort IPS sets no
+    # budget); ``turnover_status`` flips the panel line "reported" → "within
+    # budget"/"capped at budget".
+    turnover_budget: Decimal | None = None
+    turnover_binding: bool = False
+    unconstrained_turnover_l1: Decimal = Decimal("0")
+    turnover_budget_is_demo: bool = False
     objective_value: Decimal
     panel_status: str = "live"
     error: str | None = None
+
+    @property
+    def turnover_status(self) -> str:
+        """Human label for the turnover line (reported → constrained, §B.3)."""
+        if self.turnover_budget is None:
+            return "reported (no budget)"
+        if self.turnover_binding:
+            return "capped at budget"
+        return "within budget"
 
 
 def load_optimizer_dashboard() -> OptimizerPanelData:
@@ -75,7 +93,16 @@ def load_optimizer_dashboard() -> OptimizerPanelData:
         positions = lot_positions_from_fixture(
             fixture, restricted_tickers=restricted
         )
-        proposal = run_mv_rebalance(positions, bundle.ips)
+        # DEMO-ONLY turnover budget: the §9 cohort IPS leaves
+        # turnover_budget_pct unset, so inject a labelled pin (model_copy) to
+        # show a live within-budget/capped state on the panel (§B.3). Not a
+        # household policy.
+        cfg = get_settings()
+        demo_budget = Decimal(str(cfg.optimizer_demo_turnover_budget_pct))
+        ips = bundle.ips.model_copy(
+            update={"turnover_budget_pct": demo_budget}
+        )
+        proposal = run_mv_rebalance(positions, ips)
 
         illiquid = set(proposal.illiquid_advisory_sleeves)
         unbounded = set(proposal.unbounded_sleeves)
@@ -103,6 +130,10 @@ def load_optimizer_dashboard() -> OptimizerPanelData:
             rows=rows,
             binding_bounds=proposal.binding_bounds,
             turnover_l1=proposal.turnover_l1,
+            turnover_budget=proposal.turnover_budget,
+            turnover_binding=proposal.turnover_binding,
+            unconstrained_turnover_l1=proposal.unconstrained_turnover_l1,
+            turnover_budget_is_demo=True,
             objective_value=proposal.objective_value,
         )
     except Exception as err:

@@ -56,6 +56,14 @@ class RebalanceProposal(BaseModel):
     illiquid_advisory_sleeves: list[IpsSleeve] = Field(default_factory=list)
     risk_contributions: dict[IpsSleeve, Decimal]
     turnover_l1: Decimal
+    # Turnover budget τ (po1, §B.3): the hard ‖Δw‖₁ ≤ τ cap. ``None`` when
+    # the IPS sets no ``turnover_budget_pct`` → po1 is a no-op and every field
+    # above is byte-identical to po0. ``unconstrained_turnover_l1`` is the
+    # pre-cap Σ|Δw| of the raw MV optimum (the "capped from X to τ" story);
+    # ``turnover_binding`` records whether the cap actually engaged.
+    turnover_budget: Decimal | None = None
+    turnover_binding: bool = False
+    unconstrained_turnover_l1: Decimal = Decimal("0")
     objective_value: Decimal
     mu_source: Literal["ex_ante_class_assumption"] = "ex_ante_class_assumption"
     lam: Decimal

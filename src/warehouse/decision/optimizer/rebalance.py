@@ -25,7 +25,11 @@ from warehouse.decision.optimizer.models import (
     OptimizerMappingError,
     RebalanceProposal,
 )
-from warehouse.decision.optimizer.qp import solve_qp
+from warehouse.decision.optimizer.qp import (
+    project_capped_simplex,
+    solve_qp,
+)
+from warehouse.decision.tax.estimator import TaxEstimator, ZeroTaxEstimator
 from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.covariance import (
     SleeveRiskState,
@@ -89,15 +93,24 @@ def run_mv_rebalance(
     *,
     assumptions: RiskAssumptions | None = None,
     settings: Settings | None = None,
+    tax_estimator: TaxEstimator | None = None,
 ) -> RebalanceProposal:
     """Constrained MV QP over sleeve weights → advisory ``RebalanceProposal``.
 
     Walk-forward safe: Σ/μ are the as-of base-regime priors; no realized-return
     lookahead (CLAUDE.md). Raises ``OptimizerMappingError`` on an unmapped
     sleeve and ``OptimizerInfeasibleError`` on an empty box∩simplex.
+
+    ``tax_estimator`` is the po1-tax seam (§14 Addendum C): the default
+    ``ZeroTaxEstimator`` is an identity overlay (after-tax μ ≡ pre-tax μ), so
+    w* is byte-identical to the pre-overlay path and honesty matrix #5 stays
+    ``not_computed`` — never faked. A non-zero estimator subtracts a per-sleeve
+    drag from the ex-ante μ **before** the solve (overlay inside the IPS box,
+    not a substitute).
     """
     cfg = settings or get_settings()
     priors = assumptions or assumptions_for("base")
+    estimator = tax_estimator or ZeroTaxEstimator()
 
     current = _current_weights(positions)
     target_by_class = {t.asset_class: t for t in ips.allocation_targets}
@@ -114,6 +127,17 @@ def run_mv_rebalance(
     vols = [float(priors.class_annual_vol[rc]) for rc in risk_classes]
     mu = [float(priors.class_expected_return[rc]) for rc in risk_classes]
     n = len(universe)
+
+    # po1-tax overlay (§14 Addendum C): subtract a per-sleeve after-tax drag
+    # from the ex-ante μ BEFORE the solve. The default ZeroTaxEstimator is an
+    # identity (is_zero) → the overlay is skipped entirely so μ (and thus w*)
+    # is byte-identical to the pre-overlay path; honesty #5 stays not_computed.
+    if not getattr(estimator, "is_zero", False):
+        drag = estimator.sleeve_mu_drag(universe, settings=cfg)
+        mu = [
+            mu[i] - float(drag.get(universe[i], Decimal("0")))
+            for i in range(n)
+        ]
     sigma = [
         [
             vols[i]
@@ -151,25 +175,75 @@ def run_mv_rebalance(
         max_iters=int(cfg.qp_max_iters),
     )
 
-    # 1) Clip float dust into the box (avoids AllocationSlot ge=0/le=1 raises),
-    # 2) quantize to Decimal, 3) re-assert Σw=1 (the AssetPortfolio sum
-    # validator is NOT in this path — we build SleeveRiskState directly; §A.2).
-    target_weights: dict[IpsSleeve, Decimal] = {}
-    quantized: list[Decimal] = []
-    for i, sleeve in enumerate(universe):
-        clipped = min(max(w_star_float[i], w_min[i]), w_max[i])
-        q = Decimal(str(clipped)).quantize(_QUANTUM, rounding=ROUND_HALF_EVEN)
-        target_weights[sleeve] = q
-        quantized.append(q)
+    current_weights = {s: current.get(s, Decimal("0")) for s in universe}
 
-    total = sum(quantized, Decimal("0"))
+    def _quantize_box(value: float | Decimal, i: int) -> Decimal:
+        # 1) Clip float/Decimal dust into the box (avoids AllocationSlot
+        # ge=0/le=1 raises), 2) quantize to Decimal (§A.2).
+        clipped = min(
+            max(Decimal(str(value)), Decimal(str(w_min[i]))),
+            Decimal(str(w_max[i])),
+        )
+        return clipped.quantize(_QUANTUM, rounding=ROUND_HALF_EVEN)
+
+    # po0 target — the unconstrained-by-turnover MV optimum w* (the raw QP
+    # solve, clipped + quantized). When the IPS sets no turnover budget this is
+    # the final target and every field below is byte-identical to po0.
+    unconstrained_target: dict[IpsSleeve, Decimal] = {
+        sleeve: _quantize_box(w_star_float[i], i)
+        for i, sleeve in enumerate(universe)
+    }
+    unconstrained_turnover_l1 = sum(
+        (abs(unconstrained_target[s] - current_weights[s]) for s in universe),
+        Decimal("0"),
+    )
+
+    # po1 turnover budget (§B.3) — hard cap ‖Δw‖₁ ≤ τ. ROUTE B (first-cut
+    # heuristic, documented): when the raw MV step over-trades, take the
+    # budget-scaled convex step  w_budget = w_current + (τ/‖Δw‖₁)·(w* −
+    # w_current). w_budget is a convex combination of w_current and w*, so it
+    # stays inside the box ∩ simplex (Σw=1) and ‖w_budget − w_current‖₁ = τ
+    # exactly (up to Decimal quantization). It is a feasible-DIRECTION step
+    # toward the MV optimum, NOT the L1-constrained argmax — the constrained
+    # optimum may lie off the segment. ROUTE A (Dykstra projection onto box ∩
+    # simplex ∩ L1-ball) is the documented upgrade. ‖Δw‖₁ here is TWO-WAY
+    # turnover (Σ|Δw| = buys + sells, since ΣΔw = 0); one-way = ‖Δw‖₁/2. The
+    # budget is treated as a per-rebalance cap (the IPS field is labelled
+    # "annual" — horizon mismatch flagged as a limitation, not silently
+    # reconciled).
+    turnover_budget = ips.turnover_budget_pct
+    turnover_binding = False
+    if (
+        turnover_budget is not None
+        and unconstrained_turnover_l1 > turnover_budget
+    ):
+        turnover_binding = True
+        alpha = float(turnover_budget / unconstrained_turnover_l1)
+        # Convex step toward w* in float, then PROJECT onto box ∩ simplex. On a
+        # box-feasible w_current the step is already feasible (projection = id)
+        # so ‖Δw‖₁ = τ exactly (up to quantization); when w_current breaches
+        # the IPS box, the projection restores Σw=1/feasibility and turnover
+        # can drift off τ — the honest box-vs-budget conflict (limitation).
+        cur_f = [float(current_weights[s]) for s in universe]
+        unc_f = [float(unconstrained_target[s]) for s in universe]
+        step = [cur_f[i] + alpha * (unc_f[i] - cur_f[i]) for i in range(n)]
+        projected = project_capped_simplex(step, w_min, w_max)
+        target_weights = {
+            sleeve: _quantize_box(projected[i], i)
+            for i, sleeve in enumerate(universe)
+        }
+    else:
+        target_weights = dict(unconstrained_target)
+
+    # Re-assert Σw=1 (the AssetPortfolio sum validator is NOT in this path —
+    # we build SleeveRiskState directly; §A.2).
+    total = sum(target_weights.values(), Decimal("0"))
     if abs(total - Decimal("1")) > _SUM_TOLERANCE:
         raise OptimizerInfeasibleError(
             f"target weights sum to {total}, not 1 within {_SUM_TOLERANCE}; "
             "projection or quantization is wrong"
         )
 
-    current_weights = {s: current.get(s, Decimal("0")) for s in universe}
     delta_w = {s: target_weights[s] - current_weights[s] for s in universe}
     turnover_l1 = sum((abs(d) for d in delta_w.values()), Decimal("0"))
 
@@ -238,6 +312,9 @@ def run_mv_rebalance(
         illiquid_advisory_sleeves=illiquid,
         risk_contributions=risk_contributions,
         turnover_l1=turnover_l1,
+        turnover_budget=turnover_budget,
+        turnover_binding=turnover_binding,
+        unconstrained_turnover_l1=unconstrained_turnover_l1,
         objective_value=Decimal(str(round(objective, 8))),
         lam=Decimal(str(cfg.risk_aversion_lambda)),
         config_version=cfg.optimizer_config_version,

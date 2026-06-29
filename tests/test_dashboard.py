@@ -375,3 +375,23 @@ def test_mu_not_named_forecast() -> None:
     lowered = panel.lower()
     assert "forecast" not in lowered
     assert "alpha" not in lowered
+
+
+def test_optimizer_panel_shows_turnover_budget_state() -> None:
+    """po1 §B.3: turnover line flips "reported" → within-budget/capped."""
+    from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
+    from warehouse.dashboard.render_phase3 import (
+        render_optimizer_rebalance_section,
+    )
+
+    data = load_optimizer_dashboard()
+    assert data.panel_status == "live", data.error
+    # The demo injects a labelled budget → the panel shows a live cap state.
+    assert data.turnover_budget is not None
+    panel = render_optimizer_rebalance_section(data)
+    assert "budget τ" in panel
+    assert ("within budget" in panel) or ("capped at budget" in panel)
+    assert data.turnover_status in panel
+    lowered = panel.lower()
+    assert "forecast" not in lowered
+    assert "alpha" not in lowered

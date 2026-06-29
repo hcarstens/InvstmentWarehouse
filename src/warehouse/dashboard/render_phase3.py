@@ -60,6 +60,29 @@ def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
         '<tr><td colspan="7">No rebalance computed</td></tr>'
     )
     binding = ", ".join(data.binding_bounds) or "none"
+
+    # Turnover line — po1 flips "reported" → "within budget"/"capped" (§B.3).
+    if data.turnover_budget is None:
+        turnover_html = f"turnover ‖Δw‖₁ = {_pct(data.turnover_l1)} (reported)"
+    else:
+        demo = " demo" if data.turnover_budget_is_demo else ""
+        badge = "badge-warn" if data.turnover_binding else "badge-ok"
+        label = data.turnover_status
+        budget_txt = f"budget τ = {_pct(data.turnover_budget)}{demo}"
+        if data.turnover_binding:
+            # Pre-cap vs post-cap "capped from X to τ" story.
+            turnover_html = (
+                f"turnover ‖Δw‖₁ = {_pct(data.turnover_l1)} "
+                f'<span class="badge {badge}">{html.escape(label)}</span> '
+                f"({budget_txt}; capped from "
+                f"{_pct(data.unconstrained_turnover_l1)})"
+            )
+        else:
+            turnover_html = (
+                f"turnover ‖Δw‖₁ = {_pct(data.turnover_l1)} "
+                f'<span class="badge {badge}">{html.escape(label)}</span> '
+                f"({budget_txt})"
+            )
     return f"""
   <section>
     <h2>MV rebalance (target weights w*)</h2>
@@ -71,7 +94,7 @@ def render_optimizer_rebalance_section(data: OptimizerPanelData) -> str:
        config <code>{html.escape(data.config_version)}</code></p>
     <p>μ source: <strong>{html.escape(data.mu_source_label)}</strong>
        (base-regime Σ only) · risk aversion λ = {data.lam} ·
-       turnover ‖Δw‖₁ = {_pct(data.turnover_l1)} ·
+       {turnover_html} ·
        objective = {data.objective_value}</p>
     <p>Binding IPS bounds at w*: {html.escape(binding)}</p>
     <p><em>Advisory only — w*/Δw are proposals; the constrained MV QP stages
