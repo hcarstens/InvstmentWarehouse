@@ -413,7 +413,7 @@ the investment once the suite, dashboard, and E2E wiring (st0–st4) are stable.
 | **st5a** | Infra + deps — `hypothesis` in `[dev]`; `collect_pytest_paths`; property_paths wired | `pytest tests/test_testing_registry.py -q` | ☑ done |
 | **st5b** | Data — lot properties (ST6); ingest error propagation (§4.1) | `pytest tests/test_lot_properties.py tests/test_phase2.py -q` | ☑ done |
 | **st5c** | Execution + cross-cutting — recon break taxonomy; `/testing` + QA footnote depth | `pytest tests/test_phase2.py tests/test_phase4.py tests/test_dashboard.py -q` | ☑ done |
-| **st5d** | Decision — optimizer properties (ST6) | `pytest tests/test_optimizer_properties.py tests/test_optimizer_*.py -q` | ☐ not done |
+| **st5d** | Decision — optimizer properties (ST6) | `pytest tests/test_optimizer_properties.py tests/test_optimizer_*.py -q` | ☑ done |
 | **st5e** | Decision — analyst/PM depth | `pytest tests/test_analyst_*.py tests/test_pm_*.py -q` | ☐ not done |
 | **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☐ not done |
 | **st5g** | Research — synthetic statistical (§4.2.1) | `pytest tests/test_synth_*.py -q` | ☐ not done |
@@ -720,3 +720,4 @@ all six slices are `☐ not done`** (see top status table).
 | 2026-06-29 | Re-sequenced slices: split st4 into **st4 (E2E — up, running, completed; priority)** and **st5 (hard QA — optimizer / analyst/PM / risk property + mutation; END)**. E2E wiring proven first; expensive deep correctness tests deferred to the final slice. |
 | 2026-06-29 | Added §4.2.1 synthetic portfolio + IPS builder acceptance items: **structural** (per-SDG-axiom, emit→validate round-trip, cohort coverage, determinism, error-surfacing) gate E2E in st4; **statistical** (distributional checks, null baselines, SDG3 ablation falsifier, 2022–2025 cross-regime) land in st5. Sourced from `research/software_testing.md`; split by cost per Simplicity (S1/S3). |
 | 2026-06-29 | **st5a–st5c shipped:** `hypothesis` in `[dev]` with derandomize profile; `collect_pytest_paths` merges property suites; `test_lot_properties.py` (ST6 lot invariants + ingest errors); recon break taxonomy tests; `/testing` matrix section depth in `test_dashboard.py`. |
+| 2026-06-29 | **st5d shipped:** `test_optimizer_properties.py` — hypothesis invariants on `solve_qp`, `project_capped_simplex`, and `run_mv_rebalance` (budget, box, infeasibility raises, turnover ≤ bound, monotone risk-aversion); Decision registry `pytest_paths` updated. |

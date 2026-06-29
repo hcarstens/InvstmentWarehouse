@@ -113,6 +113,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_optimizer_robust.py",
             "tests/test_optimizer_tax_seam.py",
             "tests/test_optimizer_turnover.py",
+            "tests/test_optimizer_properties.py",
             "tests/test_pm_narrative.py",
             "tests/test_pm_workflow.py",
             "tests/test_analyst_attribution.py",

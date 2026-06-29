@@ -70,7 +70,10 @@ def test_collect_pytest_paths_includes_property_paths(slice_row) -> None:
             assert rel_path in merged
 
 
-_SHIPPED_PROPERTY_PATHS = ("tests/test_lot_properties.py",)
+_SHIPPED_PROPERTY_PATHS = (
+    "tests/test_lot_properties.py",
+    "tests/test_optimizer_properties.py",
+)
 
 
 @pytest.mark.parametrize("rel_path", _SHIPPED_PROPERTY_PATHS)
