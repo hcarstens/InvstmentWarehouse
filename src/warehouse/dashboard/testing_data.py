@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from datetime import datetime
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
@@ -14,6 +16,7 @@ from warehouse.dashboard.testing_registry import (
     PLANE_TEST_SLICES,
     PYRAMID_TARGET,
     PlaneTestSlice,
+    classify_pyramid_layer,
 )
 
 _ARTIFACT_PATH = repo_root() / "runs" / "testing" / "last_report.json"
@@ -54,7 +57,9 @@ class PlaneTestResult(BaseModel):
     pytest_paths: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _sync_ok(self) -> PlaneTestResult:
+    def _sync_coverage_and_ok(self) -> PlaneTestResult:
+        status = _coverage_status(self.coverage_pct, self.coverage_floor_pct)
+        object.__setattr__(self, "coverage_status", status)
         object.__setattr__(self, "ok", self.failed == 0)
         return self
 
@@ -120,10 +125,10 @@ def _empty_plane_row(slice_row: PlaneTestSlice) -> PlaneTestResult:
 
 
 def empty_testing_report() -> TestingReport:
-    """No artifact — registry rows with unknown metrics (st0 stub state)."""
+    """No artifact — registry rows with measured pyramid baseline (st1)."""
     return TestingReport(
         has_report=False,
-        pyramid=None,
+        pyramid=measure_pyramid_mix(),
         overall=OverallTestSummary(),
         planes=[_empty_plane_row(row) for row in PLANE_TEST_SLICES],
     )
@@ -167,3 +172,59 @@ def load_testing_report(
 
 def pyramid_target_mix() -> PyramidMix:
     return PyramidMix(**PYRAMID_TARGET)
+
+
+def _collect_test_node_paths() -> list[str]:
+    """Return repo-relative paths for each collected pytest node."""
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "--collect-only",
+                "-q",
+                "--disable-warnings",
+            ],
+            cwd=repo_root(),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+    except (OSError, subprocess.SubprocessError) as err:
+        raise RuntimeError("pytest collection failed for pyramid mix") from err
+
+    if proc.returncode not in {0, 5}:
+        stderr = proc.stderr.strip() or proc.stdout.strip()
+        raise RuntimeError(
+            f"pytest collection exited {proc.returncode}: {stderr}"
+        )
+
+    paths: list[str] = []
+    for line in proc.stdout.splitlines():
+        if "::" not in line:
+            continue
+        node_path = line.split("::", 1)[0].strip()
+        if node_path:
+            paths.append(node_path)
+    return paths
+
+
+@lru_cache(maxsize=1)
+def measure_pyramid_mix() -> PyramidMix:
+    """Classify collected tests into pyramid layers (ST4 — measured)."""
+    counts = {"unit": 0, "integration": 0, "e2e": 0}
+    for path in _collect_test_node_paths():
+        layer = classify_pyramid_layer(path)
+        counts[layer] += 1
+
+    total = sum(counts.values())
+    if total == 0:
+        return PyramidMix(unit_pct=0.0, integration_pct=0.0, e2e_pct=0.0)
+
+    return PyramidMix(
+        unit_pct=100.0 * counts["unit"] / total,
+        integration_pct=100.0 * counts["integration"] / total,
+        e2e_pct=100.0 * counts["e2e"] / total,
+    )

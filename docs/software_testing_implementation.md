@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** st0 shipped (stub panel) · st1–st5 planned
+**Status:** st0–st1 shipped · st2–st5 planned
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -18,7 +18,7 @@ All slices **not done** — none started. Build order (dashboard first for visib
 | Slice | Item | Status |
 | --- | --- | --- |
 | **st0** | Dashboard panel + API + per-plane QA footnote (**top — visibility**) | ☑ done |
-| **st1** | Registry + artifact schema | ☐ not done |
+| **st1** | Registry + artifact schema | ☑ done |
 | **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☐ not done |
 | **st3** | CI coverage artifact + badges + QA7 security gate | ☐ not done |
 | **st4** | E2E testing — up, running, completed (priority) | ☐ not done |
@@ -337,7 +337,7 @@ flips to `live` once st2 writes a report.
 **Falsifier:** `pytest tests/test_dashboard.py -k "testing or qa_footnote"` — panel + every plane
 footnote render with and without a report present
 
-### st1 — registry + artifact schema  ☐ **not done**  *(~1 PR)*
+### st1 — registry + artifact schema  ☑ **done**  *(~1 PR)*
 
 **Goal:** single source of truth for plane → tests → coverage glob; feeds the st0 panel.
 

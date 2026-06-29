@@ -60,13 +60,24 @@ def _plane_row(plane: PlaneTestResult, *, has_report: bool) -> str:
 def _headline_metrics(report: TestingReport) -> str:
     target = pyramid_target_mix()
     if not report.has_report:
+        pyramid_bits = (
+            f"target {target.unit_pct:.0f}/"
+            f"{target.integration_pct:.0f}/"
+            f"{target.e2e_pct:.0f}"
+        )
+        if report.pyramid is not None:
+            actual = report.pyramid
+            pyramid_bits = (
+                f"actual {actual.unit_pct:.0f}/"
+                f"{actual.integration_pct:.0f}/"
+                f"{actual.e2e_pct:.0f} · {pyramid_bits}"
+            )
         return (
             '<div class="metrics">'
             '<div class="metric"><strong>—</strong>pass rate</div>'
             '<div class="metric"><strong>—</strong>planes below floor</div>'
-            f'<div class="metric"><strong>{target.unit_pct:.0f}/'
-            f"{target.integration_pct:.0f}/"
-            f"{target.e2e_pct:.0f}</strong>pyramid target %</div>"
+            f'<div class="metric"><strong>{html.escape(pyramid_bits)}</strong>'
+            "pyramid %</div>"
             "</div>"
         )
 

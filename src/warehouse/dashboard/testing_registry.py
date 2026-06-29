@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-# Pyramid targets (ST4) — actual mix measured in st2 CLI report.
+from warehouse.dashboard.status import PLANES, PlaneStatus
+
+# Pyramid targets (ST4) — actual mix measured, not assumed.
 PYRAMID_TARGET = {"unit_pct": 70.0, "integration_pct": 25.0, "e2e_pct": 5.0}
+
+# Classify collected tests by path when markers are absent (plan §3).
+_E2E_EXACT_PATHS = frozenset(
+    {
+        "tests/test_dashboard.py",
+        "tests/test_risk_build_dashboard.py",
+    }
+)
+_INTEGRATION_EXACT_PATHS = frozenset(
+    {
+        "tests/test_orchestrator.py",
+        "tests/test_risk_integration.py",
+    }
+)
+_INTEGRATION_PATH_MARKERS = (
+    "test_phase",
+    "test_messaging_",
+    "workflow",
+    "_integration",
+)
 
 # Plane pages that show a QA footnote (§4.8).
 QA_FOOTNOTE_PLANE_IDS: tuple[str, ...] = (
@@ -27,8 +49,8 @@ class PlaneTestSlice(BaseModel):
     coverage_floor_pct: float
     risk_tier: str  # critical | high | medium
     report_mutation: bool = False
-    mutation_targets: list[str] = []
-    property_paths: list[str] = []
+    mutation_targets: list[str] = Field(default_factory=list)
+    property_paths: list[str] = Field(default_factory=list)
     note: str = ""
 
 
@@ -46,7 +68,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         coverage_floor_pct=90.0,
         risk_tier="critical",
         report_mutation=True,
-        mutation_targets=["src/warehouse/data/lot_ledger.py"],
+        mutation_targets=["src/warehouse/data/ledger/__init__.py"],
         property_paths=["tests/test_lot_properties.py"],
     ),
     PlaneTestSlice(
@@ -69,6 +91,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_synthetic_ips_workflow.py",
             "tests/test_ips_policy_fields.py",
             "tests/test_ips_sleeves.py",
+            "tests/test_risk_asset_test_suite.py",
             "tests/integration/test_end_to_end_synthetic.py",
         ],
         coverage_glob="src/warehouse/research/**",
@@ -147,7 +170,9 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_messaging_core.py",
             "tests/test_messaging_events.py",
             "tests/test_messaging_handlers.py",
+            "tests/test_architecture.py",
             "tests/test_dashboard.py",
+            "tests/test_risk_build_dashboard.py",
             "tests/integration/test_end_to_end_synthetic.py",
         ],
         coverage_glob=(
@@ -170,3 +195,31 @@ def slice_by_plane_id(plane_id: str) -> PlaneTestSlice | None:
         if row.plane_id == plane_id:
             return row
     return None
+
+
+def status_plane_id(plane: PlaneStatus) -> str:
+    """Map ``status.PLANES`` row to registry ``plane_id``."""
+    return plane.package.rsplit(".", 1)[-1]
+
+
+def operational_plane_ids() -> tuple[str, ...]:
+    """Five operational planes from ``status.PLANES`` (excludes infra)."""
+    return tuple(status_plane_id(plane) for plane in PLANES)
+
+
+def registry_plane_ids() -> tuple[str, ...]:
+    return tuple(row.plane_id for row in PLANE_TEST_SLICES)
+
+
+def classify_pyramid_layer(rel_path: str) -> str:
+    """Return unit | integration | e2e for a collected test path."""
+    path = rel_path.replace("\\", "/")
+    if path.startswith("tests/integration/"):
+        return "e2e"
+    if path in _E2E_EXACT_PATHS or "smoke" in path:
+        return "e2e"
+    if path in _INTEGRATION_EXACT_PATHS:
+        return "integration"
+    if any(marker in path for marker in _INTEGRATION_PATH_MARKERS):
+        return "integration"
+    return "unit"
