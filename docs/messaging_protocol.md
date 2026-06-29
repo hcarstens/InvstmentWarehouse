@@ -163,7 +163,7 @@ Each plane registers handlers; the `op` namespace is `plane.verb`.
 | `tax.scenario` | EVALUATE | decision | `{positions, ips, overlays}` → `TaxScenarioResult` | `run_tax_scenario` |
 | `attribution.evaluate` | EVALUATE | decision | `AttributionEvaluatePayload{household_id, positions, as_of_date}` → `AttributionReport` | `evaluate_attribution` (analyst — pa0) |
 | `pm.advise` | EVALUATE *(composite)* | decision | `{portfolio, ips, request}` → `AdviceBundle` | nest-dispatches `risk.evaluate` / `attribution.evaluate` / `optimizer.propose` / `tax.scenario` / `policy.check` (§4.1) |
-| `report.build` | QUERY | reporting | `{household_id, period}` → `Report` | **planned** (no reporting plane yet) |
+| `report.build` | COMMAND | reporting | `ReportBuildPayload{household_id, period_label?, as_of_date?}` → `WrittenHouseholdReport` | **planned** — writes `internal.md`/`external.md`/`bundle.json` + audit row; gated on IPS/positions (see `report_writer_implementation.md`) |
 | `ingest.run` | COMMAND | data | `{household_id, custodian, file}` → `IngestSummary` | `run_custodian_ingest` |
 | `ledger.reconcile` | COMMAND | execution | `{household_id, ingest_run_id}` → `ReconcileResult` | `reconcile_ingest` |
 | `optimizer.persist` | COMMAND | decision | `{result, snapshot_id}` → `OptimizationRunView` | `persist_optimization` |
