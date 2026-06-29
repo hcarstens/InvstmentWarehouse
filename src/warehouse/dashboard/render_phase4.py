@@ -245,6 +245,10 @@ def render_report_writer_section(
 
     ts = data.generated_at.isoformat() if data.generated_at else "—"
     bluf = html.escape(data.bluf_preview or "—")
+    pdf_path = html.escape(data.external_pdf_path or "—")
+    sha_preview = html.escape(data.external_pdf_sha256_preview or "—")
+    sha_full = html.escape(data.external_pdf_sha256 or "")
+    sha_title = f' title="{sha_full}"' if sha_full else ""
     return f"""
   <section>
     <h2>Report writer — {html.escape(data.household_id)}</h2>
@@ -261,6 +265,8 @@ def render_report_writer_section(
     <ul>
       <li>internal.md — <code>{html.escape(data.internal_markdown_path or "—")}</code></li>
       <li>external.md — <code>{html.escape(data.external_markdown_path or "—")}</code></li>
+      <li>external.pdf — <code>{pdf_path}</code>
+        · sha256 <code{sha_title}>{sha_preview}</code></li>
       <li>bundle.json — <code>{html.escape(data.bundle_json_path or "—")}</code></li>
     </ul>
     <p><code>warehouse.reporting.report_writer</code> ·

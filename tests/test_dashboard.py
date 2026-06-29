@@ -163,9 +163,13 @@ def test_catalog_omits_reporting_detail() -> None:
     assert "<h2>Tax scenario panel</h2>" not in html
 
 
-def test_api_pages_reporting() -> None:
+def test_api_pages_reporting(tmp_path, monkeypatch) -> None:
     from warehouse.dashboard.pages.reporting import load_reporting_page
 
+    monkeypatch.setattr(
+        "warehouse.dashboard.report_writer_data.reports_base",
+        lambda: tmp_path,
+    )
     data = load_reporting_page()
     assert data.phase4.household_id
     assert data.error is None
@@ -625,17 +629,29 @@ def test_report_writer_panel_shows_snapshot_when_artifact_exists(
     tmp_path,
     monkeypatch,
 ) -> None:
-    from datetime import date
+    from datetime import UTC, date, datetime
+
+    from sqlalchemy import select
 
     from warehouse.dashboard.pages.reporting import render_reporting_page
     from warehouse.infra.db.base import session_scope
     from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.infra.db.models import ReconciliationBreakRow
     from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
     from warehouse.reporting.report_writer import (
         build_and_write_household_reports,
     )
 
     bootstrap_database(seed=True)
+    with session_scope() as session:
+        now = datetime.now(UTC)
+        for row in session.scalars(
+            select(ReconciliationBreakRow).where(
+                ReconciliationBreakRow.resolved.is_(False)
+            )
+        ).all():
+            row.resolved = True
+            row.resolved_at = now
     monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
     monkeypatch.setattr(
         "warehouse.reporting.report_writer.writer.repo_root",
@@ -657,6 +673,8 @@ def test_report_writer_panel_shows_snapshot_when_artifact_exists(
     assert written.snapshot_id in html
     assert "total portfolio market value" in html
     assert "Exhibit A" in html
+    assert written.external_pdf_sha256 is not None
+    assert written.external_pdf_sha256[:12] in html
 
 
 def test_report_writer_panel_error_banner(tmp_path, monkeypatch) -> None:

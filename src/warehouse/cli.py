@@ -353,6 +353,118 @@ def report_write(
     click.echo(f"  Internal: {written.internal_markdown_path}")
     click.echo(f"  External: {written.external_markdown_path}")
     click.echo(f"  Bundle: {written.bundle_json_path}")
+    if written.external_pdf_path:
+        click.echo(f"  PDF: {written.external_pdf_path}")
+        click.echo(f"  PDF sha256: {written.external_pdf_sha256}")
+
+
+@report.command("pdf")
+@click.option(
+    "--household",
+    default=None,
+    help="Household id for latest snapshot.",
+)
+@click.option(
+    "--snapshot",
+    default=None,
+    help="Snapshot id under household reports.",
+)
+@click.option(
+    "--path",
+    "md_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Re-render from an existing external.md path.",
+)
+def report_pdf(
+    household: str | None,
+    snapshot: str | None,
+    md_path: Path | None,
+) -> None:
+    """Render external Markdown to PDF (Pandoc) and print sha256."""
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.reporting.report_writer.collect import ReportWriterError
+    from warehouse.reporting.report_writer.pdf import render_external_pdf
+    from warehouse.reporting.report_writer.writer import (
+        find_latest_written_report,
+    )
+
+    if md_path is not None and (household is not None or snapshot is not None):
+        raise click.UsageError(
+            "Use --path alone, or --household with optional --snapshot."
+        )
+
+    if md_path is not None:
+        output_pdf = md_path.parent / "external.pdf"
+        snapshot_id = md_path.parent.name
+        try:
+            digest = render_external_pdf(
+                md_path,
+                output_pdf_path=output_pdf,
+                snapshot_id=snapshot_id,
+            )
+        except ReportWriterError as err:
+            click.echo(str(err), err=True)
+            raise SystemExit(1) from err
+        click.echo(f"snapshot_id={snapshot_id}")
+        click.echo(f"external_pdf_path={output_pdf}")
+        click.echo(f"sha256={digest}")
+        return
+
+    if household is None:
+        household = DEMO_HOUSEHOLD_ID
+
+    bootstrap_database(seed=True)
+    with session_scope():
+        written = find_latest_written_report(household)
+    if written is None:
+        click.echo(f"No report artifacts for household {household}", err=True)
+        raise SystemExit(1)
+    if snapshot is not None and written.snapshot_id != snapshot:
+        from warehouse.config import repo_root
+
+        candidate = (
+            repo_root()
+            / "runs"
+            / "reports"
+            / household
+            / written.period_label
+            / snapshot
+            / "external.md"
+        )
+        if not candidate.is_file():
+            globbed = list(
+                (repo_root() / "runs" / "reports" / household).glob(
+                    f"**/{snapshot}/external.md"
+                )
+            )
+            candidate = globbed[0] if globbed else candidate
+        if not candidate.is_file():
+            click.echo(
+                f"No external.md for snapshot {snapshot} under {household}",
+                err=True,
+            )
+            raise SystemExit(1)
+        md_file = candidate
+        snap = snapshot
+    else:
+        md_file = Path(written.external_markdown_path)
+        snap = written.snapshot_id
+
+    output_pdf = md_file.parent / "external.pdf"
+    try:
+        digest = render_external_pdf(
+            md_file,
+            output_pdf_path=output_pdf,
+            snapshot_id=snap,
+        )
+    except ReportWriterError as err:
+        click.echo(str(err), err=True)
+        raise SystemExit(1) from err
+    click.echo(f"snapshot_id={snap}")
+    click.echo(f"external_pdf_path={output_pdf}")
+    click.echo(f"sha256={digest}")
 
 
 @report.command("month-end")

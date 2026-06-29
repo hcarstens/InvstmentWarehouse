@@ -11,12 +11,20 @@ from sqlalchemy.orm import Session
 from warehouse.config import repo_root
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import MarketPriceRow
-from warehouse.reporting.report_writer.collect import collect_report_bundle
+from warehouse.reporting.report_writer.collect import (
+    ReportWriterError,
+    collect_report_bundle,
+)
 from warehouse.reporting.report_writer.models import (
     ReportAudience,
     ReportBundle,
     ReportPeriod,
     WrittenHouseholdReport,
+)
+from warehouse.reporting.report_writer.pdf import (
+    external_pdf_delivery_blocked,
+    render_external_pdf,
+    sha256_file,
 )
 from warehouse.reporting.report_writer.render import render_markdown
 
@@ -53,6 +61,13 @@ def find_latest_written_report(
         sort_key = bundle.generated_at
         if sort_key.tzinfo is None:
             sort_key = sort_key.replace(tzinfo=UTC)
+        pdf_path = snapshot_dir / "external.pdf"
+        pdf_sha: str | None = None
+        if pdf_path.is_file():
+            try:
+                pdf_sha = sha256_file(pdf_path)
+            except OSError:
+                pdf_sha = None
         written = WrittenHouseholdReport(
             snapshot_id=bundle.snapshot_id,
             household_id=bundle.household_id,
@@ -63,6 +78,8 @@ def find_latest_written_report(
             internal_markdown_path=str(snapshot_dir / "internal.md"),
             external_markdown_path=str(snapshot_dir / "external.md"),
             bundle_json_path=str(bundle_path),
+            external_pdf_path=str(pdf_path) if pdf_path.is_file() else None,
+            external_pdf_sha256=pdf_sha,
         )
         if best is None or sort_key > best[0]:
             best = (sort_key, written)
@@ -126,6 +143,57 @@ def write_report_bundle(
     )
 
 
+def _attach_external_pdf(
+    session: Session,
+    *,
+    bundle: ReportBundle,
+    written: WrittenHouseholdReport,
+    household_id: str,
+    as_of: date,
+) -> tuple[WrittenHouseholdReport, dict[str, str]]:
+    """Render external PDF when recon allows; return audit detail extras."""
+    # ADVISOR REVIEW GATE (human) ──► client delivery (external PDF)
+    # Full document-approval workflow deferred — needs approval.create for
+    # documents (today tied to optimization_run_id). See plan §10.
+    extra: dict[str, str] = {}
+    if external_pdf_delivery_blocked(session):
+        extra["external_pdf_blocked"] = "true"
+        extra["reason"] = "open_reconciliation_breaks"
+        return written, extra
+
+    pdf_path = Path(written.output_dir) / "external.pdf"
+    try:
+        digest = render_external_pdf(
+            Path(written.external_markdown_path),
+            output_pdf_path=pdf_path,
+            snapshot_id=bundle.snapshot_id,
+        )
+    except ReportWriterError as err:
+        raise ReportWriterError(
+            f"External PDF render failed for household_id={household_id} "
+            f"snapshot_id={bundle.snapshot_id} as_of={as_of.isoformat()}: "
+            f"{err}"
+        ) from err
+
+    on_disk = sha256_file(pdf_path)
+    if on_disk != digest:
+        raise ReportWriterError(
+            f"PDF hash mismatch for household_id={household_id} "
+            f"snapshot_id={bundle.snapshot_id}: render={digest}, "
+            f"disk={on_disk}"
+        )
+
+    updated = written.model_copy(
+        update={
+            "external_pdf_path": str(pdf_path),
+            "external_pdf_sha256": digest,
+        }
+    )
+    extra["external_pdf_path"] = str(pdf_path)
+    extra["external_pdf_sha256"] = digest
+    return updated, extra
+
+
 def build_and_write_household_reports(
     session: Session,
     household_id: str,
@@ -134,7 +202,7 @@ def build_and_write_household_reports(
     as_of_date: date | None = None,
     actor_id: str = "system:report_writer",
 ) -> WrittenHouseholdReport:
-    """Collect bundle, render Markdown artifacts, and write audit row."""
+    """Collect bundle, render Markdown artifacts, PDF, and write audit row."""
     as_of = resolve_report_as_of(session, as_of_date)
     period = _resolve_period(as_of, period_label)
     bundle = collect_report_bundle(
@@ -152,6 +220,23 @@ def build_and_write_household_reports(
         / bundle.snapshot_id
     )
     written = write_report_bundle(bundle, output_dir=output_dir)
+    written, pdf_extra = _attach_external_pdf(
+        session,
+        bundle=bundle,
+        written=written,
+        household_id=household_id,
+        as_of=as_of,
+    )
+    audit_details: dict[str, str] = {
+        "snapshot_id": bundle.snapshot_id,
+        "household_id": household_id,
+        "output_dir": written.output_dir,
+        "internal_markdown_path": written.internal_markdown_path,
+        "external_markdown_path": written.external_markdown_path,
+        "bundle_json_path": written.bundle_json_path,
+        "period_label": period.label,
+    }
+    audit_details.update(pdf_extra)
     write_audit(
         session,
         actor_id=actor_id,
@@ -159,15 +244,7 @@ def build_and_write_household_reports(
         resource_type="household_report",
         resource_id=bundle.snapshot_id,
         household_id=household_id,
-        details={
-            "snapshot_id": bundle.snapshot_id,
-            "household_id": household_id,
-            "output_dir": written.output_dir,
-            "internal_markdown_path": written.internal_markdown_path,
-            "external_markdown_path": written.external_markdown_path,
-            "bundle_json_path": written.bundle_json_path,
-            "period_label": period.label,
-        },
+        details=audit_details,
     )
     session.flush()
     return written

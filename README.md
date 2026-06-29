@@ -16,6 +16,19 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
+**Optional system dependency (report PDF):** external client packs render to PDF via
+[Pandoc](https://pandoc.org/) — not a Python package. Install locally when you need
+`external.pdf` output:
+
+```bash
+brew install pandoc          # macOS
+sudo apt install pandoc      # Debian/Ubuntu
+```
+
+A PDF engine (wkhtmltopdf, weasyprint, or a LaTeX distribution) may also be required.
+Markdown + `bundle.json` remain canonical without Pandoc; `report.build` fails loudly if PDF
+render is attempted without it.
+
 Config lives in `configs/development.toml` (committed, not secrets). Optional machine overrides: `configs/local.toml` (gitignored).
 
 ## CLI
@@ -153,6 +166,17 @@ warehouse db upgrade             # Alembic migrations only
 warehouse db seed                # demo data only (idempotent)
 warehouse db --help
 ```
+
+### Report writer
+
+```bash
+warehouse report write --household hh_demo --as-of 2026-06-24
+warehouse report pdf --household hh_demo              # re-render external.pdf
+warehouse report month-end --all
+```
+
+Writes `runs/reports/{household}/{period}/{snapshot_id}/` — `internal.md`, `external.md`,
+`bundle.json`, and `external.pdf` (when Pandoc is available).
 
 SQLite file: `data/warehouse_dev.db` (gitignored).
 

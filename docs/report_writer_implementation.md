@@ -1,7 +1,7 @@
 # Report Writer — Implementation Plan
 
-**Status:** **rw0–rw3 shipped** — `report.build` COMMAND live; month-end batch fan-out via
-`workflows.month_end.run_month_end_reporting_batch`.
+**Status:** **rw0–rw4 shipped** — `report.build` COMMAND live; external PDF channel via Pandoc
+with sha256 pinning; month-end batch fan-out via `workflows.month_end.run_month_end_reporting_batch`.
 **Date:** 2026-06-29
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
 **Inputs:** [`research/report_writing.md`](research/report_writing.md) (reader-first structure,
@@ -379,13 +379,13 @@ Acceptance is by **artifact traceability** (every exhibit number reconciles to b
 | --- | --- |
 | **Month-end batch** (`TODO.md` Review all portfolios) | `ledger.positions` → `report.build` per household after recon green |
 | **PM orchestrator** | Optional: attach `WrittenHouseholdReport.snapshot_id` to `AdviceBundle` provenance (additive field — separate PR) |
-| **Approval gate** | Future: `approval.create` for external Markdown before client portal publish (open question #9) |
+| **Approval gate** | Future: `approval.create` for external Markdown before client portal publish (open question #9). **rw4 seam:** recon gate blocks external PDF when firm-wide breaks are open; advisor document-approval (`ADVISOR REVIEW GATE ──► client delivery`) deferred — needs `approval.create` pattern for documents (today tied to `optimization_run_id`). Code comment at `_attach_external_pdf` in `writer.py`. |
 | **Audit log** | `write_audit` on `report.build` with `snapshot_id`, `household_id`, paths |
 | **Client portal (Phase 5+)** | Serve frozen PDF generated from `external.md`; portal tile links `bundle.json` exhibits |
 
 ---
 
-## 11. Addendum A — render channel upgrade (rw4+, deferred)
+## 11. Addendum A — render channel (rw4 shipped)
 
 Research minimum tool chain: `terrain_map.json → Quarto template → PDF + approval gate`.
 
@@ -393,11 +393,24 @@ Research minimum tool chain: `terrain_map.json → Quarto template → PDF + app
 | --- | --- | --- |
 | Source | Markdown + YAML front matter | **rw1** |
 | Intermediate | `bundle.json` | **rw1** |
-| PDF | Quarto or Pandoc CI job | rw4 — after advisor gate design |
-| Client-of-record | Frozen PDF hash pinned to `snapshot_id` | rw4+ |
+| PDF | **Pandoc** (`render_external_pdf` in `pdf.py`) | **rw4 shipped** |
+| Client-of-record | Frozen PDF hash pinned to `snapshot_id` on `WrittenHouseholdReport` + `report_build` audit row | **rw4 shipped** |
+
+```text
+bundle.json + external.md  →  Pandoc (v1)  →  external.pdf
+                                      ↓
+                         sha256 pinned on WrittenHouseholdReport + audit
+```
+
+**System dependency:** Pandoc must be on `PATH` for PDF render (`brew install pandoc` /
+`apt install pandoc`). A PDF engine (wkhtmltopdf, weasyprint, or LaTeX) may also be required.
+Phases 0–4: no Docker — operator installs locally.
+
+**CLI:** `warehouse report pdf` re-renders from `--path`, `--household`, or `--snapshot`.
 
 **Risk:** Pandoc table formatting loss on financial exhibits (research uncertainty) — keep
-Markdown + JSON as source of truth; PDF is a render artifact.
+Markdown + JSON as source of truth; PDF is a render artifact only. Hash mismatch ⇒ render
+failure, not a stale PDF on disk.
 
 ---
 
@@ -439,8 +452,8 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 | rw0 collect + bundle | shipped | |
 | rw1 render + write + `report.build` | shipped | |
 | rw2 dashboard + registry | shipped | |
-| rw3 month-end workflow | shipped | `run_month_end_reporting_batch`; Tier-1 recon gate deferred (firm-wide breaks, no tier field) |
-| rw4 PDF channel | deferred | Quarto/Pandoc |
+| rw3 month-end workflow | shipped | `run_month_end_reporting_batch`; Tier-1 recon gate on external PDF shipped (firm-wide breaks, no tier field) |
+| rw4 PDF channel | shipped | Pandoc v1; `external.pdf` + `external_pdf_sha256`; recon gate blocks PDF not Markdown; `warehouse report pdf` |
 | rw5 extended exhibits | deferred | attribution, risk, alts |
 
 ---
@@ -455,6 +468,6 @@ Operationalize before claiming client-value (from DHA runs):
   complaints at equal recon quality.
 - Reports with explicit limitations vs unstructured memos — track complaint rate at equal
   portfolio outcomes.
-- Tier 1 recon breaks open ⇒ **block external delivery** (gate rule — implement in rw3+).
+- Tier 1 recon breaks open ⇒ **block external PDF delivery** (gate rule — **shipped rw4**; firm-wide `list_reconciliation_breaks`, not household-scoped).
 
 When a falsifier fires, downgrade the relevant slice in this plan before expanding report count.

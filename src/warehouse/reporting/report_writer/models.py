@@ -70,3 +70,5 @@ class WrittenHouseholdReport(BaseModel):
     internal_markdown_path: str
     external_markdown_path: str
     bundle_json_path: str
+    external_pdf_path: str | None = None
+    external_pdf_sha256: str | None = None

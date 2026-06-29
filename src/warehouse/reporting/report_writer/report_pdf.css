@@ -1,0 +1,38 @@
+/* Minimal Pandoc PDF styling — monospace exhibit tables, neutral tone. */
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  color: #111;
+  max-width: 7in;
+  margin: 0 auto;
+}
+h1, h2, h3 {
+  font-family: Helvetica, Arial, sans-serif;
+  color: #222;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0 1em;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9pt;
+}
+th, td {
+  border: 1px solid #999;
+  padding: 0.25em 0.5em;
+  text-align: left;
+}
+th {
+  background: #f4f4f4;
+}
+code {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 9pt;
+}
+blockquote {
+  border-left: 3px solid #ccc;
+  margin-left: 0;
+  padding-left: 1em;
+  color: #333;
+}

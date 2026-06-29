@@ -44,11 +44,14 @@ warehouse = "warehouse.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-warehouse = ["py.typed"]
+warehouse = ["py.typed", "reporting/report_writer/report_pdf.css"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "pandoc: tests that require Pandoc on PATH (skipped when absent)",
+]
 
 [tool.ruff]
 line-length = 79

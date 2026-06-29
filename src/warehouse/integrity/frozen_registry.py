@@ -374,6 +374,10 @@ def _sample_instance(cls: type[Any]) -> Any:
             bundle_json_path=(
                 "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/bundle.json"
             ),
+            external_pdf_path=(
+                "/tmp/reports/hh_test/month-end-2026-06-24/rpt_test/external.pdf"
+            ),
+            external_pdf_sha256="abc123",
         )
     if cls is MonthEndHouseholdOutcome:
         return MonthEndHouseholdOutcome(

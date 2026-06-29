@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from warehouse.config import repo_root
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
 from warehouse.reporting.report_writer.models import ReportBundle
+from warehouse.reporting.report_writer.pdf import sha256_file
 from warehouse.reporting.report_writer.writer import household_reports_dir
 
 _BLUF_HEADING = "## Executive summary (BLUF)"
@@ -28,6 +29,9 @@ class ReportWriterPanelData(BaseModel):
     internal_markdown_path: str | None = None
     external_markdown_path: str | None = None
     bundle_json_path: str | None = None
+    external_pdf_path: str | None = None
+    external_pdf_sha256: str | None = None
+    external_pdf_sha256_preview: str | None = None
     panel_status: str = "empty"  # empty | live | error
     error: str | None = None
 
@@ -132,6 +136,50 @@ def load_report_writer_panel(
     bluf = extract_bluf_preview(external_md)
     internal_path = snapshot_dir / "internal.md"
     internal_md = str(internal_path) if internal_path.is_file() else None
+    external_pdf_path = snapshot_dir / "external.pdf"
+    pdf_path_str: str | None = None
+    pdf_sha: str | None = None
+    pdf_preview: str | None = None
+    if external_pdf_path.is_file():
+        try:
+            pdf_sha = sha256_file(external_pdf_path)
+            pdf_path_str = str(external_pdf_path)
+            pdf_preview = pdf_sha[:12]
+        except OSError as err:
+            return ReportWriterPanelData(
+                household_id=household_id,
+                snapshot_id=bundle.snapshot_id,
+                period_label=bundle.period.label,
+                as_of_date=bundle.as_of_date,
+                generated_at=bundle.generated_at,
+                bluf_preview=bluf or None,
+                output_dir=str(snapshot_dir),
+                internal_markdown_path=internal_md,
+                external_markdown_path=str(external_path),
+                bundle_json_path=str(bundle_path),
+                panel_status="error",
+                error=f"external.pdf unreadable: {err}",
+            )
+    else:
+        return ReportWriterPanelData(
+            household_id=household_id,
+            snapshot_id=bundle.snapshot_id,
+            period_label=bundle.period.label,
+            as_of_date=bundle.as_of_date,
+            generated_at=bundle.generated_at,
+            bluf_preview=bluf or None,
+            output_dir=str(snapshot_dir),
+            internal_markdown_path=internal_md,
+            external_markdown_path=str(external_path),
+            bundle_json_path=str(bundle_path),
+            panel_status="error",
+            error=(
+                "external.md present but external.pdf missing — PDF render "
+                "failed, was blocked by open reconciliation breaks, or "
+                "Pandoc is unavailable. Re-run warehouse report pdf."
+            ),
+        )
+
     return ReportWriterPanelData(
         household_id=household_id,
         snapshot_id=bundle.snapshot_id,
@@ -143,5 +191,8 @@ def load_report_writer_panel(
         internal_markdown_path=internal_md,
         external_markdown_path=str(external_path),
         bundle_json_path=str(bundle_path),
+        external_pdf_path=pdf_path_str,
+        external_pdf_sha256=pdf_sha,
+        external_pdf_sha256_preview=pdf_preview,
         panel_status="live",
     )

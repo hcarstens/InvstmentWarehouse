@@ -1,38 +1,18 @@
 """Shared pytest fixtures."""
 
-import os
+from __future__ import annotations
+
+import hashlib
+from datetime import date
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
-from hypothesis import HealthCheck, settings
 
-from warehouse.config import get_settings
 from warehouse.data.ledger import Lot
 from warehouse.data.security_master import AssetClass, Security, TaxCharacter
-from warehouse.infra.db.bootstrap import bootstrap_database
 
-
-def pytest_configure(config: pytest.Config) -> None:
-    # ST5 — deterministic property tests (Persona ST5 / derandomize).
-    settings.register_profile(
-        "warehouse",
-        derandomize=True,
-        deadline=None,
-        suppress_health_check=[HealthCheck.too_slow],
-    )
-    settings.load_profile("warehouse")
-
-
-@pytest.fixture(scope="session", autouse=True)
-def isolated_database(tmp_path_factory: pytest.TempPathFactory) -> None:
-    db_dir = tmp_path_factory.mktemp("warehouse_db")
-    db_file = db_dir / "test.db"
-    os.environ["DATABASE_URL"] = f"sqlite:///{db_file}"
-    get_settings.cache_clear()
-    bootstrap_database(seed=True)
-    yield
-    get_settings.cache_clear()
-    os.environ.pop("DATABASE_URL", None)
+_FAKE_PDF = b"%PDF-1.4\n% fake report writer test pdf\n"
 
 
 @pytest.fixture
@@ -40,7 +20,6 @@ def sample_security() -> Security:
     return Security(
         security_id="sec_vti",
         ticker="VTI",
-        cusip="922908769",
         name="Vanguard Total Stock Market ETF",
         asset_class=AssetClass.ETF,
         tax_character=TaxCharacter.LTCG,
@@ -51,10 +30,32 @@ def sample_security() -> Security:
 @pytest.fixture
 def sample_lot() -> Lot:
     return Lot(
-        lot_id="lot_001",
-        account_id="acct_taxable_01",
+        lot_id="lot_vti",
+        account_id="acct_taxable",
         security_id="sec_vti",
         quantity=Decimal("100"),
         cost_basis_per_share=Decimal("220.50"),
-        acquisition_date="2024-03-15",
+        acquisition_date=date(2024, 1, 15),
+    )
+
+
+def _fake_pdf_render(
+    external_md_path: Path,
+    *,
+    output_pdf_path: Path,
+    snapshot_id: str,
+) -> str:
+    del external_md_path, snapshot_id
+    output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
+    output_pdf_path.write_bytes(_FAKE_PDF)
+    return hashlib.sha256(_FAKE_PDF).hexdigest()
+
+
+@pytest.fixture(autouse=True)
+def _mock_report_pdf_render_unless_pandoc(request, monkeypatch) -> None:
+    if request.node.get_closest_marker("pandoc"):
+        return
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.render_external_pdf",
+        _fake_pdf_render,
     )

@@ -1,13 +1,17 @@
-"""rw0-rw1 report writer falsifiers."""
+"""rw0-rw4 report writer falsifiers."""
 
 from __future__ import annotations
 
+import shutil
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import select
 
 import warehouse.messaging.handlers  # noqa: F401 — registers catalog ops
 from warehouse.data.security_master import AssetClass, TaxCharacter
@@ -19,8 +23,10 @@ from warehouse.infra.db.base import session_scope
 from warehouse.infra.db.bootstrap import bootstrap_database
 from warehouse.infra.db.models import (
     EntityRow,
+    IngestRunRow,
     LotRow,
     MarketPriceRow,
+    ReconciliationBreakRow,
     SecurityRow,
 )
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
@@ -39,16 +45,39 @@ from warehouse.reporting.report_writer import (
     ReportWriterError,
     build_and_write_household_reports,
     collect_report_bundle,
+    render_external_pdf,
     render_markdown,
 )
+from warehouse.reporting.report_writer.pdf import sha256_file
 
 AS_OF = date(2026, 6, 24)
 DEMO = DEMO_HOUSEHOLD_ID
 
 
+def _resolve_open_breaks(session) -> None:
+    """Clear firm-wide breaks so PDF render is not gated in unrelated tests."""
+    now = datetime.now(UTC)
+    for row in session.scalars(
+        select(ReconciliationBreakRow).where(
+            ReconciliationBreakRow.resolved.is_(False)
+        )
+    ).all():
+        row.resolved = True
+        row.resolved_at = now
+    session.flush()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _bootstrap_report_writer_module_db() -> Iterator[None]:
+    bootstrap_database(seed=True)
+    yield
+
+
 @pytest.fixture
 def seeded() -> Iterator[None]:
     bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
     yield
 
 
@@ -132,14 +161,15 @@ def test_demo_household_bundle_has_performance_and_ips_drift() -> None:
 
 
 def test_missing_ips_raises() -> None:
-    hh = "hh_report_no_ips"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_report_no_ips_{suffix}"
     with session_scope() as session:
         _seed_household_with_lot(
             session,
             household_id=hh,
-            lot_id="lot_nips",
-            security_id="sec_nips",
-            account_id="acct_nips",
+            lot_id=f"lot_nips_{suffix}",
+            security_id=f"sec_nips_{suffix}",
+            account_id=f"acct_nips_{suffix}",
             qty=Decimal("1"),
             cost=Decimal("100"),
             price=Decimal("110"),
@@ -155,7 +185,8 @@ def test_missing_ips_raises() -> None:
 
 
 def test_missing_positions_raises() -> None:
-    hh = "hh_report_no_positions"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_report_no_positions_{suffix}"
     with session_scope() as session:
         session.add(
             EntityRow(
@@ -168,7 +199,7 @@ def test_missing_positions_raises() -> None:
         save_ips(
             session,
             InvestmentPolicyStatement(
-                ips_id="ips_npos",
+                ips_id=f"ips_npos_{suffix}",
                 household_id=hh,
                 version=1,
                 effective_date="2026-01-01",
@@ -193,14 +224,15 @@ def test_missing_positions_raises() -> None:
 
 
 def test_limitations_include_tax_stub_when_zero() -> None:
-    hh = "hh_report_zero_tax"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_report_zero_tax_{suffix}"
     with session_scope() as session:
         _seed_household_with_lot(
             session,
             household_id=hh,
-            lot_id="lot_ztax",
-            security_id="sec_ztax",
-            account_id="acct_ztax",
+            lot_id=f"lot_ztax_{suffix}",
+            security_id=f"sec_ztax_{suffix}",
+            account_id=f"acct_ztax_{suffix}",
             qty=Decimal("10"),
             cost=Decimal("100"),
             price=Decimal("100"),
@@ -209,7 +241,7 @@ def test_limitations_include_tax_stub_when_zero() -> None:
         save_ips(
             session,
             InvestmentPolicyStatement(
-                ips_id="ips_ztax",
+                ips_id=f"ips_ztax_{suffix}",
                 household_id=hh,
                 version=1,
                 effective_date="2026-01-01",
@@ -304,6 +336,8 @@ def test_report_build_writes_three_files(seeded: None) -> None:
     assert Path(written.internal_markdown_path).is_file()
     assert Path(written.external_markdown_path).is_file()
     assert Path(written.bundle_json_path).is_file()
+    assert Path(written.external_pdf_path or "").is_file()
+    assert written.external_pdf_sha256 is not None
     assert written.period_label == f"month-end-{AS_OF.isoformat()}"
     assert Path(written.output_dir).name == written.snapshot_id
 
@@ -339,6 +373,8 @@ def test_report_build_messaging_round_trip(seeded: None) -> None:
 @pytest.fixture
 def seeded_tmp_reports(tmp_path, monkeypatch) -> Iterator[Path]:
     bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
     monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
     monkeypatch.setattr(
         "warehouse.reporting.report_writer.writer.repo_root",
@@ -393,7 +429,7 @@ def test_month_end_batch_one_failure_does_not_swallow_others(
 ) -> None:
     from warehouse.workflows.month_end import run_month_end_reporting_batch
 
-    bad_hh = "hh_month_end_no_ips"
+    bad_hh = f"hh_month_end_no_ips_{uuid4().hex[:8]}"
     with session_scope() as session:
         session.add(
             EntityRow(
@@ -426,7 +462,7 @@ def test_month_end_batch_failures_include_household_id(
 ) -> None:
     from warehouse.workflows.month_end import run_month_end_reporting_batch
 
-    bad_hh = "hh_month_end_fail_ctx"
+    bad_hh = f"hh_month_end_fail_ctx_{uuid4().hex[:8]}"
     with session_scope() as session:
         session.add(
             EntityRow(
@@ -452,7 +488,7 @@ def test_month_end_batch_failures_include_household_id(
 def test_month_end_reporting_raises_on_single_household_failure() -> None:
     from warehouse.workflows.month_end import run_month_end_reporting
 
-    bad_hh = "hh_month_end_single_fail"
+    bad_hh = f"hh_month_end_single_fail_{uuid4().hex[:8]}"
     bootstrap_database(seed=True)
     with session_scope() as session:
         session.add(
@@ -471,3 +507,227 @@ def test_month_end_reporting_raises_on_single_household_failure() -> None:
                 as_of_date=AS_OF,
                 actor_id="test",
             )
+
+
+# --- rw4 PDF channel falsifiers ----------------------------------------------
+
+
+@pytest.mark.pandoc
+def test_report_build_writes_external_pdf_when_pandoc_available(
+    seeded_tmp_reports: Path,
+) -> None:
+    if shutil.which("pandoc") is None:
+        pytest.skip("pandoc not installed")
+
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    pdf_path = Path(written.external_pdf_path or "")
+    assert pdf_path.is_file()
+    assert pdf_path.stat().st_size > 0
+    assert written.external_pdf_sha256 is not None
+
+
+def test_external_pdf_sha256_matches_file_bytes(
+    seeded_tmp_reports: Path,
+) -> None:
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    pdf_path = Path(written.external_pdf_path or "")
+    assert pdf_path.is_file()
+    assert written.external_pdf_sha256 == sha256_file(pdf_path)
+
+
+def test_pdf_render_raises_when_markdown_missing(tmp_path: Path) -> None:
+    missing = tmp_path / "external.md"
+    out = tmp_path / "external.pdf"
+    with pytest.raises(ReportWriterError, match="missing"):
+        render_external_pdf(
+            missing,
+            output_pdf_path=out,
+            snapshot_id="rpt_missing",
+        )
+    assert not out.exists()
+
+
+def test_pdf_render_raises_when_pandoc_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    md = tmp_path / "external.md"
+    md.write_text(
+        "---\ntitle: Test\nsnapshot_id: rpt_x\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.pdf.shutil.which",
+        lambda _: None,
+    )
+    with pytest.raises(ReportWriterError, match="Pandoc is not installed"):
+        render_external_pdf(
+            md,
+            output_pdf_path=tmp_path / "external.pdf",
+            snapshot_id="rpt_x",
+        )
+
+
+def test_report_build_audit_includes_pdf_hash(
+    seeded_tmp_reports: Path,
+) -> None:
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+        entries = list_audit_entries(session, household_id=DEMO)
+    match = next(
+        e
+        for e in entries
+        if e.action == "report_build" and e.resource_id == written.snapshot_id
+    )
+    assert match.details["external_pdf_path"] == written.external_pdf_path
+    assert match.details["external_pdf_sha256"] == written.external_pdf_sha256
+
+
+def _seed_open_break(session, *, account_id: str = "acct_demo") -> None:
+    ingest_id = f"ingest_rw4_{uuid4().hex[:8]}"
+    break_id = f"break_rw4_{uuid4().hex[:8]}"
+    session.add(
+        IngestRunRow(
+            run_id=ingest_id,
+            custodian_id="custodian_fidelity",
+            file_name="rw4_test.csv",
+            status="completed",
+            started_at=datetime(2026, 6, 24, tzinfo=UTC),
+            finished_at=datetime(2026, 6, 24, tzinfo=UTC),
+            rows_processed=1,
+        )
+    )
+    session.add(
+        ReconciliationBreakRow(
+            break_id=break_id,
+            ingest_run_id=ingest_id,
+            account_id=account_id,
+            security_id=None,
+            description="rw4 gate test break",
+            opened_at=datetime(2026, 6, 24, tzinfo=UTC),
+            resolved=False,
+        )
+    )
+    session.flush()
+
+
+def test_external_pdf_blocked_when_open_breaks(
+    seeded_tmp_reports: Path,
+) -> None:
+    with session_scope() as session:
+        _seed_open_break(session)
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+        entries = list_audit_entries(session, household_id=DEMO)
+    assert Path(written.external_markdown_path).is_file()
+    assert written.external_pdf_path is None
+    assert written.external_pdf_sha256 is None
+    match = next(
+        e
+        for e in entries
+        if e.action == "report_build" and e.resource_id == written.snapshot_id
+    )
+    assert match.details.get("external_pdf_blocked") == "true"
+    assert match.details.get("reason") == "open_reconciliation_breaks"
+
+
+def test_month_end_batch_pdf_on_success(seeded_tmp_reports: Path) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting_batch
+
+    with session_scope() as session:
+        result = run_month_end_reporting_batch(
+            session,
+            as_of_date=AS_OF,
+            household_ids=[DEMO],
+            actor_id="test",
+        )
+    completed = next(o for o in result.outcomes if o.status == "completed")
+    assert completed.written is not None
+    assert completed.written.external_pdf_path is not None
+    assert completed.written.external_pdf_sha256 is not None
+    assert Path(completed.written.external_pdf_path).is_file()
+
+
+def test_pdf_render_subprocess_failure_propagates(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    md = tmp_path / "external.md"
+    md.write_text(
+        "---\ntitle: Test\nsnapshot_id: rpt_sub\n---\n\n# Body\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.pdf.shutil.which",
+        lambda _: "/usr/bin/pandoc",
+    )
+
+    def _fail(cmd, **kwargs):
+        del kwargs
+        proc = MagicMock()
+        proc.returncode = 1
+        proc.stderr = "engine missing"
+        return proc
+
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.pdf.subprocess.run",
+        _fail,
+    )
+    with pytest.raises(ReportWriterError, match="External PDF render failed"):
+        render_external_pdf(
+            md,
+            output_pdf_path=tmp_path / "external.pdf",
+            snapshot_id="rpt_sub",
+        )
+
+
+def test_dashboard_panel_shows_pdf_hash(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "warehouse.dashboard.report_writer_data.reports_base",
+        lambda: tmp_path,
+    )
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    html = render_reporting_page()
+    assert written.external_pdf_sha256 is not None
+    assert written.external_pdf_sha256[:12] in html
+    assert "external.pdf" in html
