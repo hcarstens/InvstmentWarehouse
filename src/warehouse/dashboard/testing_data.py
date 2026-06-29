@@ -89,6 +89,11 @@ def testing_artifact_path() -> Path:
     return _ARTIFACT_PATH
 
 
+def current_git_sha() -> str | None:
+    """Return ``git rev-parse HEAD`` at repo root, or None on failure."""
+    return _current_git_sha()
+
+
 def _current_git_sha() -> str | None:
     try:
         proc = subprocess.run(

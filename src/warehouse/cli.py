@@ -311,6 +311,22 @@ def risk_evaluate(file: Path, horizon: str) -> None:
     click.echo(payload)
 
 
+@main.group()
+def test() -> None:
+    """Testing report generation."""
+
+
+@test.command("report")
+def test_report() -> None:
+    """Run pytest with coverage and write ``runs/testing/last_report.json``."""
+    from warehouse.dashboard.testing_report import generate_testing_report
+
+    exit_code = generate_testing_report()
+    if exit_code != 0:
+        raise SystemExit(exit_code)
+    click.echo("Testing report written to runs/testing/last_report.json")
+
+
 @main.command()
 def info() -> None:
     """Print platform planes and build order."""
