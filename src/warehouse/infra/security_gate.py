@@ -15,24 +15,24 @@ from typing import Any
 _BLOCKING_SEVERITIES = frozenset({"HIGH", "CRITICAL"})
 _CVSS_IMPACT = re.compile(r"CVSS:3\.[01]/.*")
 _DEFAULT_BASELINE = Path(".secrets.baseline")
+# Baseline JSON embeds hashed_secret hex digests that re-trigger detectors.
+_EXCLUDE_FILES = r"\.secrets\.baseline$"
 _OSV_URL = "https://api.osv.dev/v1/vulns/{vuln_id}"
 
 
-def _secret_fingerprints(data: dict[str, Any]) -> set[tuple[str, str, int]]:
-    keys: set[tuple[str, str, int]] = set()
+def _secret_fingerprints(data: dict[str, Any]) -> set[tuple[str, str]]:
+    """Stable (path, hashed_secret) keys — line numbers drift across edits."""
+    keys: set[tuple[str, str]] = set()
     for path, findings in data.get("results", {}).items():
         if not isinstance(findings, list):
             continue
         for item in findings:
             if not isinstance(item, dict):
                 continue
-            keys.add(
-                (
-                    str(path),
-                    str(item.get("type", "")),
-                    int(item.get("line_number", 0)),
-                )
-            )
+            digest = item.get("hashed_secret")
+            if not isinstance(digest, str) or not digest:
+                continue
+            keys.add((str(path), digest))
     return keys
 
 
@@ -170,7 +170,14 @@ def run_detect_secrets_gate(
         return 1
 
     proc = subprocess.run(
-        [executable, "-m", "detect_secrets", "scan"],
+        [
+            executable,
+            "-m",
+            "detect_secrets",
+            "scan",
+            "--exclude-files",
+            _EXCLUDE_FILES,
+        ],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -193,7 +200,29 @@ def run_detect_secrets_gate(
     if not new_keys:
         return 0
 
-    for path, secret_type, line in sorted(new_keys):
+    # Map digest → first finding for readable CI output.
+    digest_meta: dict[tuple[str, str], tuple[str, int]] = {}
+    for path, findings in current.get("results", {}).items():
+        if not isinstance(findings, list):
+            continue
+        for item in findings:
+            if not isinstance(item, dict):
+                continue
+            digest = item.get("hashed_secret")
+            if not isinstance(digest, str) or not digest:
+                continue
+            key = (str(path), digest)
+            if key in new_keys and key not in digest_meta:
+                digest_meta[key] = (
+                    str(item.get("type", "unknown")),
+                    int(item.get("line_number", 0)),
+                )
+
+    for path, digest in sorted(new_keys):
+        secret_type, line = digest_meta.get(
+            (path, digest),
+            ("unknown", 0),
+        )
         print(
             f"NEW SECRET: {path}:{line} ({secret_type})",
             file=sys.stderr,

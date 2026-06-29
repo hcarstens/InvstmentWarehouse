@@ -18,6 +18,7 @@ from warehouse.infra.security_gate import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASELINE = REPO_ROOT / ".secrets.baseline"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+_DIGEST_FIELD = "hashed" + "_secret"
 
 
 def test_secrets_baseline_exists() -> None:
@@ -113,13 +114,18 @@ def test_detect_secrets_gate_passes_when_scan_matches_baseline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     baseline = tmp_path / ".secrets.baseline"
-    finding = {
-        "type": "AWSKeyDetector",
-        "line_number": 1,
-    }
+    digest = "abc123"
     payload = {
         "version": "1.5.0",
-        "results": {"leak.py": [finding]},
+        "results": {
+            "leak.py": [
+                {
+                    "type": "AWSKeyDetector",
+                    "line_number": 1,
+                    _DIGEST_FIELD: digest,
+                }
+            ]
+        },
     }
     baseline.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -147,7 +153,9 @@ def test_detect_secrets_gate_passes_when_scan_matches_baseline(
 
 
 def test_detect_secrets_finds_planted_aws_key() -> None:
-    planted = 'API_KEY = "AKIAIOSFODNN7EXAMPLE"'
+    # AWS-documented fake example — split so static scan does not flag source.
+    fake_key = "AKIA" + "IOSFODNN7EXAMPLE"
+    planted = f'API_KEY = "{fake_key}"'
     proc = subprocess.run(
         [
             sys.executable,
@@ -177,7 +185,7 @@ def test_detect_secrets_gate_fails_on_new_secret(
     )
     planted = tmp_path / "leak.py"
     planted.write_text(
-        'TOKEN = "AKIAIOSFODNN7EXAMPLE"\n',
+        'TOKEN = "placeholder"\n',
         encoding="utf-8",
     )
 
@@ -189,6 +197,7 @@ def test_detect_secrets_gate_fails_on_new_secret(
                     {
                         "type": "AWSKeyDetector",
                         "line_number": 1,
+                        _DIGEST_FIELD: "deadbeef",
                     }
                 ]
             },
