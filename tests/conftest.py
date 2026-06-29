@@ -4,11 +4,23 @@ import os
 from decimal import Decimal
 
 import pytest
+from hypothesis import HealthCheck, settings
 
 from warehouse.config import get_settings
 from warehouse.data.ledger import Lot
 from warehouse.data.security_master import AssetClass, Security, TaxCharacter
 from warehouse.infra.db.bootstrap import bootstrap_database
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    # ST5 — deterministic property tests (Persona ST5 / derandomize).
+    settings.register_profile(
+        "warehouse",
+        derandomize=True,
+        deadline=None,
+        suppress_health_check=[HealthCheck.too_slow],
+    )
+    settings.load_profile("warehouse")
 
 
 @pytest.fixture(scope="session", autouse=True)

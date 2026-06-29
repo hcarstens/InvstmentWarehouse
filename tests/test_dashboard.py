@@ -480,6 +480,9 @@ def test_testing_page_empty_state() -> None:
     assert "Testing matrix" in html
     assert "No report yet" in html
     assert "warehouse test report" in html
+    assert "gap-finder badge" in html
+    assert "<th>Mutation</th>" in html
+    assert "<th>Coverage</th>" in html
 
 
 def test_api_testing_empty_state_json() -> None:
@@ -657,3 +660,8 @@ def test_testing_matrix_with_report_artifact(tmp_path) -> None:
     assert "4/4" in panel
     assert "Decision" in panel
     assert "No report yet" not in panel
+    assert "gap-finder badge" in panel
+    assert "<th>Mutation</th>" in panel
+    assert "pass rate</span>" in panel
+    assert "E2E smoke</span>" in panel
+    assert "planes below floor</span>" in panel

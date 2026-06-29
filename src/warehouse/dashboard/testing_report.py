@@ -36,6 +36,7 @@ from warehouse.dashboard.testing_data import (
 from warehouse.dashboard.testing_registry import (
     PLANE_TEST_SLICES,
     PlaneTestSlice,
+    collect_pytest_paths,
 )
 
 _COVERAGE_PATH = repo_root() / "runs" / "testing" / "coverage.json"
@@ -160,8 +161,9 @@ def run_plane_pytest(
     cwd: Path,
     run_pytest: RunPytest = _default_run_pytest,
 ) -> tuple[int, int, int]:
+    paths = collect_pytest_paths(slice_row)
     proc = run_pytest(
-        [*slice_row.pytest_paths, "-q", "--tb=no", "--disable-warnings"],
+        [*paths, "-q", "--tb=no", "--disable-warnings"],
         cwd=cwd,
     )
     if proc.returncode not in {0, 1, 5}:

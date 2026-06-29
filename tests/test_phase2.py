@@ -79,6 +79,91 @@ def test_reconcile_stale_as_of_date_opens_break(tmp_path: Path) -> None:
     assert any("stale custodian file" in b.description for b in breaks)
 
 
+def test_recon_quantity_mismatch_opens_break(tmp_path: Path) -> None:
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.execution.reconciliation.service import reconcile_ingest
+
+    bootstrap_database(seed=True)
+    wrong_qty = tmp_path / "wrong_qty.csv"
+    wrong_qty.write_text(
+        "account_id,ticker,quantity,as_of_date\n"
+        "acct_taxable,VTI,500,2026-06-24\n"
+        "acct_taxable,AAPL,100,2026-06-24\n"
+        "acct_ira,BND,300,2026-06-24\n"
+    )
+    with session_scope() as session:
+        ingest = run_custodian_ingest(
+            session,
+            wrong_qty,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+        breaks = reconcile_ingest(
+            session,
+            ingest.run_id,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+    qty_breaks = [
+        b
+        for b in breaks
+        if "custodian=" in b.description and "ledger=" in b.description
+    ]
+    assert any("VTI" in b.description for b in qty_breaks)
+
+
+def test_recon_ledger_only_position_opens_break(tmp_path: Path) -> None:
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.execution.reconciliation.service import reconcile_ingest
+
+    bootstrap_database(seed=True)
+    missing_row = tmp_path / "missing_aapl.csv"
+    missing_row.write_text(
+        "account_id,ticker,quantity,as_of_date\n"
+        "acct_taxable,VTI,550,2026-06-24\n"
+        "acct_ira,BND,300,2026-06-24\n"
+    )
+    with session_scope() as session:
+        ingest = run_custodian_ingest(
+            session,
+            missing_row,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+        breaks = reconcile_ingest(
+            session,
+            ingest.run_id,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+    assert any(
+        "custodian=0" in b.description and "ledger=" in b.description
+        for b in breaks
+    )
+
+
+def test_recon_mixed_as_of_date_opens_break(tmp_path: Path) -> None:
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.execution.reconciliation.service import reconcile_ingest
+
+    bootstrap_database(seed=True)
+    mixed = tmp_path / "mixed_dates.csv"
+    mixed.write_text(
+        "account_id,ticker,quantity,as_of_date\n"
+        "acct_taxable,VTI,550,2026-06-24\n"
+        "acct_taxable,AAPL,100,2026-06-25\n"
+        "acct_ira,BND,300,2026-06-24\n"
+    )
+    with session_scope() as session:
+        ingest = run_custodian_ingest(
+            session,
+            mixed,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+        breaks = reconcile_ingest(
+            session,
+            ingest.run_id,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+    assert any("mixed as_of_date" in b.description for b in breaks)
+
+
 def test_phase2_dashboard_loads() -> None:
     data = load_phase2_dashboard()
     assert data.error is None

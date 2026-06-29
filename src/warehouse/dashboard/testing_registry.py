@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from warehouse.config import repo_root
 from warehouse.dashboard.status import PLANES, PlaneStatus
 
 # Pyramid targets (ST4) — actual mix measured, not assumed.
@@ -63,6 +64,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_phase1.py",
             "tests/test_phase2.py",
             "tests/test_architecture.py",
+            "tests/test_lot_properties.py",
         ],
         coverage_glob="src/warehouse/data/**",
         coverage_floor_pct=90.0,
@@ -188,6 +190,24 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         risk_tier="medium",
     ),
 ]
+
+
+def collect_pytest_paths(slice_row: PlaneTestSlice) -> list[str]:
+    """Merge pytest_paths and shipped property_paths (deduped, st5a)."""
+    root = repo_root()
+    seen: set[str] = set()
+    merged: list[str] = []
+    for rel_path in slice_row.pytest_paths:
+        if rel_path not in seen:
+            seen.add(rel_path)
+            merged.append(rel_path)
+    for rel_path in slice_row.property_paths:
+        if rel_path in seen:
+            continue
+        if (root / rel_path).is_file():
+            seen.add(rel_path)
+            merged.append(rel_path)
+    return merged
 
 
 def slice_by_plane_id(plane_id: str) -> PlaneTestSlice | None:

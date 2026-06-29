@@ -1,6 +1,6 @@
 # Software testing — Implementation Plan
 
-**Status:** st0–st4 shipped · st5 planned
+**Status:** st0–st4 shipped · st5 in progress (st5a–st5c shipped)
 **Date:** 2026-06-29
 **Owner:** cross-cutting (infra + dashboard)
 **Inputs:** [`heuristics/Software QA.md`](heuristics/Software%20QA.md) (QA1–QA8),
@@ -22,7 +22,7 @@ All slices **not done** — none started. Build order (dashboard first for visib
 | **st2** | `warehouse test report` CLI (flips panel `stub`→`live`) | ☑ done |
 | **st3** | CI coverage artifact + badges + QA7 security gate | ☑ done |
 | **st4** | E2E testing — up, running, completed (priority) | ☑ done |
-| **st5** | Hard QA — optimizer / analyst / risk property + mutation (END) | ☐ not done |
+| **st5** | Hard QA — optimizer / analyst / risk property + mutation (END) | ☐ in progress |
 
 Mark a slice `☑ done` here and in its §5 header when its falsifier is green on `main`.
 
@@ -400,11 +400,29 @@ layer must exist and pass), then deepen the base (st5).
 **Falsifier:** `pytest tests/integration/test_end_to_end_synthetic.py tests/test_*smoke* -q`
 green; `/testing` reports 4/4 cohorts.
 
-### st5 — hard QA: deep correctness tests  ☐ **not done**  *(end — after E2E green)*
+### st5 — hard QA: deep correctness tests  ☐ **in progress**  *(end — after E2E green)*
 
 **Goal:** the expensive, high-rigor per-plane work — optimizer, analyst/PM, risk math, mutation.
 These are **deferred to the end on purpose**: they are slow to author and run, and only worth
 the investment once the suite, dashboard, and E2E wiring (st0–st4) are stable.
+
+#### st5 sub-slices
+
+| Sub-slice | Scope | Falsifier | Status |
+| --- | --- | --- | --- |
+| **st5a** | Infra + deps — `hypothesis` in `[dev]`; `collect_pytest_paths`; property_paths wired | `pytest tests/test_testing_registry.py -q` | ☑ done |
+| **st5b** | Data — lot properties (ST6); ingest error propagation (§4.1) | `pytest tests/test_lot_properties.py tests/test_phase2.py -q` | ☑ done |
+| **st5c** | Execution + cross-cutting — recon break taxonomy; `/testing` + QA footnote depth | `pytest tests/test_phase2.py tests/test_phase4.py tests/test_dashboard.py -q` | ☑ done |
+| **st5d** | Decision — optimizer properties (ST6) | `pytest tests/test_optimizer_properties.py tests/test_optimizer_*.py -q` | ☐ not done |
+| **st5e** | Decision — analyst/PM depth | `pytest tests/test_analyst_*.py tests/test_pm_*.py -q` | ☐ not done |
+| **st5f** | Research — risk properties (ST6) | `pytest tests/test_risk_properties.py tests/test_risk_*.py -q` | ☐ not done |
+| **st5g** | Research — synthetic statistical (§4.2.1) | `pytest tests/test_synth_*.py -q` | ☐ not done |
+| **st5h** | Mutation report (ST3) — `mutmut` on Data + Decision; `mutation_kill_pct` artifact | artifact shows kill % on Data + Decision rows | ☐ not done |
+| **st5i** | Reporting — `tests/test_reporting_performance.py` when module ships | — | ☐ deferred |
+
+**Sequence:** st5a first (deps + registry). st5b–st5c can land in parallel. st5d–st5f last
+(highest cost). st5g after synthetic paths stable. st5h after property suites green. st5i when
+module exists.
 
 | Order | Plane | Target tests |
 | --- | --- | --- |
@@ -701,4 +719,4 @@ all six slices are `☐ not done`** (see top status table).
 | 2026-06-29 | Added per-plane QA footnote (§4.8): `render_qa_footnote(plane_id)` shows test pass/fail + coverage % on each plane page (`/data`, `/research`, `/decision`, `/execution`, `/reporting`, `/infra`), wired in the dashboard slice and covered by `test_dashboard.py`. |
 | 2026-06-29 | Re-sequenced slices: split st4 into **st4 (E2E — up, running, completed; priority)** and **st5 (hard QA — optimizer / analyst/PM / risk property + mutation; END)**. E2E wiring proven first; expensive deep correctness tests deferred to the final slice. |
 | 2026-06-29 | Added §4.2.1 synthetic portfolio + IPS builder acceptance items: **structural** (per-SDG-axiom, emit→validate round-trip, cohort coverage, determinism, error-surfacing) gate E2E in st4; **statistical** (distributional checks, null baselines, SDG3 ablation falsifier, 2022–2025 cross-regime) land in st5. Sourced from `research/software_testing.md`; split by cost per Simplicity (S1/S3). |
-| 2026-06-29 | **Dashboard moved to top (st0)** for current-phase visibility (dashboard-first): old st2 dashboard → st0 (ships with stub/empty-state), registry → st1, CLI report → st2 (flips panel `stub`→`live`); st3–st5 unchanged. Added top **implementation-status table** and marked **all six slices `☐ not done`** (nothing built yet). |
+| 2026-06-29 | **st5a–st5c shipped:** `hypothesis` in `[dev]` with derandomize profile; `collect_pytest_paths` merges property suites; `test_lot_properties.py` (ST6 lot invariants + ingest errors); recon break taxonomy tests; `/testing` matrix section depth in `test_dashboard.py`. |

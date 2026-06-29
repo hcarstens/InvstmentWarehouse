@@ -13,6 +13,7 @@ from warehouse.dashboard.testing_data import (
 from warehouse.dashboard.testing_registry import (
     PLANE_TEST_SLICES,
     QA_FOOTNOTE_PLANE_IDS,
+    collect_pytest_paths,
     operational_plane_ids,
     registry_plane_ids,
     slice_by_plane_id,
@@ -54,9 +55,28 @@ _SLICE_IDS = [row.plane_id for row in PLANE_TEST_SLICES]
 
 @pytest.mark.parametrize("slice_row", PLANE_TEST_SLICES, ids=_SLICE_IDS)
 def test_pytest_paths_exist(slice_row) -> None:
-    for rel_path in slice_row.pytest_paths:
+    for rel_path in collect_pytest_paths(slice_row):
         path = _ROOT / rel_path
         assert path.is_file(), f"{slice_row.plane_id}: missing {rel_path}"
+
+
+@pytest.mark.parametrize("slice_row", PLANE_TEST_SLICES, ids=_SLICE_IDS)
+def test_collect_pytest_paths_includes_property_paths(slice_row) -> None:
+    merged = collect_pytest_paths(slice_row)
+    for rel_path in slice_row.property_paths:
+        if rel_path in slice_row.pytest_paths:
+            assert rel_path in merged
+        elif (_ROOT / rel_path).is_file():
+            assert rel_path in merged
+
+
+_SHIPPED_PROPERTY_PATHS = ("tests/test_lot_properties.py",)
+
+
+@pytest.mark.parametrize("rel_path", _SHIPPED_PROPERTY_PATHS)
+def test_shipped_property_paths_exist(rel_path: str) -> None:
+    path = _ROOT / rel_path
+    assert path.is_file(), f"missing shipped property suite {rel_path}"
 
 
 @pytest.mark.parametrize("slice_row", PLANE_TEST_SLICES, ids=_SLICE_IDS)
