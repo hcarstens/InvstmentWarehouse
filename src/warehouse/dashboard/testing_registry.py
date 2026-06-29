@@ -154,6 +154,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_phase4.py",
             "tests/test_reporting_performance.py",
             "tests/test_reporting_tax.py",
+            "tests/test_report_writer.py",
         ],
         coverage_glob="src/warehouse/reporting/**",
         coverage_floor_pct=80.0,

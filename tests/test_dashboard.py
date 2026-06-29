@@ -614,6 +614,73 @@ def test_qa_footnote_with_report_artifact(tmp_path) -> None:
     assert report.planes[0].coverage_status == "below_floor"
 
 
+def test_report_writer_panel_on_reporting_page() -> None:
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+
+    html = render_reporting_page()
+    assert "<h2>Report writer" in html
+
+
+def test_report_writer_panel_shows_snapshot_when_artifact_exists(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from datetime import date
+
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
+    from warehouse.reporting.report_writer import (
+        build_and_write_household_reports,
+    )
+
+    bootstrap_database(seed=True)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "warehouse.dashboard.report_writer_data.reports_base",
+        lambda: tmp_path,
+    )
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO_HOUSEHOLD_ID,
+            as_of_date=date(2026, 6, 24),
+            actor_id="test",
+        )
+    html = render_reporting_page()
+    assert written.snapshot_id.startswith("rpt_")
+    assert written.snapshot_id in html
+    assert "total portfolio market value" in html
+    assert "Exhibit A" in html
+
+
+def test_report_writer_panel_error_banner(tmp_path, monkeypatch) -> None:
+    from warehouse.dashboard.render_phase4 import render_report_writer_section
+    from warehouse.dashboard.report_writer_data import load_report_writer_panel
+
+    monkeypatch.setattr(
+        "warehouse.dashboard.report_writer_data.reports_base",
+        lambda: tmp_path,
+    )
+    data = load_report_writer_panel()
+    assert data.panel_status == "empty"
+    panel = render_report_writer_section(data)
+    assert "error-banner" in panel
+    assert "badge-live" not in panel
+    assert "No report artifacts" in panel
+
+
+def test_catalog_registry_lists_report_writer_panel() -> None:
+    page_html = render_catalog()
+    assert html.escape("Report writer") in page_html
+    assert page_for_panel("Report writer").page_id == "reporting"
+
+
 def test_testing_matrix_with_report_artifact(tmp_path) -> None:
     import json
     from datetime import UTC, datetime

@@ -129,6 +129,7 @@ PHASES: list[Phase] = [
             DashboardPanel(
                 name="Household performance", phase=4, status="live"
             ),
+            DashboardPanel(name="Report writer", phase=4, status="live"),
         ],
     ),
     Phase(

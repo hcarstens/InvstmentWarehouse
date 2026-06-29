@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from warehouse.dashboard.phase4_data import Phase4DashboardData
 
 if TYPE_CHECKING:
+    from warehouse.dashboard.report_writer_data import ReportWriterPanelData
     from warehouse.dashboard.reporting_performance_data import (
         ReportingPerformanceData,
     )
@@ -219,4 +220,49 @@ def render_performance_section(
         <td>{r.realized_gain_ytd:,.2f}</td>
       </tr></tbody>
     </table>
+  </section>"""
+
+
+def render_report_writer_section(
+    data: ReportWriterPanelData,
+) -> str:
+    """Report writer panel — artifact-backed BLUF preview and paths."""
+    if data.panel_status != "live":
+        label = (
+            "Report writer error"
+            if data.panel_status == "error"
+            else "Report writer"
+        )
+        msg = data.error or "Report writer panel unavailable."
+        return f"""
+  <section>
+    <h2>Report writer</h2>
+    <section class="error-banner"><strong>{html.escape(label)}:</strong>
+      {html.escape(msg)}</section>
+    <p><code>warehouse.reporting.report_writer</code> ·
+       <code>report.build</code></p>
+  </section>"""
+
+    ts = data.generated_at.isoformat() if data.generated_at else "—"
+    bluf = html.escape(data.bluf_preview or "—")
+    return f"""
+  <section>
+    <h2>Report writer — {html.escape(data.household_id)}</h2>
+    <p><span class="badge badge-live">live</span>
+       snapshot <code>{html.escape(data.snapshot_id or "—")}</code> ·
+       period <code>{html.escape(data.period_label or "—")}</code> ·
+       as of {html.escape(str(data.as_of_date))} ·
+       generated {html.escape(ts)}</p>
+    <h3>Executive summary (BLUF) — external.md excerpt</h3>
+    <blockquote><p>{bluf}</p></blockquote>
+    <p><em>Figures in the preview trace to exhibits in
+       <code>bundle.json</code> ({html.escape(data.snapshot_id or "")}).</em></p>
+    <h3>Artifact paths</h3>
+    <ul>
+      <li>internal.md — <code>{html.escape(data.internal_markdown_path or "—")}</code></li>
+      <li>external.md — <code>{html.escape(data.external_markdown_path or "—")}</code></li>
+      <li>bundle.json — <code>{html.escape(data.bundle_json_path or "—")}</code></li>
+    </ul>
+    <p><code>warehouse.reporting.report_writer</code> ·
+       <code>report.build</code></p>
   </section>"""

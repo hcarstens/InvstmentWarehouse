@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from sqlalchemy import select
@@ -19,6 +19,54 @@ from warehouse.reporting.report_writer.models import (
     WrittenHouseholdReport,
 )
 from warehouse.reporting.report_writer.render import render_markdown
+
+
+def household_reports_dir(
+    household_id: str,
+    *,
+    base: Path | None = None,
+) -> Path:
+    """Path to ``runs/reports/{household_id}`` under *base* or repo root."""
+    root = base if base is not None else repo_root()
+    return root / "runs" / "reports" / household_id
+
+
+def find_latest_written_report(
+    household_id: str,
+    *,
+    base: Path | None = None,
+) -> WrittenHouseholdReport | None:
+    """Return the most recently generated report for a household, if any."""
+    hh_dir = household_reports_dir(household_id, base=base)
+    if not hh_dir.is_dir():
+        return None
+
+    best: tuple[datetime, WrittenHouseholdReport] | None = None
+    for bundle_path in hh_dir.glob("**/bundle.json"):
+        snapshot_dir = bundle_path.parent
+        try:
+            bundle = ReportBundle.model_validate_json(
+                bundle_path.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            continue
+        sort_key = bundle.generated_at
+        if sort_key.tzinfo is None:
+            sort_key = sort_key.replace(tzinfo=UTC)
+        written = WrittenHouseholdReport(
+            snapshot_id=bundle.snapshot_id,
+            household_id=bundle.household_id,
+            period_label=bundle.period.label,
+            as_of_date=bundle.as_of_date,
+            generated_at=bundle.generated_at,
+            output_dir=str(snapshot_dir),
+            internal_markdown_path=str(snapshot_dir / "internal.md"),
+            external_markdown_path=str(snapshot_dir / "external.md"),
+            bundle_json_path=str(bundle_path),
+        )
+        if best is None or sort_key > best[0]:
+            best = (sort_key, written)
+    return best[1] if best else None
 
 
 def resolve_report_as_of(

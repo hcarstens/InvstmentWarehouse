@@ -55,6 +55,7 @@ _EXECUTION_PANELS: tuple[str, ...] = (
 _REPORTING_PANELS: tuple[str, ...] = (
     "Household performance",
     "Tax scenario panel",
+    "Report writer",
 )
 
 _INFRA_PANELS: tuple[str, ...] = (
