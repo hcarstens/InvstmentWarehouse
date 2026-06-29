@@ -6,11 +6,16 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel, Field
 
+from warehouse.dashboard.e2e_data import (
+    E2ePanelData,
+    load_e2e_smoke_dashboard,
+)
 from warehouse.dashboard.layout import wrap_page
 from warehouse.dashboard.phase3_data import (
     ResearchBacktestData,
     load_research_backtest_data,
 )
+from warehouse.dashboard.render_e2e import render_e2e_smoke_section
 from warehouse.dashboard.render_phase3 import render_backtest_section
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.render_risk_build import render_risk_build_link_card
@@ -31,6 +36,7 @@ class ResearchPageData(BaseModel):
     risk: RiskDashboardData
     backtests: ResearchBacktestData
     build: RiskBuildReport
+    e2e: E2ePanelData
     error: str | None = None
 
 
@@ -38,11 +44,13 @@ def load_research_page() -> ResearchPageData:
     risk = load_risk_dashboard(household_id=DEMO_HOUSEHOLD_ID)
     backtests = load_research_backtest_data()
     build = load_risk_build_report()
+    e2e = load_e2e_smoke_dashboard()
     error = risk.error or backtests.error
     return ResearchPageData(
         risk=risk,
         backtests=backtests,
         build=build,
+        e2e=e2e,
         error=error,
     )
 
@@ -58,6 +66,7 @@ def render_research_page(data: ResearchPageData | None = None) -> str:
                 bundle.backtests.backtest_runs,
                 error=bundle.backtests.error,
             ),
+            render_e2e_smoke_section(bundle.e2e),
         ]
     )
     subtitle = (

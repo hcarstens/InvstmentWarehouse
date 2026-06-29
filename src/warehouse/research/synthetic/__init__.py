@@ -53,8 +53,10 @@ from warehouse.research.synthetic.thesis_emit import (
     synthetic_thesis_as_of,
 )
 from warehouse.research.synthetic.workflow_smoke import (
+    E2eMatrixResult,
     WorkflowSmokeCheck,
     WorkflowSmokeResult,
+    run_e2e_matrix,
     run_workflow_smoke,
 )
 
@@ -71,6 +73,7 @@ __all__ = [
     "IpsValidationError",
     "IpsValidationResult",
     "IpsExcludedError",
+    "E2eMatrixResult",
     "ScenarioCard",
     "SyntheticHouseholdBundle",
     "build_manifest_from_hnw_types",
@@ -87,6 +90,7 @@ __all__ = [
     "project_to_asset_portfolio",
     "run_asset_test_suite",
     "run_combination_matrix",
+    "run_e2e_matrix",
     "run_harness_cell",
     "run_workflow_smoke",
     "summarize_matrix",

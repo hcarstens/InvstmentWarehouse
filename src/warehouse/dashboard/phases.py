@@ -101,6 +101,11 @@ PHASES: list[Phase] = [
                 status="live",
             ),
             DashboardPanel(
+                name="End-to-end smoke matrix (synthetic)",
+                phase=3,
+                status="live",
+            ),
+            DashboardPanel(
                 name="Non-performing-asset flags",
                 phase=3,
                 status="live",

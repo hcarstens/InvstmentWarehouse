@@ -397,6 +397,37 @@ def test_optimizer_panel_shows_turnover_budget_state() -> None:
     assert "alpha" not in lowered
 
 
+def test_e2e_smoke_panel_renders_on_research() -> None:
+    """End-to-end smoke matrix panel renders live on /research, all green."""
+    from warehouse.dashboard.e2e_data import load_e2e_smoke_dashboard
+    from warehouse.dashboard.render_e2e import render_e2e_smoke_section
+
+    data = load_e2e_smoke_dashboard()
+    assert data.panel_status == "live", data.error
+    assert data.households > 0
+    # Every generated household passes every leg end-to-end.
+    assert data.all_ok, [
+        (r.cohort_id, leg.workflow, leg.detail)
+        for r in data.rows
+        for leg in r.legs
+        if not leg.ok
+    ]
+    # The v1 optimizer + PM legs are exercised (not just v0 TLH).
+    assert "mv_rebalance_qp" in data.leg_names
+    assert "pm_advise" in data.leg_names
+    panel = render_e2e_smoke_section(data)
+    assert "End-to-end smoke matrix (synthetic)" in panel
+    assert "households pass" in panel
+
+
+def test_e2e_smoke_panel_on_research_page() -> None:
+    """The panel is wired into the rendered /research page."""
+    from warehouse.dashboard.pages.research import render_research_page
+
+    html = render_research_page()
+    assert "End-to-end smoke matrix (synthetic)" in html
+
+
 def test_optimizer_panel_shows_base_vs_stress() -> None:
     """po2 §B.8: panel shows base-vs-stress w* + the regime gap (PO7)."""
     from warehouse.dashboard.optimizer_data import load_optimizer_dashboard
