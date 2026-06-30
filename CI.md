@@ -59,16 +59,34 @@ scripts/ci.sh security   # pip-audit + detect-secrets only
 scripts/ci.sh fix        # ruff --fix + ruff format (mutating; not a gate)
 ```
 
-### Pre-push hook (catch before push)
+### Pre-push hook is fast-only
 
-A version-controlled hook runs `scripts/ci.sh` before every push, so a red
-build never reaches `main`. `make setup` enables it; or once per clone:
+The version-controlled pre-push hook runs **only** `ruff check` +
+`ruff format --check` (~0.08s, no network). The full gate already runs
+server-side on every push (GitHub Actions, above), so the hook stays off your
+critical path — it does **not** run mypy, tests, or the security gates. `make
+setup` enables it; or once per clone:
 
 ```bash
 git config core.hooksPath scripts/git-hooks
 ```
 
-Escape hatch (CI still runs server-side): `SKIP_CI_HOOK=1 git push`.
+Escape hatch (skip even the fast checks; CI still runs server-side):
+`SKIP_CI_HOOK=1 git push`.
+
+### End-of-day full gate
+
+Run the complete gate (lint → format → mypy → tests → security) locally before
+signing off or opening a risky PR:
+
+```bash
+scripts/ci.sh fix && scripts/ci.sh
+```
+
+`scripts/ci.sh fix` auto-fixes import order + formatting (mutating); `scripts/ci.sh`
+then runs every gate and aggregates failures (one gate never masks another).
+This path hits the network for `pip-audit` — that's fine end-of-day; only the
+per-push hook is kept network-free.
 
 ### Raw one-liner (no script)
 
@@ -274,9 +292,10 @@ curl -s http://127.0.0.1:8765/api/phase4
 
 ---
 
-## Pre-push checklist
+## End-of-day / pre-PR checklist
 
-Minimum (matches GitHub Actions):
+The pre-push hook only covers steps 1–2 (fast, no network). Run the rest before
+signing off or opening a PR — or just `scripts/ci.sh`, which runs all four:
 
 1. `ruff check src tests`
 2. `ruff format --check src tests`

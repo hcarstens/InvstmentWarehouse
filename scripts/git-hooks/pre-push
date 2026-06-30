@@ -1,20 +1,32 @@
 #!/usr/bin/env bash
-# Pre-push gate — runs the canonical CI gate before every push so a red build
-# never reaches main. This is the guard that would have caught the po2 mypy
-# regression (passed ruff locally, never ran mypy).
+# Pre-push gate — FAST checks only (ruff lint + format). Sub-second, no network.
+#
+# Rationale: GitHub Actions (.github/workflows/ci.yml) already runs the full
+# gate (lint, format, mypy, tests, security) on every push to main, so the
+# local hook does not need to duplicate it. Running the full `scripts/ci.sh`
+# here made pushes slow and flaky — it shells out to the network (pip upgrade,
+# pip-audit → api.osv.dev) and runs the whole pytest+coverage suite, so any
+# slow network or one red test blocked every push. We keep only the two
+# sub-second ruff gates that catch the vast majority of CI-lint failures.
+#
+# Run the FULL gate yourself at end of day (or before a risky PR):
+#   scripts/ci.sh          # lint + format + mypy + tests + security
 #
 # Install once (version-controlled hooks) — via `make setup`, or directly:
 #   git config core.hooksPath scripts/git-hooks
 #
-# Escape hatch (use sparingly — CI still runs on the server):
+# Escape hatch (skip even the fast checks):
 #   SKIP_CI_HOOK=1 git push
 set -euo pipefail
 
 if [[ "${SKIP_CI_HOOK:-}" == "1" ]]; then
-  echo "pre-push: SKIP_CI_HOOK=1 set — skipping local CI gate." >&2
+  echo "pre-push: SKIP_CI_HOOK=1 set — skipping local checks." >&2
   exit 0
 fi
 
 repo_root="$(git rev-parse --show-toplevel)"
-echo "pre-push: running canonical CI gate (scripts/ci.sh)…" >&2
-exec "$repo_root/scripts/ci.sh"
+echo "pre-push: fast checks (ruff lint + format)…" >&2
+"$repo_root/scripts/ci.sh" lint
+"$repo_root/scripts/ci.sh" format
+echo "pre-push: fast checks passed. Full gate runs server-side on push" \
+     "(scripts/ci.sh to replay locally)." >&2

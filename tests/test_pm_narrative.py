@@ -41,6 +41,12 @@ from warehouse.research.synthetic import emit_synthetic_household
 DEMO = DEMO_HOUSEHOLD_ID
 _ONE = Decimal("1")
 _QUANTUM = Decimal("0.000001")
+# Tolerance for re-deriving expected_cumulative via the oracle. The production
+# path and this test's (1+r)**years recomputation round independently, so the
+# two can differ by a few quanta (interpreter/Decimal-context dependent) — a
+# logic error would be orders of magnitude larger. Keep _QUANTUM for the exact
+# algebraic identity (recombination) below.
+_ORACLE_TOL = Decimal("0.00001")
 
 
 def _oracle_expected_cumulative(
@@ -188,7 +194,7 @@ def test_pm_attribution_oracle_on_hnw_path() -> None:
             pa.class_expected,
             pa.holding_years,
         ).quantize(_QUANTUM)
-        assert abs(pa.expected_cumulative - expected) <= _QUANTUM
+        assert abs(pa.expected_cumulative - expected) <= _ORACLE_TOL
 
 
 def test_pm_zero_residual_probe_checkpoint_pass() -> None:

@@ -7,7 +7,11 @@ name = "invstment-warehouse"
 version = "0.1.0"
 description = "UHNW wealth platform — positions-first investment warehouse"
 readme = "docs/research/sharpe_founding_engineer_brief.md"
-requires-python = ">=3.11"
+# Pinned to 3.12 — the only version CI and mypy exercise. An open ceiling
+# (">=3.11") let local dev drift to 3.14, where Decimal/float rounding differs
+# and tests went red locally but green in CI. Keep this == .github/workflows
+# python-version and [tool.mypy] python_version.
+requires-python = ">=3.12,<3.13"
 dependencies = [
     "pydantic>=2.6",
     "pydantic-settings>=2.2",

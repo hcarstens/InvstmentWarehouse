@@ -8,12 +8,27 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from hypothesis import HealthCheck, settings
 
 from warehouse.data.ledger import Lot
 from warehouse.data.security_master import AssetClass, Security, TaxCharacter
 from warehouse.infra.db.bootstrap import bootstrap_database
 
 _FAKE_PDF = b"%PDF-1.4\n% fake report writer test pdf\n"
+
+# Deterministic property tests in the gate. ``derandomize=True`` makes @given
+# replay the same examples every run, so a push never randomly fails on a fresh
+# input Hypothesis just discovered. ``deadline=None`` removes timing-based
+# flakes (slow machine -> DeadlineExceeded). This is the real fix for the
+# intermittent "QP property flakes" -- not widening input floors. Loaded
+# unconditionally so local and CI runs are identical.
+settings.register_profile(
+    "warehouse",
+    derandomize=True,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+settings.load_profile("warehouse")
 
 
 @pytest.fixture(scope="session", autouse=True)

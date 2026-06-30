@@ -10,10 +10,16 @@ https://hcarstens.github.io
 
 ## Setup
 
+**Python 3.12 required** (pinned in `.python-version`). CI and mypy only
+exercise 3.12 — using another version risks rounding/precision differences that
+pass locally but break in CI (or vice versa). Create the venv with 3.12
+explicitly:
+
 ```bash
-python -m venv .venv
+python3.12 -m venv .venv        # must be 3.12 — see .python-version
 source .venv/bin/activate
 pip install -e ".[dev]"
+python --version                # confirm: Python 3.12.x
 ```
 
 **Optional system dependency (report PDF):** external client packs render to PDF via
@@ -257,6 +263,23 @@ The `test` job runs `warehouse test report` (full `pytest --cov=warehouse`), upl
 `coverage.json` and `last_report.json` as artifacts (7-day retention), and runs a **security
 gate** (`pip-audit` + `detect-secrets`) — high/critical vulns or leaked secrets fail the job.
 Mutation testing stays **on-demand** (not on the PR critical path).
+
+**Pre-push is fast-only.** The local pre-push hook runs just `ruff check` +
+`ruff format --check` (~0.08s, no network) — the full gate already runs
+server-side on every push, so the hook stays off your critical path. Escape
+hatch: `SKIP_CI_HOOK=1 git push`.
+
+**End-of-day full gate.** Run the complete gate (lint → format → mypy → tests →
+security) locally before signing off or opening a risky PR:
+
+```bash
+scripts/ci.sh fix && scripts/ci.sh
+```
+
+`scripts/ci.sh fix` auto-fixes import order + formatting (mutating); `scripts/ci.sh`
+then runs every gate and aggregates failures. This path hits the network for
+`pip-audit` — that's fine end-of-day; only the per-push hook is kept
+network-free.
 
 See [`CI.md`](CI.md) for the full command reference and [`docs/software_testing_implementation.md`](docs/software_testing_implementation.md) for the implementation plan.
 
