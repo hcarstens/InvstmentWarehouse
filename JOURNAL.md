@@ -4,6 +4,65 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-30 — rw8: collector import-cycle fix (engineering hygiene)
+
+**Problem:** importing `warehouse.reporting.report_writer` transitively pulled
+**46** plane modules (execution/data/research/decision) at module load, because
+the package `__init__` eagerly imported `collect`/`writer` and `collect.py`
+imported all five planes at module scope. The same fan-out had already produced
+a real cycle that the rw5 commit (`2d6be7b`) worked around:
+
+    report_writer.collect → research.risk.adapters.ledger
+      → workflows.daily_refresh → messaging.handlers
+      → report_writer.writer → report_writer.collect   (loop)
+
+rw5 broke it by *not* importing `HouseholdRiskManifest` from
+`adapters.ledger`; instead `_build_household_manifest_from_session` in
+`collect.py` returned a bare `tuple[AssetPortfolio, Decimal | None]`. That
+inline tuple (plus a duplicated `_household_notional`) was the workaround to
+retire.
+
+**Edge cut (root cause):** the smell was a risk *adapter* importing a workflow
+*runner*. `research/risk/adapters/ledger.py` no longer imports
+`workflows.daily_refresh` at module scope — the import moved into
+`_ensure_demo_refresh()` (function scope; the dependency is real but only at
+runtime). With that back-edge gone, `collect` can safely depend on the adapter
+again.
+
+**Workaround retired:** added a session-backed
+`manifest_from_session(session, household_id) -> HouseholdRiskManifest` to
+`adapters/ledger.py` (Lib2 — the manifest type and its builders live together;
+`build_household_manifest` now delegates to it). `collect._collect_risk_headline`
+calls it and reads `manifest.portfolio` / `manifest.notional_usd`, so
+`HouseholdRiskManifest` is **restored**; the inline tuple builder and the
+duplicated `_household_notional` are deleted.
+
+**Plane-free package import:** the package `__init__` is now a **lazy PEP 562
+facade** (`__getattr__` over an `_EXPORTS` name→submodule map; `TYPE_CHECKING`
+block preserves static names for mypy/consumers). Every production consumer
+(cli, dashboard, `messaging.handlers`, workflows) already imported the
+*submodules* directly — the eager re-export was test convenience that forced
+the whole plane fan-out on any importer and amplified the cycle. The bare
+package import now loads only the facade; `collect.py`/`models.py` keep their
+honest module-scope plane imports (Cartography: the integrator map shows what
+it depends on; the band-aid would have been scattering those into function
+bodies + fragile pydantic deferred-rebuilds).
+
+**Before → after** (acceptance probe):
+
+    import warehouse.reporting.report_writer
+    # plane modules in sys.modules:  46  →  0
+
+    import warehouse.workflows.daily_refresh, warehouse.reporting.report_writer
+    # acyclic WITHOUT the rw5 workaround:  ok
+
+**Pure import-structure refactor:** no public API/signature changes to
+`collect_report_bundle` / `build_and_write_household_reports`; no new
+fields/exhibits; errors still bubble. Full gate green — `ruff`, `mypy` (193
+files), `pytest` (665 passed).
+
+---
+
 ## 2026-06-30 — rw7: comparability columns (prior-period / Δ)
 
 **Problem:** every report-writer exhibit was point-in-time — a performance or

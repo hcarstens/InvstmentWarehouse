@@ -10,10 +10,6 @@ from uuid import uuid4
 from sqlalchemy.orm import Session
 
 from warehouse.config import get_settings, repo_root
-from warehouse.data.alternatives.service import (
-    AlternativeHoldingView,
-    list_alternative_holdings,
-)
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.decision.analyst.attribution import (
     AttributionError,
@@ -47,15 +43,12 @@ from warehouse.reporting.tax import (
     ReportingTaxResult,
     run_reporting_tax_scenario,
 )
+from warehouse.research.risk.adapters.ledger import manifest_from_session
 from warehouse.research.risk.models import (
-    AssetPortfolio,
     RiskHorizon,
     RiskRequest,
     RiskResult,
     ScenarioSet,
-)
-from warehouse.research.risk.portfolio_builder import (
-    build_portfolio_from_holdings,
 )
 from warehouse.research.risk.scenarios import assumptions_for
 from warehouse.research.risk.service import evaluate_risk
@@ -112,31 +105,6 @@ def _collect_tax_scenarios(
     return tuple(results)
 
 
-def _household_notional(
-    positions: list[LotPositionView],
-    alt_holdings: list[AlternativeHoldingView],
-) -> Decimal:
-    lot_nav = sum(
-        (p.market_value for p in positions if p.market_value is not None),
-        Decimal("0"),
-    )
-    alt_nav = sum((a.current_nav for a in alt_holdings), Decimal("0"))
-    return lot_nav + alt_nav
-
-
-def _build_household_manifest_from_session(
-    session: Session,
-    household_id: str,
-) -> tuple[AssetPortfolio, Decimal | None]:
-    """Session-backed manifest for risk evaluation (walk-forward safe)."""
-    positions = list_lot_positions(session, household_id=household_id)
-    alts = list_alternative_holdings(session, household_id=household_id)
-    portfolio = build_portfolio_from_holdings(household_id, positions, alts)
-    portfolio = portfolio.model_copy(update={"source": "ledger"})
-    notional = _household_notional(positions, alts)
-    return portfolio, notional if notional > 0 else None
-
-
 def _collect_attribution(
     positions: list[LotPositionView],
     *,
@@ -175,15 +143,13 @@ def _collect_risk_headline(
     settings = get_settings()
     horizon = RiskHorizon.parse(settings.risk_dashboard_horizon_years)
     try:
-        portfolio, notional = _build_household_manifest_from_session(
-            session, household_id
-        )
+        manifest = manifest_from_session(session, household_id)
         request = RiskRequest(
             horizon=horizon,
-            notional_usd=notional,
+            notional_usd=manifest.notional_usd,
             run_scenarios=ScenarioSet.NONE,
         )
-        return evaluate_risk(request, portfolio)
+        return evaluate_risk(request, manifest.portfolio)
     except (ValueError, TypeError) as err:
         raise ReportWriterError(
             f"Risk headline failed for household {household_id}: {err}"

@@ -6,7 +6,13 @@ with sha256 pinning; month-end batch fan-out via `workflows.month_end.run_month_
 APPROVED report-subject approval (recon gate still first).
 **rw7 shipped (2026-06-30):** comparability columns — Exhibits A/B carry prior-period +
 Δ columns from the previous `bundle.json` (walk-forward safe; `n/a` not `0` on the first
-report). Remaining seam in §7/§16: rw8 collector import-cycle fix.
+report).
+**rw8 shipped (2026-06-30):** collector import-cycle fix (engineering hygiene) — cut the
+root edge `research.risk.adapters.ledger → workflows.daily_refresh`, retired the rw5 tuple
+workaround (`HouseholdRiskManifest` restored via `manifest_from_session`), and made the
+package `__init__` a lazy PEP 562 facade. Bare package import is now plane-free (46 → 0
+plane modules) and the import graph is acyclic without the workaround. **All §7/§16 seams
+closed.**
 **Date:** 2026-06-30
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
 **Inputs:** [`research/report_writing.md`](research/report_writing.md) (reader-first structure,
@@ -553,7 +559,7 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 | rw5 extended exhibits | shipped | internal Exhibit D (attribution) + E (risk headline); external D/E deferred |
 | rw6 advisor approval gate | **shipped** | `ApprovalSubject` (optimization\|report); nullable `optimization_run_id` + `subject_type`/`subject_id` (migration 007, back-filled); `approval.create` reused via XOR `report_snapshot_id`; `approve_and_render_report` produces the PDF only after sign-off (recon gate still precedes); `warehouse report approve`; panel `delivery_state` (delivered\|awaiting_delivery) |
 | rw7 comparability columns | **shipped** | `find_prior_bundle` loads the most recent strictly-earlier `bundle.json` (no lookahead); `ReportComparison`/`ComparisonDelta` (frozen, registered) carry per-figure prior + Δ; Exhibits A (perf) and B (internal drift) render `Prior` + `Δ` columns, `n/a` (never `0`) on first report; limitation lines for missing / non-adjacent prior; panel `comparison_summary` |
-| rw8 collector import-cycle fix | **planned** | function-scope cross-plane imports; drop rw5 workaround |
+| rw8 collector import-cycle fix | **shipped** | cut the root edge `research.risk.adapters.ledger → workflows.daily_refresh` (now function-scope in `_ensure_demo_refresh`); restored `HouseholdRiskManifest` in `collect` via a new session-backed `manifest_from_session` (retires the rw5 `tuple[AssetPortfolio, Decimal \| None]` workaround + duplicated `_household_notional`); package `__init__` made **lazy** (PEP 562 facade) so the bare import is plane-free. Plane-free probe 46 → 0; acyclic without the workaround |
 
 ---
 
@@ -567,7 +573,7 @@ rw6 → rw7 → rw8; rw8 is independent and can land any time.
 | --- | --- | --- | --- |
 | **Advisor approval gate** | §6 Credibility through costly signal (T3) | A client-of-record document ships with no named human sign-off; the §1 dataflow's review gate is hollow. Highest value; `approval.create` already exists to extend. | **rw6 (shipped)** |
 | **Comparability** | §7 Comparable, time-adjusted figures (Fi2) | Exhibits are point-in-time — a figure with no prior-period denominator is not decision-grade. | **rw7 (shipped)** |
-| **Collector import cycle** | — (engineering hygiene) | `collect.py` imports all five planes at module scope; recurring cycle risk (JOURNAL 2026-06-30). Not reader-facing. | rw8 |
+| **Collector import cycle** | — (engineering hygiene) | ~~`collect.py` imports all five planes at module scope; recurring cycle risk~~ **closed rw8**: root edge `risk.adapters.ledger → workflows.daily_refresh` cut (function-scope); rw5 tuple workaround retired (`HouseholdRiskManifest` restored via `manifest_from_session`); package `__init__` is a lazy PEP 562 facade — bare import is plane-free (0 plane modules) and the graph is acyclic without the workaround. | rw8 (shipped) |
 
 ---
 

@@ -3,6 +3,11 @@
 from warehouse.research.risk.adapters.ledger import (
     HouseholdRiskManifest,
     build_household_manifest,
+    manifest_from_session,
 )
 
-__all__ = ["HouseholdRiskManifest", "build_household_manifest"]
+__all__ = [
+    "HouseholdRiskManifest",
+    "build_household_manifest",
+    "manifest_from_session",
+]
