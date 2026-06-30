@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -34,7 +34,12 @@ class TaxScenarioRunView(BaseModel):
 
 
 class TaxScenarioResult(BaseModel):
-    """Session-less after-tax scenario — baseline vs overlay + delta."""
+    """Session-less after-tax scenario — baseline vs overlay + delta.
+
+    Frozen audit/replay record (mirrors ``ReportingTaxResult``).
+    """
+
+    model_config = ConfigDict(frozen=True)
 
     overlays: TaxScenarioOverlays
     baseline_tax: Decimal

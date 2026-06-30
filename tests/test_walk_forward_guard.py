@@ -163,6 +163,25 @@ def test_backtest_future_mark_injection_raises() -> None:
             session.flush()
 
 
+def test_market_price_single_mark_per_security_invariant() -> None:
+    """Regression: ``list_lot_positions`` outer-joins ``MarketPriceRow`` with
+    NO ``as_of_date`` predicate (views.py:59). That is leakage-safe ONLY while
+    each security has exactly one mark — i.e. the PK is ``security_id`` alone.
+
+    A future time-series schema (e.g. PK ``(security_id, as_of_date)``) would
+    silently let the join pick an arbitrary / future-dated mark. Pin the
+    single-mark assumption here so that change fails loudly and forces a
+    dated-mark predicate to be added to the join.
+    """
+    pk_cols = {c.name for c in MarketPriceRow.__table__.primary_key.columns}
+    assert pk_cols == {"security_id"}, (
+        "MarketPriceRow PK changed from {security_id} to "
+        f"{pk_cols}: list_lot_positions joins marks with no as_of_date "
+        "predicate and would now leak a future mark — add a dated-mark "
+        "filter to the join before allowing multiple marks per security."
+    )
+
+
 def test_backtest_clean_seed_passes_walk_forward() -> None:
     """Green path — demo seed has no future lots or marks."""
     bootstrap_database(seed=True)

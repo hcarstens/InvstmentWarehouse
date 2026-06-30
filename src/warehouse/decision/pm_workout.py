@@ -94,7 +94,8 @@ def run_pm_workout_case(
         correlation_id=correlation_id,
         household_id=payload.household_id,
     )
-    ctx = DispatchContext(session=None)  # type: ignore[arg-type] — pure leg
+    # Pure leg: pm.advise fans out QUERY/EVALUATE ops only — no DB session.
+    ctx = DispatchContext()
     advice = dispatch_typed(ctx, msg, AdviceBundle)
     return PmWorkoutCase(
         cohort_id=cohort_id,

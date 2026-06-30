@@ -219,7 +219,7 @@ def _pm_advise_check(
         from warehouse.messaging.payloads import AdviceBundle, PmAdvisePayload
 
         payload = build_working_set_from_bundle(bundle)
-        ctx = DispatchContext(session=None)  # type: ignore[arg-type]
+        ctx = DispatchContext()  # pure leg: pm.advise needs no DB session
         # dispatch_typed narrows to AdviceBundle or raises loudly — a wrong
         # type surfaces through the except below as a failed check (no
         # swallow).

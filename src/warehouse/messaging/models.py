@@ -51,14 +51,37 @@ class DispatchContext:
 
     One ``session`` per orchestrator run = one transaction boundary, threaded
     through nested dispatch unchanged (contract §4.1).
+
+    ``session`` is optional: a *pure* leg (QUERY/EVALUATE-only fan-out such
+    as ``pm.advise``) has no DB transaction and is dispatched with
+    ``session=None``. A handler that mutates or reads stored state takes it via
+    ``require_session()`` so a missing session raises loudly (no silent None
+    deref — errors bubble to the surface).
     """
 
-    session: Session
+    session: Session | None = None
     actor_id: str = "system:messaging"
     settings: Settings | None = None  # resolved by handler/dispatch if None
     # Set by dispatch to the message's correlation_id so a coordinator can
     # thread the same trace into nested dispatch (contract §4.1).
     correlation_id: str = ""
+
+    def require_session(self) -> Session:
+        """Return the session, or raise if this is a session-less pure leg.
+
+        Stored-state handlers (QUERY over the ledger, every COMMAND) call this
+        instead of touching ``session`` directly: a pure-leg dispatch that
+        wrongly routes to a stateful op fails with a typed error rather than a
+        silent ``None`` attribute error.
+        """
+        if self.session is None:
+            raise ValueError(
+                "DispatchContext has no session: a stored-state handler was "
+                "reached on a session-less (pure) leg "
+                f"(actor={self.actor_id}, "
+                f"correlation_id={self.correlation_id!r})."
+            )
+        return self.session
 
 
 # --- EVENT payloads (plane-free — primitive fields only, no cycle with the

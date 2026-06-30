@@ -3,6 +3,21 @@
 Coverage measures execution, not checking (¬QA6). These guards raise
 ``WalkForwardError`` when injected marks, lots, or scenario observations
 would peek past the evaluation cutoff — never clip or default quietly.
+
+Wiring status (a defined guard must imply a called guard):
+
+- ``assert_min_backtest_window``, ``assert_lots_not_after``, and
+  ``assert_mark_dates_not_after`` are WIRED into the live backtest path via
+  ``validate_backtest_walk_forward`` (called from ``harness.run_backtest``).
+- ``assert_scenario_observations_not_after`` and ``assert_series_cutoff`` are
+  FORWARD-PROVISIONED: the backtest harness has no scenario-observation or
+  path-slice input yet (``research/scenarios`` is a stub). They are NOT wired
+  into any live leg — do not read them as active leakage checks. Their
+  contract is pinned by direct falsifier tests in
+  ``tests/test_walk_forward_guard.py`` (``test_scenario_observation_in_purge_
+  window_raises``, ``test_series_cutoff_beyond_walk_forward_raises``). Wire
+  them into ``validate_backtest_walk_forward`` the moment a dated scenario
+  series or path slice becomes reachable in the backtest path.
 """
 
 from __future__ import annotations
@@ -62,7 +77,11 @@ def assert_scenario_observations_not_after(
     *,
     as_of: date,
 ) -> None:
-    """Reject dated scenario rows that peek past the walk-forward cutoff."""
+    """Reject dated scenario rows that peek past the walk-forward cutoff.
+
+    Forward-provisioned: not yet wired into a live backtest leg (no scenario
+    series input exists). Pinned by a direct falsifier test. See module note.
+    """
     for obs_date, label in observations:
         if obs_date > as_of:
             raise WalkForwardError(
@@ -76,7 +95,11 @@ def assert_series_cutoff(
     cutoff_index: int,
     label: str = "series",
 ) -> None:
-    """Reject path slices that extend beyond the allowed walk-forward index."""
+    """Reject path slices beyond the allowed walk-forward index.
+
+    Forward-provisioned: not yet wired into a live backtest leg (no path-slice
+    input exists). Pinned by a direct falsifier test. See module note.
+    """
     if end_index > cutoff_index:
         raise WalkForwardError(
             f"{label} end_index {end_index} exceeds walk-forward "

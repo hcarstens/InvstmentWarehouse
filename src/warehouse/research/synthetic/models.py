@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.research.risk.models import AssetPortfolio
@@ -54,6 +54,10 @@ class SyntheticAltHolding(BaseModel):
 
 
 class ProvenanceManifest(BaseModel):
+    """Replay fingerprint — frozen audit record (construct-then-copy)."""
+
+    model_config = ConfigDict(frozen=True)
+
     generator_version: str
     seed: int
     cohort_id: str

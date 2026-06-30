@@ -10,6 +10,9 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import Settings
+from warehouse.data.ingest.schwab_csv import CustodianPositionRecord
+from warehouse.data.ledger.corporate_actions import StockSplitAction
+from warehouse.data.ledger.wash_chains import WashSaleSellEvent
 from warehouse.data.security_master import AssetClass as SecurityAssetClass
 from warehouse.decision.analyst import (
     AnalystCheckpoint,
@@ -30,6 +33,7 @@ from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer import OptimizationResult
 from warehouse.decision.optimizer.models import RebalanceProposal
+from warehouse.decision.optimizer.robust import StressOverlay
 from warehouse.decision.tax.scenarios import (
     TaxScenarioOverlays,
     TaxScenarioResult,
@@ -55,6 +59,8 @@ from warehouse.reporting.report_writer.models import (
 )
 from warehouse.reporting.tax import ReportingTaxResult
 from warehouse.research.backtest import BacktestResult
+from warehouse.research.risk.adapters.ledger import HouseholdRiskManifest
+from warehouse.research.risk.assumptions import RiskAssumptions
 from warehouse.research.risk.engine import evaluate_portfolio_risk
 from warehouse.research.risk.models import (
     AllocationSlot,
@@ -67,7 +73,9 @@ from warehouse.research.risk.models import (
     RiskResult,
     ScenarioSet,
 )
+from warehouse.research.risk.scenarios import assumptions_for
 from warehouse.research.synthetic.daily_paths import PathTargets
+from warehouse.research.synthetic.models import ProvenanceManifest
 from warehouse.workflows.month_end import (
     MonthEndHouseholdOutcome,
     MonthEndReportingResult,
@@ -81,9 +89,11 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     AttributionReport,
     BacktestResult,
     ComparisonDelta,
+    CustodianPositionRecord,
     DispatchContext,
     Event,
     HouseholdPerformanceReport,
+    HouseholdRiskManifest,
     KillBreach,
     KillCriteria,
     Message,
@@ -98,14 +108,20 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     PmNarrative,
     PositionAttribution,
     PositionThesis,
-    RebalanceProposal,
+    ProvenanceManifest,
     RealizedGainEvent,
+    RebalanceProposal,
     ReportBundle,
     ReportComparison,
     ReportingTaxResult,
+    RiskAssumptions,
     RiskDeltas,
     RiskResult,
     Settings,
+    StockSplitAction,
+    StressOverlay,
+    TaxScenarioResult,
+    WashSaleSellEvent,
     WrittenHouseholdReport,
 )
 
@@ -141,7 +157,7 @@ def _sample_instance(cls: type[Any]) -> Any:
     if cls is DispatchContext:
         # Frozen dataclass — no runtime type check; a real Session is not
         # needed to prove setattr is rejected.
-        return DispatchContext(session=None)  # type: ignore[arg-type]
+        return DispatchContext(session=None)
     if cls is RiskResult:
         portfolio = AssetPortfolio(
             allocations=[
@@ -413,6 +429,61 @@ def _sample_instance(cls: type[Any]) -> Any:
             finished_at=datetime(2026, 6, 24, tzinfo=UTC),
             outcomes=(_sample_instance(MonthEndHouseholdOutcome),),
         )
+    if cls is TaxScenarioResult:
+        return TaxScenarioResult(
+            overlays=TaxScenarioOverlays(),
+            baseline_tax=Decimal("1000"),
+            scenario_tax=Decimal("1100"),
+            tax_delta=Decimal("100"),
+        )
+    if cls is ProvenanceManifest:
+        return ProvenanceManifest(
+            generator_version="test",
+            seed=42,
+            cohort_id="cohort_test",
+            axiom_set_hash="hash_test",
+            rung=1,
+        )
+    if cls is WashSaleSellEvent:
+        return WashSaleSellEvent(
+            lot_id="lot_test",
+            sell_date=date(2026, 3, 1),
+        )
+    if cls is StockSplitAction:
+        return StockSplitAction(
+            security_id="sec_test",
+            ratio=Decimal("2"),
+        )
+    if cls is CustodianPositionRecord:
+        return CustodianPositionRecord(
+            account_id="acct_test",
+            ticker="AAPL",
+            quantity=Decimal("100"),
+            as_of_date=date(2026, 6, 24),
+        )
+    if cls is RiskAssumptions:
+        return assumptions_for("base")
+    if cls is StressOverlay:
+        return StressOverlay(
+            stress_regime="crisis",
+            stress_target_weights={IpsSleeve.EQUITY: Decimal("0.5")},
+            stress_delta_w={IpsSleeve.EQUITY: Decimal("0.1")},
+            regime_gap_l1=Decimal("0.2"),
+            stress_objective_value=Decimal("0.05"),
+        )
+    if cls is HouseholdRiskManifest:
+        portfolio = AssetPortfolio(
+            allocations=[
+                AllocationSlot(
+                    asset_class=AssetClass.EQUITY,
+                    weight=Decimal("1"),
+                )
+            ],
+        )
+        return HouseholdRiskManifest(
+            portfolio=portfolio,
+            notional_usd=Decimal("1000000"),
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
 
 
@@ -535,6 +606,22 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "household_id"
     if isinstance(instance, MonthEndReportingResult):
         return "correlation_id"
+    if isinstance(instance, TaxScenarioResult):
+        return "tax_delta"
+    if isinstance(instance, ProvenanceManifest):
+        return "seed"
+    if isinstance(instance, WashSaleSellEvent):
+        return "lot_id"
+    if isinstance(instance, StockSplitAction):
+        return "security_id"
+    if isinstance(instance, CustodianPositionRecord):
+        return "ticker"
+    if isinstance(instance, RiskAssumptions):
+        return "regime"
+    if isinstance(instance, StressOverlay):
+        return "stress_regime"
+    if isinstance(instance, HouseholdRiskManifest):
+        return "notional_usd"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 

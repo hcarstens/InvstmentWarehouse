@@ -90,7 +90,9 @@ def _ledger_positions(
     ctx: DispatchContext, p: LedgerPositionsPayload
 ) -> PositionSet:
     return PositionSet(
-        positions=list_lot_positions(ctx.session, household_id=p.household_id)
+        positions=list_lot_positions(
+            ctx.require_session(), household_id=p.household_id
+        )
     )
 
 
@@ -220,7 +222,7 @@ def _pm_advise(ctx: DispatchContext, p: PmAdvisePayload) -> AdviceBundle:
 
 def _ingest_run(ctx: DispatchContext, p: IngestRunPayload) -> IngestRunSummary:
     return run_custodian_ingest(
-        ctx.session,
+        ctx.require_session(),
         Path(p.path),
         custodian_id=p.custodian_id,
         household_id=p.household_id,
@@ -233,7 +235,7 @@ def _ledger_reconcile(
 ) -> ReconcileResult:
     return ReconcileResult(
         breaks=reconcile_ingest(
-            ctx.session,
+            ctx.require_session(),
             p.ingest_run_id,
             household_id=p.household_id,
             actor_id=ctx.actor_id,
@@ -247,7 +249,7 @@ def _optimizer_persist(
     # queue_approval=False: persisting is just persisting. The approval is a
     # separate `approval.create` op (no fused persist+queue — S2).
     return persist_optimization(
-        ctx.session,
+        ctx.require_session(),
         p.result,
         input_snapshot_id=p.input_snapshot_id,
         actor_id=ctx.actor_id,
@@ -261,13 +263,13 @@ def _approval_create(
     # Payload validator guarantees exactly one subject is set.
     if p.report_snapshot_id is not None:
         return create_report_approval_request(
-            ctx.session,
+            ctx.require_session(),
             report_snapshot_id=p.report_snapshot_id,
             household_id=p.household_id,
         )
     assert p.optimization_run_id is not None  # XOR validator
     return create_approval_request(
-        ctx.session, p.optimization_run_id, p.household_id
+        ctx.require_session(), p.optimization_run_id, p.household_id
     )
 
 
@@ -275,7 +277,7 @@ def _approval_decide(
     ctx: DispatchContext, p: ApprovalDecidePayload
 ) -> ApprovalRequestView:
     return update_approval_status(
-        ctx.session,
+        ctx.require_session(),
         p.request_id,
         status=p.status,
         reviewer_id=p.reviewer_id,
@@ -285,7 +287,9 @@ def _approval_decide(
 def _orders_stage(ctx: DispatchContext, p: OrdersStagePayload) -> StagedOrders:
     return StagedOrders(
         orders=stage_orders_from_approval(
-            ctx.session, p.approval_request_id, actor_id=ctx.actor_id
+            ctx.require_session(),
+            p.approval_request_id,
+            actor_id=ctx.actor_id,
         )
     )
 
@@ -294,7 +298,7 @@ def _report_build(
     ctx: DispatchContext, p: ReportBuildPayload
 ) -> WrittenHouseholdReport:
     return build_and_write_household_reports(
-        ctx.session,
+        ctx.require_session(),
         p.household_id,
         period_label=p.period_label,
         as_of_date=p.as_of_date,
