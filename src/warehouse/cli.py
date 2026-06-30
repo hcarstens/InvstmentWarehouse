@@ -653,6 +653,69 @@ def test_mutation() -> None:
     click.echo(f"Mutation report written to {path.name} in runs/testing/")
 
 
+@main.command("pm-workout")
+@click.option(
+    "--seed", default=42, show_default=True, help="Deterministic seed."
+)
+@click.option("--as-of", "as_of", type=click.DateTime(formats=["%Y-%m-%d"]))
+@click.option(
+    "--cohort",
+    default=None,
+    help="Run a single cohort (default: all four HNW cohorts).",
+)
+@click.option(
+    "--rung",
+    default=None,
+    type=int,
+    help="Rung for --cohort (default 3; concentrated_stress 4).",
+)
+@click.option(
+    "--out",
+    "out_path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Output path (default runs/pm_workout/...).",
+)
+def pm_workout(
+    seed: int,
+    as_of: datetime | None,
+    cohort: str | None,
+    rung: int | None,
+    out_path: Path | None,
+) -> None:
+    """Drive pm.advise over synthetic cohorts; write a Markdown workout.
+
+    In-process — no DB, no external services. Each cohort generates a
+    portfolio + IPS, dispatches `pm.advise`, and renders the AdviceBundle.
+    """
+    from warehouse.decision.pm_workout import (
+        write_pm_workout,
+    )
+
+    if rung is not None and cohort is None:
+        raise click.UsageError("--rung requires --cohort.")
+    combos: tuple[tuple[str, int], ...] | None = None
+    if cohort is not None:
+        combos = ((cohort, rung if rung is not None else 3),)
+
+    as_of_date = as_of.date() if as_of is not None else None
+    path, cases = write_pm_workout(
+        combos=combos,
+        seed=seed,
+        as_of=as_of_date,
+        out_path=out_path,
+    )
+    click.echo(f"PM workout written to {path} ({len(cases)} households)")
+    for case in cases:
+        o = case.advice
+        head = o.narrative.headline if o.narrative is not None else "—"
+        click.echo(
+            f"  {case.cohort_id}: trades={len(o.proposal.trades)} "
+            f"alerts={len(o.drift.alerts)}+"
+            f"{len(o.drift.concentration_alerts)} → {head}"
+        )
+
+
 @main.command()
 def info() -> None:
     """Print platform planes and build order."""

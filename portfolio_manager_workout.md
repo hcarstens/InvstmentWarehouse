@@ -6,6 +6,7 @@ End-to-end run of the Investment Warehouse decision stack, driven from the **Por
 - **Seed:** 42 (deterministic, replayable)
 - **Dispatch:** `op=pm.advise` · `kind=EVALUATE` (pure, no mutation)
 - **Persona lens:** [Persona of The Portfolio Manager](docs/heuristics/Persona%20of%20The%20Portfolio%20Manager.md) — the 7-axiom ℍ_Allocation diagnostic
+- **Track:** `pm_workout` (pmw) — see [docs/pm_workout_implementation.md](docs/pm_workout_implementation.md)
 - **Households run:** 4 (one per HNW cohort)
 
 ## Run ledger
@@ -21,7 +22,7 @@ End-to-end run of the Investment Warehouse decision stack, driven from the **Por
 
 ## general_hnw — `synthetic-general_hnw-s42`
 
-NAV **$10,000,000** · rung 3 · correlation_id `pm-workout-general_hnw` · IPS `ips_synthetic-general_hnw-s42_v1` (v1, eff. 2024-01-15)
+NAV **$10,000,000** · rung 3 · correlation_id `pmw-general_hnw-s42` · IPS `ips_synthetic-general_hnw-s42_v1` (v1, eff. 2024-01-15)
 
 ### 1 · Synthetic portfolio vs IPS policy
 
@@ -121,7 +122,7 @@ Specialist legs: analyst=`live`, optimizer=`live`, risk=`live`, tax=`stub`
 
 ## uhnw_inherited — `synthetic-uhnw_inherited-s42`
 
-NAV **$10,000,000** · rung 3 · correlation_id `pm-workout-uhnw_inherited` · IPS `ips_synthetic-uhnw_inherited-s42_v1` (v1, eff. 2024-01-15)
+NAV **$10,000,000** · rung 3 · correlation_id `pmw-uhnw_inherited-s42` · IPS `ips_synthetic-uhnw_inherited-s42_v1` (v1, eff. 2024-01-15)
 
 ### 1 · Synthetic portfolio vs IPS policy
 
@@ -226,7 +227,7 @@ Specialist legs: analyst=`live`, optimizer=`live`, risk=`live`, tax=`stub`
 
 ## founder_executive — `synthetic-founder_executive-s42`
 
-NAV **$10,000,000** · rung 3 · correlation_id `pm-workout-founder_executive` · IPS `ips_synthetic-founder_executive-s42_v1` (v1, eff. 2024-01-15)
+NAV **$10,000,000** · rung 3 · correlation_id `pmw-founder_executive-s42` · IPS `ips_synthetic-founder_executive-s42_v1` (v1, eff. 2024-01-15)
 
 ### 1 · Synthetic portfolio vs IPS policy
 
@@ -320,7 +321,7 @@ Specialist legs: analyst=`live`, optimizer=`live`, risk=`live`, tax=`stub`
 
 ## concentrated_stress — `synthetic-concentrated_stress-s42`
 
-NAV **$10,000,000** · rung 4 · correlation_id `pm-workout-concentrated_stress` · IPS `ips_synthetic-concentrated_stress-s42_v1` (v1, eff. 2024-01-15)
+NAV **$10,000,000** · rung 4 · correlation_id `pmw-concentrated_stress-s42` · IPS `ips_synthetic-concentrated_stress-s42_v1` (v1, eff. 2024-01-15)
 
 ### 1 · Synthetic portfolio vs IPS policy
 
@@ -421,4 +422,4 @@ Specialist legs: analyst=`live`, optimizer=`live`, risk=`live`, tax=`stub`
 4. **Dispatch from the PM** — `dispatch_typed(ctx, msg, AdviceBundle)` routes through `warehouse.messaging.core`; the `pm.advise` coordinator nest-dispatches each specialist leg under the same `correlation_id`.
 5. **Result** — one frozen `AdviceBundle` carrying the risk report, the optimizer recommendation (TLH trades + MV rebalance), the tax scenario, the IPS drift report, attribution, and the PM narrative.
 
-Re-run: `python scratchpad/pm_workout.py` (in-process, no database, no external services).
+Re-run: `warehouse pm-workout` (in-process, no database, no external services).
