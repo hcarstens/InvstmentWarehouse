@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 from hypothesis import given
@@ -136,12 +137,28 @@ def _seed_perf_household(
 
 
 def test_known_two_lot_mv_and_unrealized() -> None:
-    hh = "hh_perf_two"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_perf_two_{suffix}"
     lot_specs = [
-        ("lot_a", "sec_x", Decimal("10"), Decimal("100"), date(2024, 1, 1)),
-        ("lot_b", "sec_y", Decimal("5"), Decimal("200"), date(2024, 6, 1)),
+        (
+            f"lot_a_{suffix}",
+            f"sec_x_{suffix}",
+            Decimal("10"),
+            Decimal("100"),
+            date(2024, 1, 1),
+        ),
+        (
+            f"lot_b_{suffix}",
+            f"sec_y_{suffix}",
+            Decimal("5"),
+            Decimal("200"),
+            date(2024, 6, 1),
+        ),
     ]
-    marks = [("sec_x", Decimal("110")), ("sec_y", Decimal("210"))]
+    marks = [
+        (f"sec_x_{suffix}", Decimal("110")),
+        (f"sec_y_{suffix}", Decimal("210")),
+    ]
     expected_mv = _independent_mv(
         [(Decimal("10"), Decimal("110")), (Decimal("5"), Decimal("210"))]
     )
@@ -180,15 +197,16 @@ def test_empty_household_zero_mv() -> None:
 
 
 def test_missing_mark_treated_loudly() -> None:
-    hh = "hh_perf_nomark"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_perf_nomark_{suffix}"
     with session_scope() as session:
         _seed_perf_household(
             session,
             household_id=hh,
             lots=[
                 (
-                    "lot_nomark",
-                    "sec_unmarked",
+                    f"lot_nomark_{suffix}",
+                    f"sec_unmarked_{suffix}",
                     Decimal("1"),
                     Decimal("50"),
                     date(2024, 1, 1),
@@ -286,20 +304,21 @@ def test_demo_household_matches_independent_oracle() -> None:
 
 def test_ytd_realized_wired_through_build() -> None:
     """Integration — persisted events flow through build without mocks."""
-    hh = "hh_ytd_integration"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_ytd_integration_{suffix}"
     events = [
         (
-            "rg_ytd_int_in",
+            f"rg_ytd_int_in_{suffix}",
             date(2026, 3, 10),
             Decimal("2500"),
         ),
         (
-            "rg_ytd_int_prior",
+            f"rg_ytd_int_prior_{suffix}",
             date(2025, 12, 31),
             Decimal("999"),
         ),
         (
-            "rg_ytd_int_after",
+            f"rg_ytd_int_after_{suffix}",
             date(2026, 7, 1),
             Decimal("500"),
         ),
@@ -336,7 +355,8 @@ def test_ytd_realized_wired_through_build() -> None:
 
 
 def test_ytd_jan1_boundary_included() -> None:
-    hh = "hh_ytd_jan1"
+    suffix = uuid4().hex[:8]
+    hh = f"hh_ytd_jan1_{suffix}"
     jan1 = date(AS_OF.year, 1, 1)
     with session_scope() as session:
         session.add(
@@ -349,7 +369,7 @@ def test_ytd_jan1_boundary_included() -> None:
         )
         session.add(
             RealizedGainEventRow(
-                event_id="rg_jan1",
+                event_id=f"rg_jan1_{suffix}",
                 household_id=hh,
                 event_date=jan1,
                 amount=Decimal("100"),

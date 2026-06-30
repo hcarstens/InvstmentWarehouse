@@ -11,8 +11,15 @@ import pytest
 
 from warehouse.data.ledger import Lot
 from warehouse.data.security_master import AssetClass, Security, TaxCharacter
+from warehouse.infra.db.bootstrap import bootstrap_database
 
 _FAKE_PDF = b"%PDF-1.4\n% fake report writer test pdf\n"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_bootstrap_database() -> None:
+    """Migrate + seed once per pytest session (CI and local parity)."""
+    bootstrap_database(seed=True)
 
 
 @pytest.fixture

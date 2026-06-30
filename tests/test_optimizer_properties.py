@@ -10,7 +10,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from hypothesis import assume, given
+from hypothesis import assume, given, settings
 from hypothesis import strategies as st
 
 from warehouse.data.ledger.views import LotPositionView
@@ -242,6 +242,12 @@ def _bond_heavy_positions() -> list[LotPositionView]:
 # --- solve_qp / projection properties ----------------------------------------
 
 
+# solve_qp is iterative (up to 5000 steps); Hypothesis' 200ms default deadline
+# flakes under full-suite / CI load — properties assert math, not latency.
+_QP_HYPOTHESIS = settings(deadline=None)
+
+
+@_QP_HYPOTHESIS
 @given(problem=qp_problem())
 def test_solve_qp_budget_sums_to_one(problem: QpProblem) -> None:
     mu, sigma, w_min, w_max, lam = problem
@@ -249,6 +255,7 @@ def test_solve_qp_budget_sums_to_one(problem: QpProblem) -> None:
     assert _oracle_budget_sum(w)
 
 
+@_QP_HYPOTHESIS
 @given(problem=qp_problem())
 def test_solve_qp_respects_box_bounds(problem: QpProblem) -> None:
     mu, sigma, w_min, w_max, lam = problem
@@ -292,6 +299,7 @@ def test_project_capped_simplex_random_v(
     assert _oracle_box_feasible(w, w_min, w_max)
 
 
+@_QP_HYPOTHESIS
 @given(
     lam_spread=st.floats(
         min_value=2.0,
@@ -384,6 +392,7 @@ def test_infeasible_box_sum_w_max_property(undershoot: float) -> None:
 # --- turnover budget (run_mv_rebalance) --------------------------------------
 
 
+@_QP_HYPOTHESIS
 @given(
     budget=st.decimals(
         min_value=Decimal("0.05"),

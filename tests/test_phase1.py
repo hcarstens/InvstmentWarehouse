@@ -10,6 +10,8 @@ from warehouse.infra.db.schema_status import HEAD_REVISION, build_schema_status
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
 from warehouse.workflows.catalog import WORKFLOW_CATALOG
 
+_DEMO_TICKERS = frozenset({"VTI", "BND", "AAPL"})
+
 
 def test_migration_at_head() -> None:
     get_settings.cache_clear()
@@ -43,7 +45,8 @@ def test_security_master_search() -> None:
     with session_scope() as session:
         all_secs = list_securities(session)
         vti = list_securities(session, query="VTI")
-    assert len(all_secs) == 3
+    tickers = {s.ticker for s in all_secs if s.ticker}
+    assert _DEMO_TICKERS.issubset(tickers)
     assert len(vti) == 1
     assert vti[0].ticker == "VTI"
 
@@ -52,7 +55,8 @@ def test_phase1_dashboard_loads() -> None:
     data = load_phase1_dashboard()
     assert data.error is None
     assert len(data.entity_graph.entities) >= 6
-    assert len(data.securities) == 3
+    tickers = {s.ticker for s in data.securities if s.ticker}
+    assert _DEMO_TICKERS.issubset(tickers)
     assert data.schema_status.is_current
 
 

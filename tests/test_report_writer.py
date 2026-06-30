@@ -67,12 +67,6 @@ def _resolve_open_breaks(session) -> None:
     session.flush()
 
 
-@pytest.fixture(scope="module", autouse=True)
-def _bootstrap_report_writer_module_db() -> Iterator[None]:
-    bootstrap_database(seed=True)
-    yield
-
-
 @pytest.fixture
 def seeded() -> Iterator[None]:
     bootstrap_database(seed=True)
