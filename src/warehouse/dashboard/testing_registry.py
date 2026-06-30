@@ -76,6 +76,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         note=(
             "Wash-sale chain merge (qa3); "
             "corporate-action basis oracle (qa4); "
+            "beneficiary_of graph edges (qa8); "
             "H2 partial-qty + ST6 boundary extension"
         ),
     ),

@@ -30,6 +30,9 @@ from warehouse.workflows.catalog import WORKFLOW_CATALOG
 
 DEMO_HOUSEHOLD_ID = "hh_smith"
 
+BENEFICIARY_ALEX_ID = "beneficiary_alex_smith"
+BENEFICIARY_MORGAN_ID = "beneficiary_morgan_smith"
+
 
 def _demo_ips_statement() -> InvestmentPolicyStatement:
     return InvestmentPolicyStatement(
@@ -92,6 +95,71 @@ def seed_demo_lots(session: Session) -> None:
             acquisition_date=date(2025, 3, 1),
         )
     )
+
+
+def seed_beneficiary_edges(session: Session) -> None:
+    """IRA + trust beneficiary designations on the demo graph (qa8)."""
+    beneficiaries = (
+        EntityRow(
+            entity_id=BENEFICIARY_ALEX_ID,
+            entity_type=EntityType.BENEFICIARY,
+            name="Alex Smith",
+            household_id=DEMO_HOUSEHOLD_ID,
+        ),
+        EntityRow(
+            entity_id=BENEFICIARY_MORGAN_ID,
+            entity_type=EntityType.BENEFICIARY,
+            name="Morgan Smith",
+            household_id=DEMO_HOUSEHOLD_ID,
+        ),
+    )
+    for row in beneficiaries:
+        if session.get(EntityRow, row.entity_id) is None:
+            session.add(row)
+
+    designation_edges = (
+        (BENEFICIARY_ALEX_ID, "acct_ira"),
+        (BENEFICIARY_MORGAN_ID, "trust_smith_rev"),
+    )
+    for source_id, target_id in designation_edges:
+        exists = session.scalar(
+            select(EntityRelationshipRow.id)
+            .where(
+                EntityRelationshipRow.source_id == source_id,
+                EntityRelationshipRow.target_id == target_id,
+                EntityRelationshipRow.relationship_type
+                == RelationshipType.BENEFICIARY_OF,
+            )
+            .limit(1)
+        )
+        if exists is None:
+            session.add(
+                EntityRelationshipRow(
+                    source_id=source_id,
+                    target_id=target_id,
+                    relationship_type=RelationshipType.BENEFICIARY_OF,
+                )
+            )
+
+    for beneficiary_id in (BENEFICIARY_ALEX_ID, BENEFICIARY_MORGAN_ID):
+        exists = session.scalar(
+            select(EntityRelationshipRow.id)
+            .where(
+                EntityRelationshipRow.source_id == DEMO_HOUSEHOLD_ID,
+                EntityRelationshipRow.target_id == beneficiary_id,
+                EntityRelationshipRow.relationship_type
+                == RelationshipType.AGGREGATES,
+            )
+            .limit(1)
+        )
+        if exists is None:
+            session.add(
+                EntityRelationshipRow(
+                    source_id=DEMO_HOUSEHOLD_ID,
+                    target_id=beneficiary_id,
+                    relationship_type=RelationshipType.AGGREGATES,
+                )
+            )
 
 
 def seed_phase4_extensions(session: Session) -> None:
@@ -282,6 +350,7 @@ def seed_demo_data(session: Session) -> bool:
         seed_market_prices(session)
         seed_ips_policy(session)
         seed_demo_lots(session)
+        seed_beneficiary_edges(session)
         seed_phase4_extensions(session)
         seed_realized_gain_events(session)
         _sync_workflow_definitions(session)
@@ -334,6 +403,18 @@ def seed_demo_data(session: Session) -> bool:
             entity_id="acct_fidelity",
             entity_type=EntityType.ACCOUNT,
             name="Fidelity Taxable",
+            household_id=DEMO_HOUSEHOLD_ID,
+        ),
+        EntityRow(
+            entity_id=BENEFICIARY_ALEX_ID,
+            entity_type=EntityType.BENEFICIARY,
+            name="Alex Smith",
+            household_id=DEMO_HOUSEHOLD_ID,
+        ),
+        EntityRow(
+            entity_id=BENEFICIARY_MORGAN_ID,
+            entity_type=EntityType.BENEFICIARY,
+            name="Morgan Smith",
             household_id=DEMO_HOUSEHOLD_ID,
         ),
     ]
@@ -397,6 +478,26 @@ def seed_demo_data(session: Session) -> bool:
             source_id="acct_fidelity",
             target_id="custodian_fidelity",
             relationship_type=RelationshipType.CUSTODIED_AT,
+        ),
+        EntityRelationshipRow(
+            source_id=BENEFICIARY_ALEX_ID,
+            target_id="acct_ira",
+            relationship_type=RelationshipType.BENEFICIARY_OF,
+        ),
+        EntityRelationshipRow(
+            source_id=BENEFICIARY_MORGAN_ID,
+            target_id="trust_smith_rev",
+            relationship_type=RelationshipType.BENEFICIARY_OF,
+        ),
+        EntityRelationshipRow(
+            source_id=DEMO_HOUSEHOLD_ID,
+            target_id=BENEFICIARY_ALEX_ID,
+            relationship_type=RelationshipType.AGGREGATES,
+        ),
+        EntityRelationshipRow(
+            source_id=DEMO_HOUSEHOLD_ID,
+            target_id=BENEFICIARY_MORGAN_ID,
+            relationship_type=RelationshipType.AGGREGATES,
         ),
     ]
     securities = [

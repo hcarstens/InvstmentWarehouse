@@ -320,6 +320,19 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         ),
         falsifier_test="tests/test_walk_forward_guard.py",
     ),
+    BuildDeliverable(
+        id="qa8-beneficiary-edges",
+        track="qa_plan",
+        slice="qa8",
+        name="Beneficiary graph edges on entity graph",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "beneficiary_of on IRA + trust; graph oracle in "
+            "test_phase1.py; /data panel shows edges"
+        ),
+        falsifier_test="tests/test_phase1.py",
+    ),
 ]
 
 RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (

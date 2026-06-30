@@ -1,8 +1,11 @@
 """Entity graph — Person, Household, Trust, LLC, Account, Custodian.
 
+Beneficiary nodes use ``beneficiary_of`` edges to accounts and trusts.
+
 Graph (v0):
   Person ──owns──> Trust ──holds──> Account ──custodied_at──> Custodian
-  Household ──aggregates──> Person, Trust, Account
+  Household ──aggregates──> Person, Trust, Account, Beneficiary
+  Beneficiary ──beneficiary_of──> Account | Trust
 """
 
 from enum import StrEnum

@@ -472,7 +472,7 @@ boundary concentration (ST6), coverage never gates `ok` (ST3).
 | Plane | Gap | Notes |
 | --- | --- | --- |
 | **Execution** | Multi-custodian break taxonomy; OMS cancel/replace | Next QA3 priority |
-| **Data** | Wash-sale chain boundaries; corporate actions; beneficiary edges | `test_lot_properties.py` extension |
+| **Data** | Wash-sale chain boundaries; corporate actions | qa8 beneficiary edges shipped |
 | **Decision** | — | qa5 shipped (`test_optimizer_properties.py`, `test_optimizer_qp.py`) |
 | **Research** | Explicit `WalkForwardError` coverage expansion | Partial in `test_phase3.py` |
 | **Reporting** | Decision estimator seam (po1-tax) | qa7 after-tax YTD shipped |
