@@ -243,7 +243,7 @@ pytest tests/test_phase2.py tests/test_phase4.py -q
 
 | Area | Oracle | Primary tests | Gaps |
 | --- | --- | --- | --- |
-| Performance | Known return series | `tests/test_reporting_performance.py` | After-tax return YTD |
+| Performance | Known return series | `tests/test_reporting_performance.py` | — (qa7 shipped) |
 | Tax scenarios | Scenario → liability | `tests/test_reporting_tax.py` (reporting-owned) | Decision estimator internals (po1-tax seam) |
 
 **Falsifier:**
@@ -253,8 +253,7 @@ pytest tests/test_reporting_performance.py tests/test_reporting_tax.py -q
 ```
 
 **Rule:** Reporting plane is `live` in `status.py` with dedicated
-`tests/test_reporting_*.py`. Remaining gaps: after-tax return YTD, decision
-estimator seam (po1-tax).
+`tests/test_reporting_*.py`. Remaining gap: decision estimator seam (po1-tax).
 
 ### 4.6 Infrastructure (`warehouse.infra`) — baseline 86.6% · floor 85% · readiness `live`
 
@@ -476,7 +475,7 @@ boundary concentration (ST6), coverage never gates `ok` (ST3).
 | **Data** | Wash-sale chain boundaries; corporate actions; beneficiary edges | `test_lot_properties.py` extension |
 | **Decision** | — | qa5 shipped (`test_optimizer_properties.py`, `test_optimizer_qp.py`) |
 | **Research** | Explicit `WalkForwardError` coverage expansion | Partial in `test_phase3.py` |
-| **Reporting** | After-tax return YTD | `after_tax_return_ytd` still `None` |
+| **Reporting** | Decision estimator seam (po1-tax) | qa7 after-tax YTD shipped |
 | **Infra** | Postgres/Redis; migration rollback | Phase 5 |
 
 ---

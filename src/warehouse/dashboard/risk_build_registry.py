@@ -262,7 +262,10 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         name="After-tax return YTD with hand-math oracle",
         status="shipped",
         doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
-        note="compute_after_tax_return_ytd; version-pinned LTCG drag",
+        note=(
+            "compute_after_tax_return_ytd; version-pinned LTCG drag; "
+            "dashboard After-tax YTD column"
+        ),
         falsifier_test="tests/test_reporting_performance.py",
     ),
     BuildDeliverable(

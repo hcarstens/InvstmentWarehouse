@@ -154,6 +154,7 @@ def test_reporting_page_loads() -> None:
     html = render_reporting_page()
     assert "Tax scenario panel" in html
     assert "partial" in html
+    assert "After-tax YTD" in html
     assert "Reconciliation queue" not in html
     assert "Staged orders" not in html
 

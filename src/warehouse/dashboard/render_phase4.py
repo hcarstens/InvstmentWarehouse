@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import html
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from warehouse.dashboard.phase4_data import Phase4DashboardData
@@ -181,6 +182,13 @@ def render_tax_scenario_section(phase4: Phase4DashboardData) -> str:
   </section>"""
 
 
+def _fmt_return_ratio(value: Decimal | None) -> str:
+    """Format a return ratio for dashboard display — n/a when unset."""
+    if value is None:
+        return "n/a"
+    return f"{value * Decimal('100'):.2f}%"
+
+
 def render_performance_section(
     perf: ReportingPerformanceData,
 ) -> str:
@@ -206,6 +214,7 @@ def render_performance_section(
   </section>"""
 
     r = perf.report
+    after_tax = _fmt_return_ratio(r.after_tax_return_ytd)
     return f"""{error}
   <section>
     <h2>Household performance — {html.escape(perf.household_id)}</h2>
@@ -213,11 +222,13 @@ def render_performance_section(
        as of {html.escape(r.as_of_date)} ·
        <code>build_household_performance_report</code></p>
     <table>
-      <thead><tr><th>Total MV</th><th>Unrealized</th><th>Realized YTD</th></tr></thead>
+      <thead><tr><th>Total MV</th><th>Unrealized</th>
+        <th>Realized YTD</th><th>After-tax YTD</th></tr></thead>
       <tbody><tr>
         <td>{r.total_market_value:,.2f}</td>
         <td>{r.unrealized_gain:,.2f}</td>
         <td>{r.realized_gain_ytd:,.2f}</td>
+        <td>{after_tax}</td>
       </tr></tbody>
     </table>
   </section>"""

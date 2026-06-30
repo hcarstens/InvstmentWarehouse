@@ -490,6 +490,90 @@ def test_after_tax_return_ytd_zero_cost_basis_none() -> None:
     assert report.after_tax_return_ytd is None
 
 
+def test_after_tax_return_ytd_negative_realized_no_tax_drag() -> None:
+    """qa7/ST6 — realized loss YTD must not add tax drag."""
+    suffix = uuid4().hex[:8]
+    hh = f"hh_at_loss_{suffix}"
+    ltcg = Decimal(str(get_settings().fed_ltcg_rate))
+    with session_scope() as session:
+        _seed_perf_household(
+            session,
+            household_id=hh,
+            lots=[
+                (
+                    f"lot_loss_{suffix}",
+                    f"sec_loss_{suffix}",
+                    Decimal("10"),
+                    Decimal("100"),
+                    date(2024, 1, 1),
+                ),
+            ],
+            prices=[(f"sec_loss_{suffix}", Decimal("120"))],
+        )
+        session.add(
+            RealizedGainEventRow(
+                event_id=f"rg_loss_{suffix}",
+                household_id=hh,
+                event_date=date(2026, 4, 1),
+                amount=Decimal("-500"),
+            )
+        )
+        session.flush()
+        report = build_household_performance_report(
+            session,
+            household_id=hh,
+            as_of=AS_OF,
+        )
+    expected = _oracle_after_tax_ytd(
+        total_mv=Decimal("1200"),
+        total_cost=Decimal("1000"),
+        realized_ytd=Decimal("-500"),
+        ltcg_rate=ltcg,
+    )
+    assert report.after_tax_return_ytd == expected
+    assert report.after_tax_return_ytd == Decimal("0.2")
+
+
+def test_after_tax_return_ytd_zero_realized_equals_gross() -> None:
+    """qa7 — no YTD events → after-tax equals gross return."""
+    suffix = uuid4().hex[:8]
+    hh = f"hh_at_zero_rg_{suffix}"
+    with session_scope() as session:
+        _seed_perf_household(
+            session,
+            household_id=hh,
+            lots=[
+                (
+                    f"lot_z_{suffix}",
+                    f"sec_z_{suffix}",
+                    Decimal("10"),
+                    Decimal("100"),
+                    date(2024, 1, 1),
+                ),
+            ],
+            prices=[(f"sec_z_{suffix}", Decimal("110"))],
+        )
+        report = build_household_performance_report(
+            session,
+            household_id=hh,
+            as_of=AS_OF,
+        )
+    gross = (Decimal("1100") - Decimal("1000")) / Decimal("1000")
+    assert report.realized_gain_ytd == Decimal("0")
+    assert report.after_tax_return_ytd == gross
+
+
+def test_compute_after_tax_zero_cost_basis_raises() -> None:
+    """qa7 — zero NAV must fail loudly, not return a default."""
+    with pytest.raises(PerformanceError, match="positive cost basis"):
+        compute_after_tax_return_ytd(
+            total_market_value=Decimal("100"),
+            total_cost_basis=Decimal("0"),
+            realized_gain_ytd=Decimal("0"),
+            fed_ltcg_rate=Decimal("0.20"),
+        )
+
+
 def _position_view(
     *,
     lot_id: str,
