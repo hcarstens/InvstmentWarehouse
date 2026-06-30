@@ -228,8 +228,57 @@ RISK_HNW_DELIVERABLES: list[BuildDeliverable] = [
     ),
 ]
 
+QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
+    BuildDeliverable(
+        id="qa3-wash-sale-properties",
+        track="qa_plan",
+        slice="qa3",
+        name="Wash-sale window property falsifiers",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "Independent oracle on evaluate_wash_sale_risk "
+            "+ chain id invariant"
+        ),
+        falsifier_test="tests/test_lot_properties.py",
+    ),
+    BuildDeliverable(
+        id="qa5-optimizer-edges",
+        track="qa_plan",
+        slice="qa5",
+        name="Near-singular Σ + all-constraints-binding QP edges",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note="Raises on infeasible box; fixed point when w_min = w_max",
+        falsifier_test="tests/test_optimizer_properties.py",
+    ),
+    BuildDeliverable(
+        id="qa7-after-tax-ytd",
+        track="qa_plan",
+        slice="qa7",
+        name="After-tax return YTD with hand-math oracle",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note="compute_after_tax_return_ytd; version-pinned LTCG drag",
+        falsifier_test="tests/test_reporting_performance.py",
+    ),
+    BuildDeliverable(
+        id="qa1-break-taxonomy",
+        track="qa_plan",
+        slice="qa1",
+        name="Multi-custodian reconciliation break taxonomy",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "ReconBreakType on breaks + symbology_mismatch "
+            "+ dashboard Type column"
+        ),
+        falsifier_test="tests/test_phase4.py",
+    ),
+]
+
 RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (
-    SYNTHETIC_IPS_DELIVERABLES + RISK_HNW_DELIVERABLES
+    SYNTHETIC_IPS_DELIVERABLES + RISK_HNW_DELIVERABLES + QA_PLAN_DELIVERABLES
 )
 
 SYNTHETIC_IPS_PIPELINE = "si0a → si0b → si1 → si2 → si3 → si4"

@@ -83,6 +83,7 @@ def render_phase2_execution_sections(phase2: Phase2DashboardData) -> str:
     """Reconciliation + daily refresh — execution plane page."""
     break_rows = "".join(
         f"<tr><td>{html.escape(b.break_id)}</td>"
+        f"<td>{html.escape(b.break_type.value)}</td>"
         f"<td>{html.escape(b.account_id)}</td>"
         f"<td>{html.escape(b.description)}</td>"
         f"<td>{html.escape(b.opened_at.isoformat())}</td>"
@@ -106,8 +107,8 @@ def render_phase2_execution_sections(phase2: Phase2DashboardData) -> str:
   <section>
     <h2>Reconciliation queue</h2>
     <table>
-      <thead><tr><th>Break</th><th>Account</th><th>Description</th><th>Opened</th><th>Status</th></tr></thead>
-      <tbody>{break_rows or '<tr><td colspan="5">No open breaks</td></tr>'}</tbody>
+      <thead><tr><th>Break</th><th>Type</th><th>Account</th><th>Description</th><th>Opened</th><th>Status</th></tr></thead>
+      <tbody>{break_rows or '<tr><td colspan="6">No open breaks</td></tr>'}</tbody>
     </table>
   </section>
 

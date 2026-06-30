@@ -16,6 +16,9 @@ from hypothesis import strategies as st
 
 from warehouse.data.ingest.schwab_csv import parse_custodian_csv
 from warehouse.data.ledger import Lot
+from warehouse.data.ledger.views import LotPositionView
+from warehouse.data.security_master import AssetClass
+from warehouse.decision.constraints import evaluate_wash_sale_risk
 
 # --- independent oracles -----------------------------------------------------
 
@@ -167,3 +170,108 @@ def test_parse_custodian_csv_no_rows(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="No position rows"):
         parse_custodian_csv(path)
+
+
+# --- wash-sale chain / window invariants (qa3) -------------------------------
+
+
+def _oracle_wash_triggers(
+    lot: LotPositionView,
+    positions: list[LotPositionView],
+    *,
+    as_of: date,
+    window_days: int = 30,
+) -> list[str]:
+    """Independent oracle — same security or substitute group within window."""
+    triggers: list[str] = []
+    for other in positions:
+        if other.lot_id == lot.lot_id:
+            continue
+        same_sec = lot.security_id == other.security_id
+        group = lot.wash_sale_substitute_group
+        same_group = (
+            group is not None and group == other.wash_sale_substitute_group
+        )
+        if not (same_sec or same_group):
+            continue
+        if abs((other.acquisition_date - as_of).days) <= window_days:
+            triggers.append(f"wash_sale_30d:{lot.lot_id}<-{other.lot_id}")
+    return triggers
+
+
+def _lot_view(
+    *,
+    lot_id: str,
+    security_id: str,
+    acq: date,
+    wash_group: str | None = None,
+) -> LotPositionView:
+    return LotPositionView(
+        lot_id=lot_id,
+        account_id="acct_a",
+        account_name="A",
+        security_id=security_id,
+        ticker=security_id.upper(),
+        security_name=security_id,
+        security_asset_class=AssetClass.ETF,
+        quantity=Decimal("10"),
+        cost_basis_per_share=Decimal("100"),
+        total_cost_basis=Decimal("1000"),
+        market_price=Decimal("90"),
+        market_value=Decimal("900"),
+        unrealized_gain=Decimal("-100"),
+        acquisition_date=acq,
+        is_restricted=False,
+        wash_sale_substitute_group=wash_group,
+    )
+
+
+@given(
+    day_offset=st.integers(min_value=0, max_value=30),
+    as_of=st.dates(
+        min_value=date(2020, 6, 1),
+        max_value=date(2025, 6, 1),
+    ),
+)
+def test_wash_sale_trigger_matches_independent_oracle(
+    day_offset: int,
+    as_of: date,
+) -> None:
+    """qa3 — substitute-group purchase inside window must trigger wash risk."""
+    replacement_acq = as_of - timedelta(days=day_offset)
+    harvest = _lot_view(
+        lot_id="lot_harvest",
+        security_id="sec_vti",
+        acq=date(2019, 1, 1),
+        wash_group="us_equity_broad",
+    )
+    replacement = _lot_view(
+        lot_id="lot_repl",
+        security_id="sec_voo",
+        acq=replacement_acq,
+        wash_group="us_equity_broad",
+    )
+    positions = [harvest, replacement]
+    actual = evaluate_wash_sale_risk(harvest, positions, as_of=as_of)
+    expected = _oracle_wash_triggers(harvest, positions, as_of=as_of)
+    assert actual == expected
+
+
+@given(
+    chain_id=st.text(
+        alphabet=st.characters(whitelist_categories=("L", "N")),
+        min_size=4,
+        max_size=12,
+    ),
+    lots=st.lists(_LOT_STRATEGY, min_size=2, max_size=8),
+)
+def test_wash_sale_chain_id_groups_are_consistent(
+    chain_id: str,
+    lots: list[Lot],
+) -> None:
+    """Lots sharing wash_sale_chain_id reference the same chain label."""
+    for lot in lots:
+        lot.wash_sale_chain_id = chain_id
+    chained = [lot for lot in lots if lot.wash_sale_chain_id == chain_id]
+    assert len(chained) == len(lots)
+    assert {lot.wash_sale_chain_id for lot in chained} == {chain_id}

@@ -145,6 +145,10 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         coverage_glob="src/warehouse/execution/**",
         coverage_floor_pct=90.0,
         risk_tier="high",
+        note=(
+            "ReconBreakType taxonomy shipped (qa1); "
+            "OMS cancel/replace gap remains"
+        ),
     ),
     PlaneTestSlice(
         plane_id="reporting",
@@ -159,7 +163,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         coverage_glob="src/warehouse/reporting/**",
         coverage_floor_pct=80.0,
         risk_tier="medium",
-        note="Performance + reporting-owned tax scenarios (st6c)",
+        note="Performance + tax scenarios; after_tax_return_ytd shipped (qa7)",
     ),
     PlaneTestSlice(
         plane_id="infra",

@@ -77,6 +77,7 @@ def test_reconcile_stale_as_of_date_opens_break(tmp_path: Path) -> None:
             household_id=DEMO_HOUSEHOLD_ID,
         )
     assert any("stale custodian file" in b.description for b in breaks)
+    assert any(b.break_type.value == "stale_as_of" for b in breaks)
 
 
 def test_recon_quantity_mismatch_opens_break(tmp_path: Path) -> None:
@@ -108,6 +109,7 @@ def test_recon_quantity_mismatch_opens_break(tmp_path: Path) -> None:
         if "custodian=" in b.description and "ledger=" in b.description
     ]
     assert any("VTI" in b.description for b in qty_breaks)
+    assert all(b.break_type.value == "quantity_mismatch" for b in qty_breaks)
 
 
 def test_recon_ledger_only_position_opens_break(tmp_path: Path) -> None:
@@ -136,6 +138,7 @@ def test_recon_ledger_only_position_opens_break(tmp_path: Path) -> None:
         "custodian=0" in b.description and "ledger=" in b.description
         for b in breaks
     )
+    assert any(b.break_type.value == "ledger_only" for b in breaks)
 
 
 def test_recon_mixed_as_of_date_opens_break(tmp_path: Path) -> None:
@@ -162,6 +165,7 @@ def test_recon_mixed_as_of_date_opens_break(tmp_path: Path) -> None:
             household_id=DEMO_HOUSEHOLD_ID,
         )
     assert any("mixed as_of_date" in b.description for b in breaks)
+    assert any(b.break_type.value == "mixed_as_of" for b in breaks)
 
 
 def test_phase2_dashboard_loads() -> None:

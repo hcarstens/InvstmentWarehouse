@@ -1,10 +1,8 @@
 """Post-trade reconciliation — custodian vs ledger breaks → exception queue."""
 
-from pydantic import BaseModel
+from warehouse.execution.reconciliation.service import (
+    ReconBreakType,
+    ReconciliationBreak,
+)
 
-
-class ReconciliationBreak(BaseModel):
-    break_id: str
-    account_id: str
-    description: str
-    resolved: bool = False
+__all__ = ["ReconBreakType", "ReconciliationBreak"]

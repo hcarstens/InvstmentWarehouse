@@ -215,3 +215,67 @@ def test_phase4_dashboard_loads() -> None:
     assert len(data.alternative_events) >= 1
     assert len(data.tax_scenarios) >= 1
     assert len(data.custodian_positions) >= 1
+
+
+def test_symbology_conflict_typed_break(tmp_path: Path) -> None:
+    """qa1 — duplicate ISIN in security master opens symbology_mismatch."""
+    from uuid import uuid4
+
+    from warehouse.data.ingest.runner import run_custodian_ingest
+    from warehouse.data.security_master import AssetClass, TaxCharacter
+    from warehouse.execution.reconciliation.service import (
+        ReconBreakType,
+        reconcile_ingest,
+    )
+    from warehouse.infra.db.models import SecurityRow
+
+    bootstrap_database(seed=True)
+    suffix = uuid4().hex[:8]
+    isin = f"US{suffix}".ljust(12, "X")[:12]
+    ticker_a = f"T{suffix[:5].upper()}"
+    with session_scope() as session:
+        session.add(
+            SecurityRow(
+                security_id=f"sec_dup_a_{suffix}",
+                ticker=ticker_a,
+                cusip=None,
+                isin=isin,
+                name="Dup A",
+                asset_class=AssetClass.ETF,
+                tax_character=TaxCharacter.LTCG,
+                liquidity_tier=1,
+            )
+        )
+        session.add(
+            SecurityRow(
+                security_id=f"sec_dup_b_{suffix}",
+                ticker=f"U{suffix[:5].upper()}",
+                cusip=None,
+                isin=isin,
+                name="Dup B",
+                asset_class=AssetClass.ETF,
+                tax_character=TaxCharacter.LTCG,
+                liquidity_tier=1,
+            )
+        )
+        session.flush()
+        csv_path = tmp_path / "dup_sym.csv"
+        csv_path.write_text(
+            f"account_id,ticker,quantity,as_of_date\n"
+            f"acct_taxable,{ticker_a},10,2026-06-24\n"
+        )
+        ingest = run_custodian_ingest(
+            session,
+            csv_path,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+        breaks = reconcile_ingest(
+            session,
+            ingest.run_id,
+            household_id=DEMO_HOUSEHOLD_ID,
+        )
+    sym_breaks = [
+        b for b in breaks if b.break_type == ReconBreakType.SYMBOLOGY_MISMATCH
+    ]
+    assert sym_breaks
+    assert isin in sym_breaks[0].description

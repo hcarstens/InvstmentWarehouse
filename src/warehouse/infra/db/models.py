@@ -168,6 +168,9 @@ class ReconciliationBreakRow(Base):
         String(64), nullable=False, index=True
     )
     security_id: Mapped[str | None] = mapped_column(String(64))
+    break_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="quantity_mismatch"
+    )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     opened_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime)

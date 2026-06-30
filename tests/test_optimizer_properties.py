@@ -433,6 +433,34 @@ def test_near_singular_sigma_still_feasible() -> None:
     assert _oracle_box_feasible(w, [0.0, 0.0], [1.0, 1.0])
 
 
+def test_near_singular_sigma_infeasible_box_raises() -> None:
+    """qa5 — near-singular Σ with infeasible box raises explicitly."""
+    with pytest.raises(OptimizerInfeasibleError, match="w_min"):
+        solve_qp(
+            mu=[0.10, 0.05],
+            sigma=[[1e-12, 0.0], [0.0, 1e-12]],
+            w_min=[0.6, 0.6],
+            w_max=[1.0, 1.0],
+            lam=1.0,
+            **_QP_KW,
+        )
+
+
+def test_all_box_constraints_binding_returns_fixed_point() -> None:
+    """qa5 — when w_min = w_max, solution is the pinned weights."""
+    target = [0.6, 0.4]
+    w = solve_qp(
+        mu=[0.20, 0.05],
+        sigma=[[0.01, 0.0], [0.0, 0.01]],
+        w_min=target,
+        w_max=target,
+        lam=1.0,
+        **_QP_KW,
+    )
+    assert w == pytest.approx(target, abs=1e-6)
+    assert _oracle_budget_sum(w)
+
+
 def test_lambda_near_zero_budget_and_box() -> None:
     w = solve_qp(
         mu=[0.20, 0.0],

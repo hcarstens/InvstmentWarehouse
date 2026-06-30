@@ -641,6 +641,7 @@ def _seed_open_break(session, *, account_id: str = "acct_demo") -> None:
             ingest_run_id=ingest_id,
             account_id=account_id,
             security_id=None,
+            break_type="quantity_mismatch",
             description="rw4 gate test break",
             opened_at=datetime(2026, 6, 24, tzinfo=UTC),
             resolved=False,

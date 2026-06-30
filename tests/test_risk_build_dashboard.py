@@ -9,7 +9,7 @@ def test_risk_build_report_has_deliverables() -> None:
     assert report.contract_status == "v1.2"
     assert len(report.deliverables) >= 7
     assert len(report.rungs) == 5
-    assert report.shipped_count == 17
+    assert report.shipped_count == 21
     assert report.planned_count == 0
     assert report.synthetic_ips_status == "si4"
     assert len(report.synthetic_ips_deliverables) == 6

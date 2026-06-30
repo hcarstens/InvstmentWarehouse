@@ -13,6 +13,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from warehouse.config import get_settings
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.data.security_master import AssetClass, TaxCharacter
 from warehouse.infra.db.base import session_scope
@@ -30,6 +31,7 @@ from warehouse.reporting.performance import (
     PerformanceError,
     RealizedGainEvent,
     build_household_performance_report,
+    compute_after_tax_return_ytd,
     realized_gain_ytd,
 )
 from warehouse.reporting.performance.compute import _aggregate_positions
@@ -55,6 +57,19 @@ def _independent_unrealized(
         (qty * mark - qty * cost for qty, mark, cost in lots),
         Decimal("0"),
     )
+
+
+def _oracle_after_tax_ytd(
+    *,
+    total_mv: Decimal,
+    total_cost: Decimal,
+    realized_ytd: Decimal,
+    ltcg_rate: Decimal,
+) -> Decimal:
+    gross = (total_mv - total_cost) / total_cost
+    taxable = max(realized_ytd, Decimal("0"))
+    tax_drag = taxable * ltcg_rate / total_cost
+    return gross - tax_drag
 
 
 def _oracle_realized_ytd(
@@ -393,6 +408,86 @@ def test_demo_household_nonzero_realized_ytd() -> None:
             as_of=AS_OF,
         )
     assert report.realized_gain_ytd == Decimal("4200.00")
+
+
+def test_after_tax_return_ytd_hand_math_oracle() -> None:
+    """qa7 — independent oracle: gross return minus LTCG drag on realized."""
+    suffix = uuid4().hex[:8]
+    hh = f"hh_after_tax_{suffix}"
+    lot_specs = [
+        (
+            f"lot_at_{suffix}",
+            f"sec_at_{suffix}",
+            Decimal("10"),
+            Decimal("100"),
+            date(2024, 1, 1),
+        ),
+    ]
+    marks = [(f"sec_at_{suffix}", Decimal("120"))]
+    ltcg = Decimal(str(get_settings().fed_ltcg_rate))
+    with session_scope() as session:
+        _seed_perf_household(
+            session,
+            household_id=hh,
+            lots=lot_specs,
+            prices=marks,
+        )
+        session.add(
+            RealizedGainEventRow(
+                event_id=f"rg_at_{suffix}",
+                household_id=hh,
+                event_date=date(2026, 3, 1),
+                amount=Decimal("200"),
+            )
+        )
+        session.flush()
+        report = build_household_performance_report(
+            session,
+            household_id=hh,
+            as_of=AS_OF,
+        )
+    expected = _oracle_after_tax_ytd(
+        total_mv=Decimal("1200"),
+        total_cost=Decimal("1000"),
+        realized_ytd=Decimal("200"),
+        ltcg_rate=ltcg,
+    )
+    assert report.after_tax_return_ytd == expected
+    assert report.after_tax_return_ytd == compute_after_tax_return_ytd(
+        total_market_value=Decimal("1200"),
+        total_cost_basis=Decimal("1000"),
+        realized_gain_ytd=Decimal("200"),
+        fed_ltcg_rate=ltcg,
+    )
+
+
+def test_after_tax_return_ytd_demo_household() -> None:
+    """Demo seed — after-tax YTD matches hand-math from report fields."""
+    with session_scope() as session:
+        report = build_household_performance_report(
+            session,
+            household_id=DEMO_HOUSEHOLD_ID,
+            as_of=AS_OF,
+        )
+    ltcg = Decimal(str(get_settings().fed_ltcg_rate))
+    total_cost = report.total_market_value - report.unrealized_gain
+    expected = _oracle_after_tax_ytd(
+        total_mv=report.total_market_value,
+        total_cost=total_cost,
+        realized_ytd=report.realized_gain_ytd,
+        ltcg_rate=ltcg,
+    )
+    assert report.after_tax_return_ytd == expected
+
+
+def test_after_tax_return_ytd_zero_cost_basis_none() -> None:
+    with session_scope() as session:
+        report = build_household_performance_report(
+            session,
+            household_id="hh_no_lots",
+            as_of=AS_OF,
+        )
+    assert report.after_tax_return_ytd is None
 
 
 def _position_view(

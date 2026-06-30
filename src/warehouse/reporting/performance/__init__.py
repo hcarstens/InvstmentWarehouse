@@ -5,6 +5,7 @@ from warehouse.reporting.performance.compute import (
     PerformanceError,
     RealizedGainEvent,
     build_household_performance_report,
+    compute_after_tax_return_ytd,
     realized_gain_ytd,
 )
 
@@ -13,5 +14,6 @@ __all__ = [
     "PerformanceError",
     "RealizedGainEvent",
     "build_household_performance_report",
+    "compute_after_tax_return_ytd",
     "realized_gain_ytd",
 ]

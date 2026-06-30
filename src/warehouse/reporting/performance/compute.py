@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from warehouse.config import get_settings
 from warehouse.data.ledger.views import LotPositionView, list_lot_positions
 from warehouse.infra.db.models import RealizedGainEventRow
 
@@ -55,6 +56,29 @@ def realized_gain_ytd(
         ),
         Decimal("0"),
     )
+
+
+def compute_after_tax_return_ytd(
+    *,
+    total_market_value: Decimal,
+    total_cost_basis: Decimal,
+    realized_gain_ytd: Decimal,
+    fed_ltcg_rate: Decimal,
+) -> Decimal:
+    """YTD after-tax return — independent oracle (qa7 / ST2).
+
+    v0 uses total cost basis as the year-start NAV proxy (no Jan-1 mark
+    history yet).  Gross return is (MV − cost) / cost; positive realized
+    gains are taxed at the version-pinned LTCG rate as a portfolio drag.
+    """
+    if total_cost_basis <= Decimal("0"):
+        raise PerformanceError(
+            "after-tax return YTD requires positive cost basis"
+        )
+    gross = (total_market_value - total_cost_basis) / total_cost_basis
+    taxable = max(realized_gain_ytd, Decimal("0"))
+    tax_drag = taxable * fed_ltcg_rate / total_cost_basis
+    return gross - tax_drag
 
 
 def _fetch_realized_events(
@@ -120,11 +144,20 @@ def build_household_performance_report(
         as_of=as_of,
     )
     realized_ytd = realized_gain_ytd(realized_events, as_of=as_of)
+    after_tax_ytd: Decimal | None = None
+    if total_cost > Decimal("0"):
+        ltcg = Decimal(str(get_settings().fed_ltcg_rate))
+        after_tax_ytd = compute_after_tax_return_ytd(
+            total_market_value=total_mv,
+            total_cost_basis=total_cost,
+            realized_gain_ytd=realized_ytd,
+            fed_ltcg_rate=ltcg,
+        )
     return HouseholdPerformanceReport(
         household_id=household_id,
         as_of_date=as_of.isoformat(),
         total_market_value=total_mv,
         unrealized_gain=unrealized,
         realized_gain_ytd=realized_ytd,
-        after_tax_return_ytd=None,
+        after_tax_return_ytd=after_tax_ytd,
     )

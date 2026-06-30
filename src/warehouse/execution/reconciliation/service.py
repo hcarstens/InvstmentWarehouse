@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from enum import StrEnum
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -23,11 +24,22 @@ from warehouse.infra.db.models import (
 from warehouse.models.entities import RelationshipType
 
 
+class ReconBreakType(StrEnum):
+    """Typed reconciliation break taxonomy (qa1)."""
+
+    STALE_AS_OF = "stale_as_of"
+    MIXED_AS_OF = "mixed_as_of"
+    QUANTITY_MISMATCH = "quantity_mismatch"
+    LEDGER_ONLY = "ledger_only"
+    SYMBOLOGY_MISMATCH = "symbology_mismatch"
+
+
 class ReconciliationBreak(BaseModel):
     break_id: str
     ingest_run_id: str
     account_id: str
     security_id: str | None
+    break_type: ReconBreakType
     description: str
     opened_at: datetime
     resolved_at: datetime | None
@@ -78,6 +90,7 @@ def _as_of_date_breaks(
                 ingest_run_id=ingest_run_id,
                 account_id=custodian_rows[0].account_id,
                 security_id=None,
+                break_type=ReconBreakType.MIXED_AS_OF,
                 description=description,
                 actor_id=actor_id,
                 household_id=household_id,
@@ -105,11 +118,61 @@ def _as_of_date_breaks(
             ingest_run_id=ingest_run_id,
             account_id=custodian_rows[0].account_id,
             security_id=None,
+            break_type=ReconBreakType.STALE_AS_OF,
             description=description,
             actor_id=actor_id,
             household_id=household_id,
         )
     )
+    return breaks
+
+
+def _symbology_breaks(
+    session: Session,
+    ingest_run_id: str,
+    security_ids: set[str],
+    *,
+    actor_id: str,
+    household_id: str | None,
+    account_id: str,
+) -> list[ReconciliationBreak]:
+    """Open breaks when ingest touches securities sharing an ISIN/CUSIP."""
+    if not security_ids:
+        return []
+
+    touched = session.scalars(
+        select(SecurityRow).where(SecurityRow.security_id.in_(security_ids))
+    ).all()
+    isins = {row.isin for row in touched if row.isin}
+    cusips = {row.cusip for row in touched if row.cusip}
+
+    breaks: list[ReconciliationBreak] = []
+    for label, keys in (("isin", isins), ("cusip", cusips)):
+        for key in keys:
+            col = SecurityRow.isin if label == "isin" else SecurityRow.cusip
+            ids = set(
+                session.scalars(
+                    select(SecurityRow.security_id).where(col == key)
+                ).all()
+            )
+            if len(ids) < 2:
+                continue
+            description = (
+                f"symbology conflict ({label}={key}): "
+                f"security_ids={sorted(ids)}"
+            )
+            breaks.append(
+                _open_break(
+                    session,
+                    ingest_run_id=ingest_run_id,
+                    account_id=account_id,
+                    security_id=None,
+                    break_type=ReconBreakType.SYMBOLOGY_MISMATCH,
+                    description=description,
+                    actor_id=actor_id,
+                    household_id=household_id,
+                )
+            )
     return breaks
 
 
@@ -119,6 +182,7 @@ def _open_break(
     ingest_run_id: str,
     account_id: str,
     security_id: str | None,
+    break_type: ReconBreakType,
     description: str,
     actor_id: str,
     household_id: str | None,
@@ -131,6 +195,7 @@ def _open_break(
             ingest_run_id=ingest_run_id,
             account_id=account_id,
             security_id=security_id,
+            break_type=break_type.value,
             description=description,
             opened_at=opened,
             resolved=False,
@@ -143,13 +208,18 @@ def _open_break(
         resource_type="reconciliation_break",
         resource_id=break_id,
         household_id=household_id,
-        details={"ingest_run_id": ingest_run_id, "description": description},
+        details={
+            "ingest_run_id": ingest_run_id,
+            "break_type": break_type.value,
+            "description": description,
+        },
     )
     return ReconciliationBreak(
         break_id=break_id,
         ingest_run_id=ingest_run_id,
         account_id=account_id,
         security_id=security_id,
+        break_type=break_type,
         description=description,
         opened_at=opened,
         resolved_at=None,
@@ -200,10 +270,12 @@ def reconcile_ingest(
         household_id=household_id,
     )
     seen: set[tuple[str, str]] = set()
+    security_ids: set[str] = set()
 
     for row in custodian_rows:
         key = (row.account_id, row.security_id)
         seen.add(key)
+        security_ids.add(row.security_id)
         ledger_qty = ledger.get(key, Decimal("0"))
         if ledger_qty != row.quantity:
             ticker = session.scalar(
@@ -221,6 +293,7 @@ def reconcile_ingest(
                     ingest_run_id=ingest_run_id,
                     account_id=row.account_id,
                     security_id=row.security_id,
+                    break_type=ReconBreakType.QUANTITY_MISMATCH,
                     description=description,
                     actor_id=actor_id,
                     household_id=household_id,
@@ -234,6 +307,7 @@ def reconcile_ingest(
             continue
         if ledger_qty == 0:
             continue
+        security_ids.add(security_id)
         ticker = session.scalar(
             select(SecurityRow.ticker).where(
                 SecurityRow.security_id == security_id
@@ -248,9 +322,22 @@ def reconcile_ingest(
                 ingest_run_id=ingest_run_id,
                 account_id=account_id,
                 security_id=security_id,
+                break_type=ReconBreakType.LEDGER_ONLY,
                 description=description,
                 actor_id=actor_id,
                 household_id=household_id,
+            )
+        )
+
+    if custodian_rows:
+        breaks.extend(
+            _symbology_breaks(
+                session,
+                ingest_run_id,
+                security_ids,
+                actor_id=actor_id,
+                household_id=household_id,
+                account_id=custodian_rows[0].account_id,
             )
         )
 
@@ -275,6 +362,7 @@ def list_reconciliation_breaks(
             ingest_run_id=row.ingest_run_id,
             account_id=row.account_id,
             security_id=row.security_id,
+            break_type=ReconBreakType(row.break_type),
             description=row.description,
             opened_at=row.opened_at,
             resolved_at=row.resolved_at,
