@@ -109,6 +109,12 @@ Backend:
 ## Loose threads (post-messaging)
 
 - [x] **Reconcile `as_of_date` gate** — `reconcile_ingest` opens a break when custodian file `as_of_date` ≠ ledger market-price `as_of_date` (stale file no longer reconciles clean).
+- [ ] **OMS partial fill (qa2 H4)** — Extend execution state machine beyond all-or-nothing fills. Sub-notes:
+  - [ ] `PARTIAL_FILL` status (or `filled_qty` on `StagedOrderRow` with derived status)
+  - [ ] Allowed transitions: `submitted → partial_fill → filled | cancelled` (cancel-after-partial-fill must stay consistent)
+  - [ ] Wire `update_order_status` / cancel-replace guards to partial-fill edges
+  - [ ] Falsifier: `test_phase4.py` — H4 adversarial hunt (cancel after partial fill); replace `test_order_partial_fill_cancel_deferred_h4` stub
+  - [ ] Dashboard staged-orders panel reflects partial qty when present
 - [ ] **Tax scenario engine (estimate)** — Replace the zero-stub in `evaluate_tax_scenario` with threshold-aware after-tax math (Tax Analyst heuristic: cliff-effect navigation, not flat additive NIIT/AMT). **Parallel / non-blocking** — deliberately held while we stress-test the PM flow with `tax → $0` (see Portfolio Manager block). Sub-notes:
   - [ ] Pin NIIT/AMT phase-outs and income thresholds to `tax_config_version`
   - [ ] Model income character and entity splits (not a single rate × unrealized gains)

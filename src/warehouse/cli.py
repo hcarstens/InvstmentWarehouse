@@ -220,20 +220,33 @@ def order_list(household: str) -> None:
 
 @order.command()
 @click.argument("order_id")
-@click.option(
-    "--submit", is_flag=True, help="Mark submitted (default: filled)."
-)
-def order_advance(order_id: str, submit: bool) -> None:
-    """Advance a staged order to submitted or filled."""
+@click.option("--submit", is_flag=True, help="Mark submitted.")
+@click.option("--fill", is_flag=True, help="Mark filled (requires submitted).")
+@click.option("--cancel", is_flag=True, help="Cancel the order.")
+def order_advance(
+    order_id: str, submit: bool, fill: bool, cancel: bool
+) -> None:
+    """Advance a staged order through allowed status transitions."""
     from warehouse.execution.oms import OrderStatus
     from warehouse.execution.oms.service import update_order_status
     from warehouse.infra.db.base import session_scope
     from warehouse.infra.db.bootstrap import bootstrap_database
 
+    flags = sum((submit, fill, cancel))
+    if flags != 1:
+        raise click.UsageError(
+            "Specify exactly one of --submit, --fill, --cancel"
+        )
+
     bootstrap_database(seed=True)
-    status = OrderStatus.SUBMITTED if submit else OrderStatus.FILLED
+    if submit:
+        target = OrderStatus.SUBMITTED
+    elif fill:
+        target = OrderStatus.FILLED
+    else:
+        target = OrderStatus.CANCELLED
     with session_scope() as session:
-        result = update_order_status(session, order_id, status=status)
+        result = update_order_status(session, order_id, status=target)
     click.echo(f"{result.order_id} → {result.status}")
 
 

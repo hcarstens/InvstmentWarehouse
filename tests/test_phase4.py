@@ -23,9 +23,10 @@ from warehouse.decision.tax.scenarios import (
     TaxScenarioOverlays,
     run_tax_scenario,
 )
-from warehouse.execution.oms import OrderStatus
+from warehouse.execution.oms import OrderStatus, OrderTransitionError
 from warehouse.execution.oms.service import (
     list_staged_orders,
+    replace_staged_order,
     update_order_status,
 )
 from warehouse.infra.db.base import session_scope
@@ -148,30 +149,34 @@ def test_oms_gate_blocks_unapproved_staging() -> None:
         )
 
 
-def test_order_state_machine() -> None:
+def _stage_first_demo_order(session):  # noqa: ANN001, ANN201
+    """Bootstrap: optimize → approve → stage; return first staged order."""
     from warehouse.execution.oms.service import stage_orders_from_approval
 
+    run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
+    pending = [
+        a
+        for a in list_approval_requests(
+            session, household_id=DEMO_HOUSEHOLD_ID
+        )
+        if a.status == ApprovalStatus.PENDING.value
+    ][0]
+    update_approval_status(
+        session,
+        pending.request_id,
+        status=ApprovalStatus.APPROVED,
+        reviewer_id="advisor:test",
+    )
+    stage_orders_from_approval(
+        session, pending.request_id, actor_id="advisor:test"
+    )
+    return list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)[0]
+
+
+def test_order_state_machine() -> None:
     bootstrap_database(seed=True)
     with session_scope() as session:
-        run_and_persist_optimizer(session, DEMO_HOUSEHOLD_ID)
-        pending = [
-            a
-            for a in list_approval_requests(
-                session, household_id=DEMO_HOUSEHOLD_ID
-            )
-            if a.status == ApprovalStatus.PENDING.value
-        ][0]
-        update_approval_status(
-            session,
-            pending.request_id,
-            status=ApprovalStatus.APPROVED,
-            reviewer_id="advisor:test",
-        )
-        # Decoupled: stage explicitly after approval.
-        stage_orders_from_approval(
-            session, pending.request_id, actor_id="advisor:test"
-        )
-        order = list_staged_orders(session, household_id=DEMO_HOUSEHOLD_ID)[0]
+        order = _stage_first_demo_order(session)
         submitted = update_order_status(
             session, order.order_id, status=OrderStatus.SUBMITTED
         )
@@ -180,6 +185,134 @@ def test_order_state_machine() -> None:
         )
     assert submitted.status == OrderStatus.SUBMITTED.value
     assert filled.status == OrderStatus.FILLED.value
+
+
+def test_order_transition_oracle_happy_paths() -> None:
+    """qa2 ST2 — allowed edges: staged→{submitted,cancelled},
+    submitted→{filled,cancelled}."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        staged_order = _stage_first_demo_order(session)
+        cancelled_from_staged = update_order_status(
+            session,
+            staged_order.order_id,
+            status=OrderStatus.CANCELLED,
+        )
+        assert cancelled_from_staged.status == OrderStatus.CANCELLED.value
+
+        submitted_order = _stage_first_demo_order(session)
+        submitted = update_order_status(
+            session,
+            submitted_order.order_id,
+            status=OrderStatus.SUBMITTED,
+        )
+        cancelled_from_submitted = update_order_status(
+            session,
+            submitted.order_id,
+            status=OrderStatus.CANCELLED,
+        )
+        assert cancelled_from_submitted.status == OrderStatus.CANCELLED.value
+
+
+@pytest.mark.parametrize(
+    ("from_status", "to_status"),
+    [
+        (OrderStatus.FILLED, OrderStatus.STAGED),
+        (OrderStatus.CANCELLED, OrderStatus.SUBMITTED),
+        (OrderStatus.FILLED, OrderStatus.CANCELLED),
+        (OrderStatus.STAGED, OrderStatus.FILLED),
+        (OrderStatus.FILLED, OrderStatus.SUBMITTED),
+    ],
+)
+def test_order_transition_rejects_illegal_edges(
+    from_status: OrderStatus,
+    to_status: OrderStatus,
+) -> None:
+    """qa2 ST1 — hostile jumps blocked with order_id + from + to context."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        order = _stage_first_demo_order(session)
+        if from_status is OrderStatus.SUBMITTED:
+            update_order_status(
+                session, order.order_id, status=OrderStatus.SUBMITTED
+            )
+        elif from_status is OrderStatus.FILLED:
+            update_order_status(
+                session, order.order_id, status=OrderStatus.SUBMITTED
+            )
+            update_order_status(
+                session, order.order_id, status=OrderStatus.FILLED
+            )
+        elif from_status is OrderStatus.CANCELLED:
+            update_order_status(
+                session, order.order_id, status=OrderStatus.CANCELLED
+            )
+        with pytest.raises(OrderTransitionError, match=order.order_id):
+            update_order_status(session, order.order_id, status=to_status)
+
+
+def test_order_transition_idempotent_re_cancel() -> None:
+    """qa2 ST6 — cancelled→cancelled is a safe no-op."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        order = _stage_first_demo_order(session)
+        cancelled = update_order_status(
+            session, order.order_id, status=OrderStatus.CANCELLED
+        )
+        again = update_order_status(
+            session, order.order_id, status=OrderStatus.CANCELLED
+        )
+    assert again.status == OrderStatus.CANCELLED.value
+    assert again.updated_at == cancelled.updated_at
+
+
+def test_order_partial_fill_cancel_deferred_h4() -> None:
+    """qa2 H4 deferred — no partial-fill status; cancel-after-fill blocked."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        order = _stage_first_demo_order(session)
+        update_order_status(
+            session, order.order_id, status=OrderStatus.SUBMITTED
+        )
+        update_order_status(session, order.order_id, status=OrderStatus.FILLED)
+        with pytest.raises(OrderTransitionError, match="filled → cancelled"):
+            update_order_status(
+                session, order.order_id, status=OrderStatus.CANCELLED
+            )
+
+
+def test_replace_staged_order_not_implemented_on_live() -> None:
+    """qa2 — replace on non-terminal order raises NotImplementedError."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        order = _stage_first_demo_order(session)
+        update_order_status(
+            session, order.order_id, status=OrderStatus.SUBMITTED
+        )
+        with pytest.raises(NotImplementedError, match=order.order_id):
+            replace_staged_order(session, order.order_id, quantity="5")
+
+
+def test_replace_staged_order_rejects_terminal() -> None:
+    """qa2 ST6 — replace on filled/cancelled orders blocked at boundary."""
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        filled_order = _stage_first_demo_order(session)
+        update_order_status(
+            session, filled_order.order_id, status=OrderStatus.SUBMITTED
+        )
+        update_order_status(
+            session, filled_order.order_id, status=OrderStatus.FILLED
+        )
+        with pytest.raises(OrderTransitionError, match="replace"):
+            replace_staged_order(session, filled_order.order_id)
+
+        cancelled_order = _stage_first_demo_order(session)
+        update_order_status(
+            session, cancelled_order.order_id, status=OrderStatus.CANCELLED
+        )
+        with pytest.raises(OrderTransitionError, match="replace"):
+            replace_staged_order(session, cancelled_order.order_id)
 
 
 def test_solver_comparison() -> None:

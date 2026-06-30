@@ -147,7 +147,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         risk_tier="high",
         note=(
             "ReconBreakType taxonomy shipped (qa1); "
-            "OMS cancel/replace gap remains"
+            "OMS cancel/replace boundaries shipped (qa2)"
         ),
     ),
     PlaneTestSlice(

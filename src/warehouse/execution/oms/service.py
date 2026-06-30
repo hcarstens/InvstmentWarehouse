@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.decision.approval import ApprovalStatus
-from warehouse.execution.oms import OrderStatus
+from warehouse.execution.oms import OrderStatus, OrderTransitionError
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import (
     ApprovalRequestRow,
@@ -19,6 +19,28 @@ from warehouse.infra.db.models import (
 )
 from warehouse.messaging import DispatchContext, Kind, Message, emit_event
 from warehouse.messaging.models import OrderFilled
+
+_ALLOWED_TRANSITIONS: dict[OrderStatus, frozenset[OrderStatus]] = {
+    OrderStatus.STAGED: frozenset(
+        {OrderStatus.SUBMITTED, OrderStatus.CANCELLED}
+    ),
+    OrderStatus.SUBMITTED: frozenset(
+        {OrderStatus.FILLED, OrderStatus.CANCELLED}
+    ),
+    OrderStatus.FILLED: frozenset(),
+    OrderStatus.CANCELLED: frozenset({OrderStatus.CANCELLED}),
+}
+
+
+def validate_order_transition(
+    order_id: str,
+    from_status: OrderStatus,
+    to_status: OrderStatus,
+) -> None:
+    """Raise OrderTransitionError when *to_status* is not an allowed edge."""
+    allowed = _ALLOWED_TRANSITIONS[from_status]
+    if to_status not in allowed:
+        raise OrderTransitionError(order_id, from_status, to_status)
 
 
 class StagedOrderView(BaseModel):
@@ -146,6 +168,32 @@ def list_staged_orders(
     return [_row_to_view(row) for row in session.scalars(stmt).all()]
 
 
+def replace_staged_order(
+    session: Session,
+    order_id: str,
+    *,
+    quantity: str | None = None,
+    _actor_id: str = "system:oms",
+) -> StagedOrderView:
+    """Cancel/replace entry point — replace body deferred; boundary guarded."""
+    row = session.get(StagedOrderRow, order_id)
+    if row is None:
+        raise ValueError(f"Order not found: {order_id}")
+    from_status = OrderStatus(row.status)
+    if from_status in (OrderStatus.FILLED, OrderStatus.CANCELLED):
+        raise OrderTransitionError(
+            order_id,
+            from_status,
+            from_status,
+            operation="replace",
+        )
+    raise NotImplementedError(
+        f"Order replace not implemented for {order_id} "
+        f"(status={from_status.value}, quantity={quantity!r}); "
+        "cancel and re-stage required"
+    )
+
+
 def update_order_status(
     session: Session,
     order_id: str,
@@ -156,6 +204,12 @@ def update_order_status(
     row = session.get(StagedOrderRow, order_id)
     if row is None:
         raise ValueError(f"Order not found: {order_id}")
+    from_status = OrderStatus(row.status)
+    if from_status is status:
+        if from_status is OrderStatus.CANCELLED:
+            return _row_to_view(row)
+        raise OrderTransitionError(order_id, from_status, status)
+    validate_order_transition(order_id, from_status, status)
     row.status = status.value
     row.updated_at = datetime.now(UTC)
     write_audit(

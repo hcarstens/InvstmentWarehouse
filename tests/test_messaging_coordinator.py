@@ -161,6 +161,12 @@ def test_rebalance_loop_through_dispatch(seeded: None) -> None:
             OrdersStagePayload(approval_request_id=appr.request_id),
         )
         assert staged.orders
+        update_order_status(
+            s,
+            staged.orders[0].order_id,
+            status=OrderStatus.SUBMITTED,
+            actor_id="advisor",
+        )
         filled = update_order_status(
             s,
             staged.orders[0].order_id,

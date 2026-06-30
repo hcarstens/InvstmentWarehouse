@@ -275,6 +275,19 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         ),
         falsifier_test="tests/test_phase4.py",
     ),
+    BuildDeliverable(
+        id="qa2-oms-transitions",
+        track="qa_plan",
+        slice="qa2",
+        name="OMS cancel/replace transition boundaries",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "Allowed-edge guard on update_order_status; "
+            "replace raises NotImplementedError"
+        ),
+        falsifier_test="tests/test_phase4.py",
+    ),
 ]
 
 RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (
