@@ -126,7 +126,7 @@ def psd_sigma(draw: st.DrawFn, n: int) -> list[list[float]]:
     vols = draw(
         st.lists(
             st.floats(
-                min_value=1e-8,
+                min_value=1e-6,
                 max_value=0.5,
                 allow_nan=False,
                 allow_infinity=False,

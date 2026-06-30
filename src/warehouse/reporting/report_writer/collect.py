@@ -40,8 +40,8 @@ from warehouse.reporting.tax import (
     ReportingTaxResult,
     run_reporting_tax_scenario,
 )
-from warehouse.research.risk.adapters.ledger import HouseholdRiskManifest
 from warehouse.research.risk.models import (
+    AssetPortfolio,
     RiskHorizon,
     RiskRequest,
     RiskResult,
@@ -120,17 +120,14 @@ def _household_notional(
 def _build_household_manifest_from_session(
     session: Session,
     household_id: str,
-) -> HouseholdRiskManifest:
+) -> tuple[AssetPortfolio, Decimal | None]:
     """Session-backed manifest for risk evaluation (walk-forward safe)."""
     positions = list_lot_positions(session, household_id=household_id)
     alts = list_alternative_holdings(session, household_id=household_id)
     portfolio = build_portfolio_from_holdings(household_id, positions, alts)
     portfolio = portfolio.model_copy(update={"source": "ledger"})
     notional = _household_notional(positions, alts)
-    return HouseholdRiskManifest(
-        portfolio=portfolio,
-        notional_usd=notional if notional > 0 else None,
-    )
+    return portfolio, notional if notional > 0 else None
 
 
 def _collect_attribution(
@@ -171,15 +168,15 @@ def _collect_risk_headline(
     settings = get_settings()
     horizon = RiskHorizon.parse(settings.risk_dashboard_horizon_years)
     try:
-        manifest = _build_household_manifest_from_session(
+        portfolio, notional = _build_household_manifest_from_session(
             session, household_id
         )
         request = RiskRequest(
             horizon=horizon,
-            notional_usd=manifest.notional_usd,
+            notional_usd=notional,
             run_scenarios=ScenarioSet.NONE,
         )
-        return evaluate_risk(request, manifest.portfolio)
+        return evaluate_risk(request, portfolio)
     except (ValueError, TypeError) as err:
         raise ReportWriterError(
             f"Risk headline failed for household {household_id}: {err}"
