@@ -32,6 +32,8 @@ class ReportWriterPanelData(BaseModel):
     external_pdf_path: str | None = None
     external_pdf_sha256: str | None = None
     external_pdf_sha256_preview: str | None = None
+    attribution_status: str | None = None
+    risk_headline_status: str | None = None
     panel_status: str = "empty"  # empty | live | error
     error: str | None = None
 
@@ -136,6 +138,10 @@ def load_report_writer_panel(
     bluf = extract_bluf_preview(external_md)
     internal_path = snapshot_dir / "internal.md"
     internal_md = str(internal_path) if internal_path.is_file() else None
+    attr_status = "live" if bundle.attribution is not None else "not computed"
+    risk_status = (
+        "live" if bundle.risk_headline is not None else "not computed"
+    )
     external_pdf_path = snapshot_dir / "external.pdf"
     pdf_path_str: str | None = None
     pdf_sha: str | None = None
@@ -194,5 +200,7 @@ def load_report_writer_panel(
         external_pdf_path=pdf_path_str,
         external_pdf_sha256=pdf_sha,
         external_pdf_sha256_preview=pdf_preview,
+        attribution_status=attr_status,
+        risk_headline_status=risk_status,
         panel_status="live",
     )

@@ -1,6 +1,6 @@
 # Report Writer — Implementation Plan
 
-**Status:** **rw0–rw4 shipped** — `report.build` COMMAND live; external PDF channel via Pandoc
+**Status:** **rw0–rw5 shipped** — `report.build` COMMAND live; external PDF channel via Pandoc
 with sha256 pinning; month-end batch fan-out via `workflows.month_end.run_month_end_reporting_batch`.
 **Date:** 2026-06-29
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
@@ -110,8 +110,8 @@ presented as estimates.
 | 4 | Tax scenario table | **reporting plane** — `run_reporting_tax_scenario` → `ReportingTaxResult` (see ownership note below) | **partial** — rows live, deltas **stubbed zero** until tax estimate engine ships |
 | 5 | Staged orders | `list_staged_orders` | **live** |
 | 6 | Open reconciliation breaks (internal only) | `list_reconciliation_breaks` | **live, firm-wide** — `list_reconciliation_breaks` has no `household_id` param and `ReconciliationBreak` carries `account_id` only; breaks shown are whole-firm until the account→household join lands. Must be labelled firm-wide; never rendered in external packs |
-| 7 | Attribution residual | `attribution.evaluate` | **`not_computed`** in v1 — internal Addendum B |
-| 8 | Risk headline (VaR / ES with explicit α, h) | `risk.evaluate` | **`not_computed`** in v1 — Addendum B |
+| 7 | Attribution residual | `attribution.evaluate` | **live (internal)** — Exhibit D; external omitted rw5 |
+| 8 | Risk headline (VaR / ES with explicit α, h) | `risk.evaluate` | **live (internal)** — Exhibit E; external omitted rw5 |
 | 9 | Alternatives / K-1 calendar | `data.alternatives` | **`not_computed`** — Addendum C |
 | 10 | LLM-drafted executive prose | — | **forbidden in v1** — template strings only; human edit layer is rw3+ |
 
@@ -379,6 +379,8 @@ Acceptance is by **artifact traceability** (every exhibit number reconciles to b
 | --- | --- |
 | **Month-end batch** (`TODO.md` Review all portfolios) | `ledger.positions` → `report.build` per household after recon green |
 | **PM orchestrator** | Optional: attach `WrittenHouseholdReport.snapshot_id` to `AdviceBundle` provenance (additive field — separate PR) |
+| **Attribution (rw5)** | `collect_report_bundle` → `evaluate_attribution` with base-regime `RiskAssumptions`; Exhibit D internal only |
+| **Risk headline (rw5)** | session → `build_portfolio_from_holdings` + `evaluate_risk`; Exhibit E internal only; `risk_headline_computed` on audit row |
 | **Approval gate** | Future: `approval.create` for external Markdown before client portal publish (open question #9). **rw4 seam:** recon gate blocks external PDF when firm-wide breaks are open; advisor document-approval (`ADVISOR REVIEW GATE ──► client delivery`) deferred — needs `approval.create` pattern for documents (today tied to `optimization_run_id`). Code comment at `_attach_external_pdf` in `writer.py`. |
 | **Audit log** | `write_audit` on `report.build` with `snapshot_id`, `household_id`, paths |
 | **Client portal (Phase 5+)** | Serve frozen PDF generated from `external.md`; portal tile links `bundle.json` exhibits |
@@ -414,19 +416,20 @@ failure, not a stale PDF on disk.
 
 ---
 
-## 12. Addendum B — optional exhibits (rw4+, deferred)
+## 12. Addendum B — optional exhibits (rw5 shipped)
 
 Pull in when upstream legs are client-safe and version-pinned:
 
-| Exhibit | `op` | Blocker |
+| Exhibit | `op` | rw5 status |
 | --- | --- | --- |
-| Attribution residual table | `attribution.evaluate` | Needs class-expected honesty labelling in client copy |
-| Risk headline | `risk.evaluate` | Must print explicit `(α, h)` per research tail-risk unit note |
-| PM advisory summary | `pm.advise` | Tax leg stub — external pack must badge `tax: stub` |
-| Scenario one-pager | research scenarios | No standard scenario summary export yet |
+| Attribution active-return table | `decision.analyst:evaluate_attribution` | **shipped internal** — Exhibit D; `ACTIVE_RETURN_LABEL`; external deferred |
+| Risk headline | `research.risk:evaluate_risk` | **shipped internal** — Exhibit E with explicit `(α, h, unit, mark_source)` |
+| PM advisory summary | `pm.advise` | deferred — tax leg stub |
+| Scenario one-pager | research scenarios | deferred — no standard export |
 
-Add fields to `ReportBundle` as **optional tuples**; renderer includes section only when
-present — Cartography C4.
+Add fields to `ReportBundle` as **optional** frozen snapshots (`attribution`,
+`risk_headline`); renderer includes section only when present — Cartography C4.
+External packs omit D/E in rw5 (client-safe review deferred).
 
 ---
 
@@ -454,7 +457,7 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 | rw2 dashboard + registry | shipped | |
 | rw3 month-end workflow | shipped | `run_month_end_reporting_batch`; Tier-1 recon gate on external PDF shipped (firm-wide breaks, no tier field) |
 | rw4 PDF channel | shipped | Pandoc v1; `external.pdf` + `external_pdf_sha256`; recon gate blocks PDF not Markdown; `warehouse report pdf` |
-| rw5 extended exhibits | deferred | attribution, risk, alts |
+| rw5 extended exhibits | shipped | internal Exhibit D (attribution) + E (risk headline); external D/E deferred |
 
 ---
 

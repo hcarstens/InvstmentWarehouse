@@ -8,7 +8,17 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from warehouse.data.ledger.views import list_lot_positions
+from warehouse.config import get_settings
+from warehouse.data.alternatives.service import (
+    AlternativeHoldingView,
+    list_alternative_holdings,
+)
+from warehouse.data.ledger.views import LotPositionView, list_lot_positions
+from warehouse.decision.analyst.attribution import (
+    AttributionError,
+    evaluate_attribution,
+)
+from warehouse.decision.analyst.models import AttributionReport
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.approval.service import list_approval_requests
 from warehouse.decision.ips.monitor import build_ips_drift_report
@@ -30,6 +40,18 @@ from warehouse.reporting.tax import (
     ReportingTaxResult,
     run_reporting_tax_scenario,
 )
+from warehouse.research.risk.adapters.ledger import HouseholdRiskManifest
+from warehouse.research.risk.models import (
+    RiskHorizon,
+    RiskRequest,
+    RiskResult,
+    ScenarioSet,
+)
+from warehouse.research.risk.portfolio_builder import (
+    build_portfolio_from_holdings,
+)
+from warehouse.research.risk.scenarios import assumptions_for
+from warehouse.research.risk.service import evaluate_risk
 
 _DEFAULT_TAX_SCENARIOS: tuple[tuple[str, TaxScenarioOverlays], ...] = (
     ("baseline", TaxScenarioOverlays(apply_niit=False)),
@@ -43,6 +65,8 @@ _DATA_SOURCES: tuple[str, ...] = (
     "execution.oms:list_staged_orders",
     "execution.recon:list_reconciliation_breaks",
     "decision.approval:list_approval_requests",
+    "decision.analyst:evaluate_attribution",
+    "research.risk:evaluate_risk",
 )
 
 
@@ -81,6 +105,87 @@ def _collect_tax_scenarios(
     return tuple(results)
 
 
+def _household_notional(
+    positions: list[LotPositionView],
+    alt_holdings: list[AlternativeHoldingView],
+) -> Decimal:
+    lot_nav = sum(
+        (p.market_value for p in positions if p.market_value is not None),
+        Decimal("0"),
+    )
+    alt_nav = sum((a.current_nav for a in alt_holdings), Decimal("0"))
+    return lot_nav + alt_nav
+
+
+def _build_household_manifest_from_session(
+    session: Session,
+    household_id: str,
+) -> HouseholdRiskManifest:
+    """Session-backed manifest for risk evaluation (walk-forward safe)."""
+    positions = list_lot_positions(session, household_id=household_id)
+    alts = list_alternative_holdings(session, household_id=household_id)
+    portfolio = build_portfolio_from_holdings(household_id, positions, alts)
+    portfolio = portfolio.model_copy(update={"source": "ledger"})
+    notional = _household_notional(positions, alts)
+    return HouseholdRiskManifest(
+        portfolio=portfolio,
+        notional_usd=notional if notional > 0 else None,
+    )
+
+
+def _collect_attribution(
+    positions: list[LotPositionView],
+    *,
+    household_id: str,
+    as_of: date,
+) -> AttributionReport | None:
+    attributable = [
+        p
+        for p in positions
+        if p.market_value is not None and p.market_value > 0
+    ]
+    if not attributable:
+        return None
+
+    settings = get_settings()
+    try:
+        return evaluate_attribution(
+            attributable,
+            assumptions_for("base").class_expected_return,
+            household_id=household_id,
+            as_of=as_of,
+            config_version=settings.analyst_config_version,
+            min_holding_years=Decimal(str(settings.analyst_min_holding_years)),
+        )
+    except AttributionError as err:
+        raise ReportWriterError(
+            f"Attribution failed for household {household_id} "
+            f"as_of={as_of.isoformat()}: {err}"
+        ) from err
+
+
+def _collect_risk_headline(
+    session: Session,
+    household_id: str,
+) -> RiskResult:
+    settings = get_settings()
+    horizon = RiskHorizon.parse(settings.risk_dashboard_horizon_years)
+    try:
+        manifest = _build_household_manifest_from_session(
+            session, household_id
+        )
+        request = RiskRequest(
+            horizon=horizon,
+            notional_usd=manifest.notional_usd,
+            run_scenarios=ScenarioSet.NONE,
+        )
+        return evaluate_risk(request, manifest.portfolio)
+    except (ValueError, TypeError) as err:
+        raise ReportWriterError(
+            f"Risk headline failed for household {household_id}: {err}"
+        ) from err
+
+
 def _build_limitations(
     *,
     snapshot_id: str,
@@ -88,6 +193,9 @@ def _build_limitations(
     tax_scenarios: tuple[ReportingTaxResult, ...],
     open_breaks: tuple[ReconciliationBreak, ...],
     pending_approval_count: int,
+    attribution_limitations: tuple[str, ...] = (),
+    risk_limitations: tuple[str, ...] = (),
+    attribution_skipped: bool = False,
 ) -> tuple[str, ...]:
     items: list[str] = [
         (
@@ -113,7 +221,25 @@ def _build_limitations(
         items.append(
             "Pending approvals — figures subject to change before delivery."
         )
+    if attribution_skipped:
+        items.append("Attribution not computed — no attributable positions.")
+    items.extend(attribution_limitations)
+    items.extend(risk_limitations)
     return tuple(items)
+
+
+def _risk_limitation_notes(risk: RiskResult) -> tuple[str, ...]:
+    meta = risk.report.manifest
+    notes: list[str] = [
+        (
+            f"Risk headline uses assumption_regime={meta.assumption_regime}, "
+            f"mark_source={meta.mark_source}, vol_window_days="
+            f"{meta.vol_window_days}."
+        ),
+    ]
+    if meta.mark_source != "live":
+        notes.append("Risk metrics use model priors — not custodian marks.")
+    return tuple(notes)
 
 
 def collect_report_bundle(
@@ -155,12 +281,27 @@ def collect_report_bundle(
     snapshot_id = f"rpt_{uuid4().hex[:12]}"
     generated_at = datetime.now(UTC)
 
+    attribution = _collect_attribution(
+        positions,
+        household_id=household_id,
+        as_of=as_of,
+    )
+    risk_headline = _collect_risk_headline(session, household_id)
+
+    attribution_lims = (
+        tuple(attribution.limitations) if attribution is not None else ()
+    )
+    risk_lims = _risk_limitation_notes(risk_headline)
+
     limitations = _build_limitations(
         snapshot_id=snapshot_id,
         as_of_date=as_of,
         tax_scenarios=tax_scenarios,
         open_breaks=open_breaks,
         pending_approval_count=pending_count,
+        attribution_limitations=attribution_lims,
+        risk_limitations=risk_lims,
+        attribution_skipped=attribution is None,
     )
 
     return ReportBundle(
@@ -177,4 +318,6 @@ def collect_report_bundle(
         open_breaks=open_breaks,
         limitations=limitations,
         data_sources=_DATA_SOURCES,
+        attribution=attribution,
+        risk_headline=risk_headline,
     )

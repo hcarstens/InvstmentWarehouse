@@ -237,6 +237,10 @@ def build_and_write_household_reports(
         "period_label": period.label,
     }
     audit_details.update(pdf_extra)
+    if bundle.attribution is not None:
+        audit_details["attribution_computed"] = "true"
+    if bundle.risk_headline is not None:
+        audit_details["risk_headline_computed"] = "true"
     write_audit(
         session,
         actor_id=actor_id,

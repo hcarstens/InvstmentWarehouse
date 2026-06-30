@@ -7,11 +7,13 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
 
+from warehouse.decision.analyst.models import AttributionReport
 from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.execution.oms.service import StagedOrderView
 from warehouse.execution.reconciliation.service import ReconciliationBreak
 from warehouse.reporting.performance import HouseholdPerformanceReport
 from warehouse.reporting.tax import ReportingTaxResult
+from warehouse.research.risk.models import RiskResult
 
 
 class ReportAudience(StrEnum):
@@ -54,6 +56,8 @@ class ReportBundle(BaseModel):
     open_breaks: tuple[ReconciliationBreak, ...]
     limitations: tuple[str, ...]
     data_sources: tuple[str, ...]
+    attribution: AttributionReport | None = None
+    risk_headline: RiskResult | None = None
 
 
 class WrittenHouseholdReport(BaseModel):

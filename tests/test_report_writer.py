@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 from collections.abc import Iterator
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -15,6 +16,7 @@ from sqlalchemy import select
 
 import warehouse.messaging.handlers  # noqa: F401 — registers catalog ops
 from warehouse.data.security_master import AssetClass, TaxCharacter
+from warehouse.decision.analyst import ACTIVE_RETURN_LABEL, AttributionError
 from warehouse.decision.ips import AllocationTarget, InvestmentPolicyStatement
 from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.ips.store import save_ips
@@ -41,6 +43,7 @@ from warehouse.messaging.payloads import ReportBuildPayload
 from warehouse.models.entities import EntityType
 from warehouse.reporting.report_writer import (
     ReportAudience,
+    ReportBundle,
     ReportPeriod,
     ReportWriterError,
     build_and_write_household_reports,
@@ -724,4 +727,187 @@ def test_dashboard_panel_shows_pdf_hash(
     html = render_reporting_page()
     assert written.external_pdf_sha256 is not None
     assert written.external_pdf_sha256[:12] in html
+    assert "Attribution exhibit:" in html
+
+
+# --- rw5 attribution + risk headline exhibits --------------------------------
+
+
+def test_report_bundle_includes_attribution_on_demo_household(
+    seeded: None,
+) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    assert bundle.attribution is not None
+    assert len(bundle.attribution.positions) > 0
+
+
+def test_attribution_exhibit_in_internal_markdown(seeded: None) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    md = render_markdown(bundle, ReportAudience.INTERNAL)
+    assert "## Exhibit D — Active return vs class assumption" in md
+    assert ACTIVE_RETURN_LABEL in md
+    exhibit_d = md.split("## Exhibit D")[1].split("## Exhibit E")[0]
+    table_part = exhibit_d.split("**Attribution limitations:**")[0]
+    lowered = table_part.lower()
+    assert "alpha" not in lowered
+    assert "idiosyncratic" not in lowered
+
+
+def test_report_bundle_includes_risk_headline_on_demo_household(
+    seeded: None,
+) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    assert bundle.risk_headline is not None
+    l1 = bundle.risk_headline.report.level_1_portfolio
+    assert l1.parametric_var is not None
+    assert l1.parametric_es is not None
+
+
+def test_risk_exhibit_shows_alpha_and_horizon(seeded: None) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    md = render_markdown(bundle, ReportAudience.INTERNAL)
+    assert "## Exhibit E — Risk headline" in md
+    assert "α=" in md or "confidence" in md.lower()
+    assert "h=" in md or "horizon" in md.lower()
+    assert "mark_source=" in md
+
+
+def test_external_markdown_omits_exhibits_d_and_e(seeded: None) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    md = render_markdown(bundle, ReportAudience.EXTERNAL)
+    assert "## Exhibit D" not in md
+    assert "## Exhibit E" not in md
+
+
+def test_attribution_limitations_in_bundle(seeded: None) -> None:
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    assert bundle.attribution is not None
+    assert bundle.attribution.limitations
+    assert any(
+        lim in note
+        for note in bundle.limitations
+        for lim in bundle.attribution.limitations
+    )
+
+
+def test_collect_raises_on_attribution_failure(seeded: None) -> None:
+    with patch(
+        "warehouse.reporting.report_writer.collect.evaluate_attribution",
+        side_effect=AttributionError("mapping failed"),
+    ):
+        with session_scope() as session:
+            with pytest.raises(ReportWriterError, match=DEMO):
+                collect_report_bundle(
+                    session,
+                    DEMO,
+                    period=ReportPeriod.month_end(AS_OF),
+                    as_of=AS_OF,
+                )
+
+
+def test_report_build_writes_attribution_to_bundle_json(
+    seeded_tmp_reports: Path,
+) -> None:
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    raw = Path(written.bundle_json_path).read_text(encoding="utf-8")
+    bundle = ReportBundle.model_validate_json(raw)
+    assert bundle.attribution is not None
+    assert bundle.risk_headline is not None
+    parsed = json.loads(raw)
+    assert "attribution" in parsed
+    assert "risk_headline" in parsed
+
+
+def test_month_end_batch_inherits_attribution_fields(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.workflows.month_end import run_month_end_reporting_batch
+
+    with session_scope() as session:
+        result = run_month_end_reporting_batch(
+            session,
+            as_of_date=AS_OF,
+            household_ids=[DEMO],
+            actor_id="test",
+        )
+    completed = next(o for o in result.outcomes if o.status == "completed")
+    assert completed.written is not None
+    bundle = ReportBundle.model_validate_json(
+        Path(completed.written.bundle_json_path).read_text(encoding="utf-8")
+    )
+    assert bundle.attribution is not None
+    assert bundle.risk_headline is not None
+
+
+def test_dashboard_panel_shows_attribution_status(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from warehouse.dashboard.pages.reporting import render_reporting_page
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    monkeypatch.setattr(
+        "warehouse.dashboard.report_writer_data.reports_base",
+        lambda: tmp_path,
+    )
+    with session_scope() as session:
+        build_and_write_household_reports(
+            session,
+            DEMO,
+            as_of_date=AS_OF,
+            actor_id="test",
+        )
+    html = render_reporting_page()
+    assert "Attribution exhibit:" in html
+    assert "Risk headline exhibit:" in html
+    assert "live" in html
     assert "external.pdf" in html

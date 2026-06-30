@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from warehouse.decision.analyst.models import ACTIVE_RETURN_LABEL
 from warehouse.reporting.report_writer.models import (
     ReportAudience,
     ReportBundle,
 )
+from warehouse.research.risk.models import ClassRiskContribution, RiskMetric
 
 _TAX_SCENARIO_LABELS: tuple[str, ...] = ("baseline", "niit_overlay")
 
@@ -185,6 +187,135 @@ _APPENDIX_POINTER = (
 )
 
 
+def _fmt_pct(value: Decimal) -> str:
+    return f"{value:.2%}"
+
+
+def _risk_metric_meta(metric: RiskMetric) -> str:
+    parts: list[str] = [f"unit={metric.unit_type.value}"]
+    if metric.confidence is not None:
+        parts.append(f"α={metric.confidence}")
+    if metric.horizon_years is not None:
+        parts.append(f"h={metric.horizon_years} yr")
+    if metric.window_days is not None:
+        parts.append(f"window={metric.window_days}d")
+    parts.append(f"mark_source={metric.mark_source}")
+    return ", ".join(parts)
+
+
+def _risk_metric_row(label: str, metric: RiskMetric) -> str:
+    return f"| {label} | {metric.value} | {_risk_metric_meta(metric)} |"
+
+
+def _exhibit_d_attribution(bundle: ReportBundle) -> str:
+    attr = bundle.attribution
+    if attr is None:
+        return ""
+    lines = [
+        "## Exhibit D — Active return vs class assumption",
+        "",
+        f"_Label: {ACTIVE_RETURN_LABEL}; config_version="
+        f"{attr.config_version}; as_of={attr.as_of_date.isoformat()}._",
+        "",
+        (
+            "| lot_id | ticker | market_value | total_return | "
+            "expected_cumulative | active_return | active_annualized |"
+        ),
+        "| --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for pos in attr.positions:
+        ann = (
+            _fmt_pct(pos.active_annualized)
+            if pos.active_annualized is not None
+            else "n/a"
+        )
+        lines.append(
+            f"| {pos.lot_id} | {pos.ticker or '—'} | "
+            f"{_fmt_money(pos.market_value)} | "
+            f"{_fmt_pct(pos.total_return)} | "
+            f"{_fmt_pct(pos.expected_cumulative)} | "
+            f"{_fmt_pct(pos.active_return)} | {ann} |"
+        )
+    lines.extend(
+        [
+            "",
+            (
+                f"**Portfolio active return (MV-weighted):** "
+                f"{_fmt_pct(attr.portfolio_active_return)} "
+                f"({ACTIVE_RETURN_LABEL})."
+            ),
+            "",
+        ]
+    )
+    if attr.limitations:
+        lines.append("**Attribution limitations:**")
+        lines.extend(f"- {lim}" for lim in attr.limitations)
+        lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _top_variance_classes(
+    rows: list[ClassRiskContribution],
+    *,
+    limit: int = 3,
+) -> list[ClassRiskContribution]:
+    return sorted(
+        rows,
+        key=lambda r: r.pct_variance_contribution,
+        reverse=True,
+    )[:limit]
+
+
+def _exhibit_e_risk(bundle: ReportBundle) -> str:
+    risk = bundle.risk_headline
+    if risk is None:
+        return ""
+    report = risk.report
+    l1 = report.level_1_portfolio
+    meta = report.manifest
+    lines = [
+        "## Exhibit E — Risk headline",
+        "",
+        (
+            f"_as_of={bundle.as_of_date.isoformat()}; "
+            f"assumption_regime={meta.assumption_regime}; "
+            f"horizon={report.horizon_years} yr; "
+            f"mark_source={meta.mark_source}._"
+        ),
+        "",
+        "| Metric | Value | Disclosure |",
+        "| --- | --- | --- |",
+        _risk_metric_row("Annualized volatility", l1.annualized_volatility),
+        _risk_metric_row("Parametric VaR", l1.parametric_var),
+        _risk_metric_row("Parametric ES", l1.parametric_es),
+    ]
+    if meta.mark_source != "live":
+        lines.extend(
+            [
+                "",
+                "_Model prior — not custodian marks._",
+            ]
+        )
+    top = _top_variance_classes(report.level_2_contributions.by_class)
+    if top:
+        lines.extend(
+            [
+                "",
+                "**Top variance contributors:**",
+                "",
+                "| Class | Weight | % variance |",
+                "| --- | --- | --- |",
+            ]
+        )
+        for row in top:
+            lines.append(
+                f"| {row.asset_class} | {row.weight:.2%} | "
+                f"{row.pct_variance_contribution:.2%} |"
+            )
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
 def _limitations_section(bundle: ReportBundle) -> str:
     lines = ["## Limitations", ""]
     lines.extend(f"- {item}" for item in bundle.limitations)
@@ -313,6 +444,8 @@ def _render_internal(bundle: ReportBundle) -> str:
         "",
         _tax_table(bundle),
         "",
+        _exhibit_d_attribution(bundle),
+        _exhibit_e_risk(bundle),
         _execution_section(bundle),
         "",
         _implications_checklist(),

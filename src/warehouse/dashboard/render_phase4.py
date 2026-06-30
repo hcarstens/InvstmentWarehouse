@@ -249,6 +249,8 @@ def render_report_writer_section(
     sha_preview = html.escape(data.external_pdf_sha256_preview or "—")
     sha_full = html.escape(data.external_pdf_sha256 or "")
     sha_title = f' title="{sha_full}"' if sha_full else ""
+    attr_status = html.escape(data.attribution_status or "—")
+    risk_status = html.escape(data.risk_headline_status or "—")
     return f"""
   <section>
     <h2>Report writer — {html.escape(data.household_id)}</h2>
@@ -257,6 +259,8 @@ def render_report_writer_section(
        period <code>{html.escape(data.period_label or "—")}</code> ·
        as of {html.escape(str(data.as_of_date))} ·
        generated {html.escape(ts)}</p>
+    <p>Attribution exhibit: <strong>{attr_status}</strong> ·
+       Risk headline exhibit: <strong>{risk_status}</strong></p>
     <h3>Executive summary (BLUF) — external.md excerpt</h3>
     <blockquote><p>{bluf}</p></blockquote>
     <p><em>Figures in the preview trace to exhibits in
