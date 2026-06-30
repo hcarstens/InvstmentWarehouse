@@ -47,7 +47,9 @@ from warehouse.reporting.performance import (
     RealizedGainEvent,
 )
 from warehouse.reporting.report_writer.models import (
+    ComparisonDelta,
     ReportBundle,
+    ReportComparison,
     ReportPeriod,
     WrittenHouseholdReport,
 )
@@ -78,6 +80,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     AnalystReview,
     AttributionReport,
     BacktestResult,
+    ComparisonDelta,
     DispatchContext,
     Event,
     HouseholdPerformanceReport,
@@ -98,6 +101,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     RebalanceProposal,
     RealizedGainEvent,
     ReportBundle,
+    ReportComparison,
     ReportingTaxResult,
     RiskDeltas,
     RiskResult,
@@ -323,6 +327,22 @@ def _sample_instance(cls: type[Any]) -> Any:
             scenario_tax=Decimal("1100"),
             tax_delta=Decimal("100"),
         )
+    if cls is ComparisonDelta:
+        return ComparisonDelta(
+            label="total_market_value",
+            current=Decimal("1000000"),
+            prior=Decimal("950000"),
+            abs_delta=Decimal("50000"),
+            pct_delta=Decimal("0.0526"),
+        )
+    if cls is ReportComparison:
+        return ReportComparison(
+            prior_snapshot_id="rpt_prior",
+            prior_as_of_date=date(2026, 5, 31),
+            is_adjacent=True,
+            performance=(_sample_instance(ComparisonDelta),),
+            drift=(),
+        )
     if cls is ReportBundle:
         return ReportBundle(
             snapshot_id="rpt_test",
@@ -503,6 +523,10 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "amount"
     if isinstance(instance, ReportingTaxResult):
         return "tax_delta"
+    if isinstance(instance, ComparisonDelta):
+        return "label"
+    if isinstance(instance, ReportComparison):
+        return "prior_snapshot_id"
     if isinstance(instance, ReportBundle):
         return "snapshot_id"
     if isinstance(instance, WrittenHouseholdReport):

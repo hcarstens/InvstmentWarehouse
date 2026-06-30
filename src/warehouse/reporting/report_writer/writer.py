@@ -228,6 +228,7 @@ def build_and_write_household_reports(
         household_id,
         period=period,
         as_of=as_of,
+        base=repo_root(),
     )
     output_dir = (
         repo_root()

@@ -3,8 +3,10 @@
 **Status:** **rw0–rw5 shipped** — `report.build` COMMAND live; external PDF channel via Pandoc
 with sha256 pinning; month-end batch fan-out via `workflows.month_end.run_month_end_reporting_batch`.
 **rw6 shipped (2026-06-30):** advisor approval gate — external PDF now requires an
-APPROVED report-subject approval (recon gate still first). Remaining seams in §7/§16:
-rw7 comparability columns, rw8 collector import-cycle fix.
+APPROVED report-subject approval (recon gate still first).
+**rw7 shipped (2026-06-30):** comparability columns — Exhibits A/B carry prior-period +
+Δ columns from the previous `bundle.json` (walk-forward safe; `n/a` not `0` on the first
+report). Remaining seam in §7/§16: rw8 collector import-cycle fix.
 **Date:** 2026-06-30
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
 **Inputs:** [`research/report_writing.md`](research/report_writing.md) (reader-first structure,
@@ -391,7 +393,7 @@ it positionally, and OMS `stage_orders_from_approval` **joins on it**
   `optimization_run_id` and `report_snapshot_id` **raises**.
 - Existing optimization-approval + OMS staging tests stay green (migration is back-compatible).
 
-### rw7 — comparability columns (prior-period / YoY) *(after rw6)*
+### rw7 — comparability columns (prior-period / YoY) *(shipped 2026-06-30)*
 
 **Goal:** satisfy the persona's **comparable, time-adjusted-figures axiom** (§7, Fi2) — "a number
 is decision-grade only when placed against the prior period, a benchmark, or a present-value
@@ -550,7 +552,7 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 | rw4 PDF channel | shipped | Pandoc v1; `external.pdf` + `external_pdf_sha256`; recon gate blocks PDF not Markdown; `warehouse report pdf` |
 | rw5 extended exhibits | shipped | internal Exhibit D (attribution) + E (risk headline); external D/E deferred |
 | rw6 advisor approval gate | **shipped** | `ApprovalSubject` (optimization\|report); nullable `optimization_run_id` + `subject_type`/`subject_id` (migration 007, back-filled); `approval.create` reused via XOR `report_snapshot_id`; `approve_and_render_report` produces the PDF only after sign-off (recon gate still precedes); `warehouse report approve`; panel `delivery_state` (delivered\|awaiting_delivery) |
-| rw7 comparability columns | **planned** | prior-period / YoY Δ from prior `bundle.json`; `n/a` not `0` on first report |
+| rw7 comparability columns | **shipped** | `find_prior_bundle` loads the most recent strictly-earlier `bundle.json` (no lookahead); `ReportComparison`/`ComparisonDelta` (frozen, registered) carry per-figure prior + Δ; Exhibits A (perf) and B (internal drift) render `Prior` + `Δ` columns, `n/a` (never `0`) on first report; limitation lines for missing / non-adjacent prior; panel `comparison_summary` |
 | rw8 collector import-cycle fix | **planned** | function-scope cross-plane imports; drop rw5 workaround |
 
 ---
@@ -564,7 +566,7 @@ rw6 → rw7 → rw8; rw8 is independent and can land any time.
 | Seam | Persona axiom | Why it matters | Slice |
 | --- | --- | --- | --- |
 | **Advisor approval gate** | §6 Credibility through costly signal (T3) | A client-of-record document ships with no named human sign-off; the §1 dataflow's review gate is hollow. Highest value; `approval.create` already exists to extend. | **rw6 (shipped)** |
-| **Comparability** | §7 Comparable, time-adjusted figures (Fi2) | Exhibits are point-in-time — a figure with no prior-period denominator is not decision-grade. | rw7 |
+| **Comparability** | §7 Comparable, time-adjusted figures (Fi2) | Exhibits are point-in-time — a figure with no prior-period denominator is not decision-grade. | **rw7 (shipped)** |
 | **Collector import cycle** | — (engineering hygiene) | `collect.py` imports all five planes at module scope; recurring cycle risk (JOURNAL 2026-06-30). Not reader-facing. | rw8 |
 
 ---

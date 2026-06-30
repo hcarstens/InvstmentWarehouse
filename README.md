@@ -27,13 +27,16 @@ python --version                # confirm: Python 3.12.x
 `external.pdf` output:
 
 ```bash
-brew install pandoc          # macOS
-sudo apt install pandoc      # Debian/Ubuntu
+brew install pandoc weasyprint           # macOS
+sudo apt install -y pandoc weasyprint    # Debian/Ubuntu
 ```
 
-A PDF engine (wkhtmltopdf, weasyprint, or a LaTeX distribution) may also be required.
-Markdown + `bundle.json` remain canonical without Pandoc; `report.build` fails loudly if PDF
-render is attempted without it.
+Pandoc needs a PDF engine — `weasyprint` (above) is the lightest; wkhtmltopdf or a LaTeX
+distribution (`xelatex`/`pdflatex`) also work. These are **system binaries, not pip
+packages** — the report writer shells out to them, so they live in the OS, not
+`pyproject.toml`. Markdown + `bundle.json` remain canonical without Pandoc; `report.build`
+fails loudly if PDF render is attempted without it. CI installs both so the `pandoc`-marked
+tests run.
 
 Config lives in `configs/development.toml` (committed, not secrets). Optional machine overrides: `configs/local.toml` (gitignored).
 

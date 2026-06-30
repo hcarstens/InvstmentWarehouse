@@ -251,6 +251,7 @@ def render_report_writer_section(
     sha_title = f' title="{sha_full}"' if sha_full else ""
     attr_status = html.escape(data.attribution_status or "—")
     risk_status = html.escape(data.risk_headline_status or "—")
+    comparison = html.escape(data.comparison_summary or "—")
     if data.delivery_state == "delivered":
         delivery = (
             '<span class="badge badge-live">delivered</span> '
@@ -275,6 +276,7 @@ def render_report_writer_section(
     <p>Client delivery: {delivery}</p>
     <p>Attribution exhibit: <strong>{attr_status}</strong> ·
        Risk headline exhibit: <strong>{risk_status}</strong></p>
+    <p>Prior-period comparison: <strong>{comparison}</strong></p>
     <h3>Executive summary (BLUF) — external.md excerpt</h3>
     <blockquote><p>{bluf}</p></blockquote>
     <p><em>Figures in the preview trace to exhibits in

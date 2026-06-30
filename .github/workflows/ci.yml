@@ -46,6 +46,10 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - name: Install Pandoc + PDF engine (report writer)
+        # System binaries the report writer shells out to — not pip packages.
+        # Present so the @pytest.mark.pandoc external-PDF test runs in CI.
+        run: sudo apt-get update && sudo apt-get install -y pandoc weasyprint
       - name: Install dependencies
         run: |
           python -m pip install --upgrade 'pip>=26.1.2'

@@ -4,6 +4,48 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-30 — rw7: comparability columns (prior-period / Δ)
+
+**Problem:** every report-writer exhibit was point-in-time — a performance or
+drift figure shipped with no denominator. That violates the report-writer
+persona's comparable-figures axiom (Fi2): a number is decision-grade only when
+placed against the prior period. The reader had no way to tell a flat quarter
+from a moving one.
+
+**Shipped:**
+
+- **`find_prior_bundle(household_id, *, as_of, base=None)`**
+  (`reporting/report_writer/collect.py`) — globs `runs/reports/{hh}/**/bundle.json`
+  and returns the bundle with the greatest `as_of_date` **strictly earlier**
+  than the current `as_of`. Walk-forward safe: a bundle dated on/after the
+  current report is never read as "prior" (no lookahead — CLAUDE.md convention).
+- **`ReportComparison` + `ComparisonDelta`** (`models.py`) — frozen, registered
+  in `frozen_registry.FROZEN_TYPES` (samples + mutation probes; `test_frozen`
+  green). `ComparisonDelta` carries `prior`, `abs_delta`, and a fractional
+  `pct_delta` (None when prior is zero). The comparison is a lightweight delta
+  snapshot, **not** a nested `ReportBundle`, so the prior chain never recurses.
+- **Render** (`render.py`) — Exhibit A (performance, both audiences) and Exhibit
+  B internal drift table render `Prior` + `Δ` columns. When no prior figure
+  exists the cells read `n/a` — never a fabricated `0` (honesty rule §3).
+- **Limitations** — the existing generator emits a line when there is no prior
+  (first report) or the prior is from a non-adjacent month (gap ≠ 1).
+- **Base threading** — `collect_report_bundle` gained an optional `base`;
+  `build_and_write_household_reports` passes `repo_root()` so the prior-lookup
+  base matches where artifacts are written (no test monkeypatch coupling).
+- **Dashboard** — Report writer panel shows `comparison_summary`
+  (`vs <prior as_of> (adjacent|non-adjacent) · <snapshot>` or first-report note).
+
+**Tests** (`tests/test_report_writer.py`): most-recent-earlier wins and the
+future bundle is never picked; second report shows prior + Δ on perf and drift;
+first report renders `n/a` not `$0.00`; a later-dated bundle is never used as
+prior; non-adjacent prior emits its limitation; `bundle.json` round-trips the
+comparison; panel surfaces the summary. Full gate green (ruff, mypy, 665 pytest).
+
+**Deferred to rw8:** the module-scope cross-plane import cycle in `collect.py`
+(unchanged here — `find_prior_bundle` reads only `config`/`Path`).
+
+---
+
 ## 2026-06-30 — rw6: advisor approval gate on client delivery
 
 **Problem:** the report writer's external PDF (the client-of-record document)

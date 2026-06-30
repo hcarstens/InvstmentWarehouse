@@ -51,7 +51,9 @@ from warehouse.reporting.report_writer import (
     collect_report_bundle,
     render_external_pdf,
     render_markdown,
+    write_report_bundle,
 )
+from warehouse.reporting.report_writer.collect import find_prior_bundle
 from warehouse.reporting.report_writer.pdf import sha256_file
 
 AS_OF = date(2026, 6, 24)
@@ -1052,3 +1054,250 @@ def test_dashboard_panel_awaiting_delivery_before_approval(
     assert panel.panel_status == "live"
     assert panel.delivery_state == "awaiting_delivery"
     assert panel.external_pdf_path is None
+
+
+# --- rw7 comparability columns (prior-period / YoY) --------------------------
+
+_PERF_HEADER = "| Metric | Value | Prior | Δ |"
+_DRIFT_HEADER = "| Sleeve | Current | Target | Min | Max | Drift | Prior | Δ |"
+
+
+def _money(value: Decimal) -> str:
+    return f"${value:,.2f}"
+
+
+def _seed_prior_bundle(
+    base: Path,
+    *,
+    as_of: date,
+    scale: Decimal,
+    snapshot_id: str = "rpt_prior_seed",
+) -> ReportBundle:
+    """Write a synthetic earlier ``bundle.json`` for DEMO under *base*.
+
+    Reuses a real demo bundle's drift sleeves (so deltas align), scales the
+    performance figures, and back-dates ``as_of`` so it qualifies as a prior.
+    """
+    with session_scope() as session:
+        current = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+        )
+    perf = current.performance
+    assert perf is not None
+    scaled_perf = perf.model_copy(
+        update={
+            "total_market_value": perf.total_market_value * scale,
+            "unrealized_gain": perf.unrealized_gain * scale,
+            "realized_gain_ytd": perf.realized_gain_ytd * scale,
+            "as_of_date": as_of.isoformat(),
+        }
+    )
+    prior = current.model_copy(
+        update={
+            "snapshot_id": snapshot_id,
+            "as_of_date": as_of,
+            "generated_at": datetime(
+                as_of.year, as_of.month, as_of.day, tzinfo=UTC
+            ),
+            "period": ReportPeriod.month_end(as_of),
+            "performance": scaled_perf,
+            "comparison": None,
+        }
+    )
+    out = (
+        base
+        / "runs"
+        / "reports"
+        / DEMO
+        / prior.period.label
+        / prior.snapshot_id
+    )
+    write_report_bundle(prior, output_dir=out)
+    return prior
+
+
+def test_find_prior_bundle_returns_most_recent_earlier(tmp_path: Path) -> None:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    _seed_prior_bundle(
+        tmp_path,
+        as_of=date(2026, 4, 30),
+        scale=Decimal("0.7"),
+        snapshot_id="rpt_older",
+    )
+    _seed_prior_bundle(
+        tmp_path,
+        as_of=date(2026, 5, 31),
+        scale=Decimal("0.9"),
+        snapshot_id="rpt_recent",
+    )
+    _seed_prior_bundle(
+        tmp_path,
+        as_of=date(2026, 7, 31),
+        scale=Decimal("1.2"),
+        snapshot_id="rpt_future",
+    )
+    prior = find_prior_bundle(DEMO, as_of=AS_OF, base=tmp_path)
+    assert prior is not None
+    # Most recent strictly-earlier wins; the future bundle is never read.
+    assert prior.snapshot_id == "rpt_recent"
+    assert prior.as_of_date == date(2026, 5, 31)
+
+
+def test_second_report_shows_prior_and_delta_columns(
+    tmp_path: Path,
+) -> None:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    prior = _seed_prior_bundle(
+        tmp_path, as_of=date(2026, 5, 31), scale=Decimal("0.8")
+    )
+    assert prior.performance is not None
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+            base=tmp_path,
+        )
+    assert bundle.comparison is not None
+    assert bundle.comparison.prior_snapshot_id == prior.snapshot_id
+    assert bundle.comparison.is_adjacent  # May -> June
+    assert bundle.performance is not None
+    perf_deltas = {d.label: d for d in bundle.comparison.performance}
+    mv = perf_deltas["total_market_value"]
+    assert mv.prior == prior.performance.total_market_value
+    assert mv.abs_delta == (
+        bundle.performance.total_market_value
+        - prior.performance.total_market_value
+    )
+    md = render_markdown(bundle, ReportAudience.INTERNAL)
+    assert _PERF_HEADER in md
+    assert _DRIFT_HEADER in md
+    # The prior figure is rendered, not fabricated.
+    assert _money(prior.performance.total_market_value) in md
+
+
+def test_first_report_renders_na_not_zero(tmp_path: Path) -> None:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+            base=tmp_path,
+        )
+    assert bundle.comparison is None
+    assert any("first report" in note for note in bundle.limitations)
+    md = render_markdown(bundle, ReportAudience.INTERNAL)
+    assert _PERF_HEADER in md
+    perf_section = md.split("## Exhibit A")[1].split("## Exhibit B")[0]
+    mv_line = next(
+        line
+        for line in perf_section.splitlines()
+        if "Total market value" in line
+    )
+    # Prior + Δ cells read n/a — never a fabricated $0.00.
+    assert "n/a" in mv_line
+    assert "$0.00" not in mv_line
+
+
+def test_comparison_never_reads_future_bundle(tmp_path: Path) -> None:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    # Only a later-dated bundle exists — it must never be used as "prior".
+    _seed_prior_bundle(
+        tmp_path,
+        as_of=date(2026, 7, 31),
+        scale=Decimal("1.3"),
+        snapshot_id="rpt_future",
+    )
+    assert find_prior_bundle(DEMO, as_of=AS_OF, base=tmp_path) is None
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+            base=tmp_path,
+        )
+    assert bundle.comparison is None
+    assert any("first report" in note for note in bundle.limitations)
+
+
+def test_non_adjacent_prior_emits_limitation(tmp_path: Path) -> None:
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    # April -> June is a 2-month gap (skips May): non-adjacent.
+    _seed_prior_bundle(tmp_path, as_of=date(2026, 4, 30), scale=Decimal("0.8"))
+    with session_scope() as session:
+        bundle = collect_report_bundle(
+            session,
+            DEMO,
+            period=ReportPeriod.month_end(AS_OF),
+            as_of=AS_OF,
+            base=tmp_path,
+        )
+    assert bundle.comparison is not None
+    assert not bundle.comparison.is_adjacent
+    assert any(
+        "not the immediately preceding month" in note
+        for note in bundle.limitations
+    )
+
+
+def test_build_writes_comparison_to_bundle_json(
+    seeded_tmp_reports: Path,
+) -> None:
+    prior = _seed_prior_bundle(
+        seeded_tmp_reports, as_of=date(2026, 5, 31), scale=Decimal("0.85")
+    )
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+    bundle = ReportBundle.model_validate_json(
+        Path(written.bundle_json_path).read_text(encoding="utf-8")
+    )
+    assert bundle.comparison is not None
+    assert bundle.comparison.prior_snapshot_id == prior.snapshot_id
+
+
+def test_panel_shows_comparison_summary(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    from warehouse.dashboard.report_writer_data import (
+        load_report_writer_panel,
+    )
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    _seed_prior_bundle(tmp_path, as_of=date(2026, 5, 31), scale=Decimal("0.9"))
+    with session_scope() as session:
+        build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+    panel = load_report_writer_panel(
+        household_id=DEMO, reports_base_path=tmp_path
+    )
+    assert panel.comparison_summary is not None
+    assert "2026-05-31" in panel.comparison_summary
+    assert "adjacent" in panel.comparison_summary

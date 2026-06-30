@@ -34,6 +34,8 @@ class ReportWriterPanelData(BaseModel):
     external_pdf_sha256_preview: str | None = None
     attribution_status: str | None = None
     risk_headline_status: str | None = None
+    # rw7: prior-period comparison provenance (or first-report note).
+    comparison_summary: str | None = None
     # delivered (PDF present) | awaiting_delivery (rw6 — recon/approval gate)
     delivery_state: str | None = None
     panel_status: str = "empty"  # empty | live | error
@@ -144,6 +146,15 @@ def load_report_writer_panel(
     risk_status = (
         "live" if bundle.risk_headline is not None else "not computed"
     )
+    comp = bundle.comparison
+    if comp is None:
+        comparison_summary = "no prior — first report (Δ columns n/a)"
+    else:
+        adjacency = "adjacent" if comp.is_adjacent else "non-adjacent"
+        comparison_summary = (
+            f"vs {comp.prior_as_of_date.isoformat()} ({adjacency}) · "
+            f"{comp.prior_snapshot_id}"
+        )
     external_pdf_path = snapshot_dir / "external.pdf"
     pdf_path_str: str | None = None
     pdf_sha: str | None = None
@@ -186,6 +197,7 @@ def load_report_writer_panel(
             bundle_json_path=str(bundle_path),
             attribution_status=attr_status,
             risk_headline_status=risk_status,
+            comparison_summary=comparison_summary,
             delivery_state="awaiting_delivery",
             panel_status="live",
         )
@@ -206,6 +218,7 @@ def load_report_writer_panel(
         external_pdf_sha256_preview=pdf_preview,
         attribution_status=attr_status,
         risk_headline_status=risk_status,
+        comparison_summary=comparison_summary,
         delivery_state="delivered",
         panel_status="live",
     )

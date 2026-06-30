@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
@@ -38,6 +39,41 @@ class ReportPeriod(BaseModel):
         )
 
 
+class ComparisonDelta(BaseModel):
+    """One figure placed against its prior-period value (persona Fi2).
+
+    ``abs_delta``/``pct_delta`` are ``None`` when either side is absent — the
+    renderer shows ``n/a`` rather than fabricating a zero (honesty rule §3).
+    ``pct_delta`` is a fraction (``0.05`` == +5%); ``None`` when prior is zero.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    current: Decimal | None
+    prior: Decimal | None
+    abs_delta: Decimal | None
+    pct_delta: Decimal | None
+
+
+class ReportComparison(BaseModel):
+    """Prior-period reference + per-figure deltas for the current bundle.
+
+    Sourced from the most recent prior ``bundle.json`` for the household whose
+    ``as_of`` is strictly earlier (walk-forward safe — no lookahead). A
+    lightweight delta snapshot, not a nested ``ReportBundle``, so the chain
+    never recurses.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    prior_snapshot_id: str
+    prior_as_of_date: date
+    is_adjacent: bool
+    performance: tuple[ComparisonDelta, ...]
+    drift: tuple[ComparisonDelta, ...]
+
+
 class ReportBundle(BaseModel):
     """Frozen terrain map — compiled facts from plane outputs."""
 
@@ -58,6 +94,7 @@ class ReportBundle(BaseModel):
     data_sources: tuple[str, ...]
     attribution: AttributionReport | None = None
     risk_headline: RiskResult | None = None
+    comparison: ReportComparison | None = None
 
 
 class WrittenHouseholdReport(BaseModel):

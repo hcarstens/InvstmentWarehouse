@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from decimal import Decimal
 
 from warehouse.decision.analyst.models import ACTIVE_RETURN_LABEL
 from warehouse.reporting.report_writer.models import (
+    ComparisonDelta,
     ReportAudience,
     ReportBundle,
 )
@@ -22,6 +24,37 @@ def _after_tax_display(value: Decimal | None) -> str:
     if value is None:
         return "n/a"
     return f"{value:.4f}"
+
+
+def _fmt_ratio(value: Decimal) -> str:
+    return f"{value:.4f}"
+
+
+def _delta_display(
+    delta: ComparisonDelta | None,
+    fmt: Callable[[Decimal], str],
+) -> tuple[str, str]:
+    """Return (prior, Δ) display cells for a comparison figure.
+
+    ``n/a`` whenever a prior figure is absent — never a fabricated zero
+    (honesty rule §3). The Δ cell carries the signed absolute change and, when
+    the prior is non-zero, the percent change.
+    """
+    if delta is None or delta.prior is None:
+        return "n/a", "n/a"
+    prior_cell = fmt(delta.prior)
+    if delta.abs_delta is None:
+        return prior_cell, "n/a"
+    sign = "+" if delta.abs_delta >= Decimal("0") else "-"
+    magnitude = fmt(abs(delta.abs_delta))
+    pct = f" ({delta.pct_delta:+.2%})" if delta.pct_delta is not None else ""
+    return prior_cell, f"{sign}{magnitude}{pct}"
+
+
+def _comparison_map(
+    deltas: tuple[ComparisonDelta, ...] | None,
+) -> dict[str, ComparisonDelta]:
+    return {d.label: d for d in deltas} if deltas else {}
 
 
 def _yaml_front_matter(
@@ -55,15 +88,31 @@ def _performance_table(bundle: ReportBundle) -> str:
     perf = bundle.performance
     if perf is None:
         return "_Performance data unavailable._\n"
-    return (
-        "| Metric | Value |\n"
-        "| --- | --- |\n"
-        f"| Total market value | {_fmt_money(perf.total_market_value)} |\n"
-        f"| Unrealized gain | {_fmt_money(perf.unrealized_gain)} |\n"
-        f"| Realized gain YTD | {_fmt_money(perf.realized_gain_ytd)} |\n"
-        f"| After-tax return YTD | "
-        f"{_after_tax_display(perf.after_tax_return_ytd)} |\n"
+    comp = bundle.comparison
+    deltas = _comparison_map(comp.performance if comp is not None else None)
+    money_rows = (
+        ("Total market value", "total_market_value", perf.total_market_value),
+        ("Unrealized gain", "unrealized_gain", perf.unrealized_gain),
+        ("Realized gain YTD", "realized_gain_ytd", perf.realized_gain_ytd),
     )
+    lines = [
+        "| Metric | Value | Prior | Δ |",
+        "| --- | --- | --- | --- |",
+    ]
+    for label, key, value in money_rows:
+        prior_cell, delta_cell = _delta_display(deltas.get(key), _fmt_money)
+        lines.append(
+            f"| {label} | {_fmt_money(value)} | {prior_cell} | {delta_cell} |"
+        )
+    at_prior, at_delta = _delta_display(
+        deltas.get("after_tax_return_ytd"), _fmt_ratio
+    )
+    lines.append(
+        f"| After-tax return YTD | "
+        f"{_after_tax_display(perf.after_tax_return_ytd)} | {at_prior} | "
+        f"{at_delta} |"
+    )
+    return "\n".join(lines) + "\n"
 
 
 def _ips_in_band(bundle: ReportBundle) -> bool:
@@ -139,15 +188,21 @@ def _exhibit_b_internal(bundle: ReportBundle) -> str:
     drift = bundle.ips_drift
     if drift is None:
         return "_IPS drift data unavailable._\n"
+    comp = bundle.comparison
+    deltas = _comparison_map(comp.drift if comp is not None else None)
     lines = [
-        "| Sleeve | Current | Target | Min | Max | Drift |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Sleeve | Current | Target | Min | Max | Drift | Prior | Δ |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in drift.rows:
+        prior_cell, delta_cell = _delta_display(
+            deltas.get(row.asset_class), _fmt_pct
+        )
         lines.append(
             f"| {row.asset_class} | {row.current_weight:.2%} | "
             f"{row.target_weight:.2%} | {row.min_weight:.2%} | "
-            f"{row.max_weight:.2%} | {row.drift:+.2%} |"
+            f"{row.max_weight:.2%} | {row.drift:+.2%} | {prior_cell} | "
+            f"{delta_cell} |"
         )
     lines.append("")
     if drift.alerts:

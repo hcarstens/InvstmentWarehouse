@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
-from warehouse.config import get_settings
+from warehouse.config import get_settings, repo_root
 from warehouse.data.alternatives.service import (
     AlternativeHoldingView,
     list_alternative_holdings,
@@ -21,7 +22,10 @@ from warehouse.decision.analyst.attribution import (
 from warehouse.decision.analyst.models import AttributionReport
 from warehouse.decision.approval import ApprovalStatus
 from warehouse.decision.approval.service import list_approval_requests
-from warehouse.decision.ips.monitor import build_ips_drift_report
+from warehouse.decision.ips.monitor import (
+    IpsDriftReport,
+    build_ips_drift_report,
+)
 from warehouse.decision.ips.store import load_ips
 from warehouse.decision.tax.scenarios import TaxScenarioOverlays
 from warehouse.execution.oms.service import list_staged_orders
@@ -30,10 +34,13 @@ from warehouse.execution.reconciliation.service import (
     list_reconciliation_breaks,
 )
 from warehouse.reporting.performance import (
+    HouseholdPerformanceReport,
     build_household_performance_report,
 )
 from warehouse.reporting.report_writer.models import (
+    ComparisonDelta,
     ReportBundle,
+    ReportComparison,
     ReportPeriod,
 )
 from warehouse.reporting.tax import (
@@ -193,6 +200,8 @@ def _build_limitations(
     attribution_limitations: tuple[str, ...] = (),
     risk_limitations: tuple[str, ...] = (),
     attribution_skipped: bool = False,
+    prior_missing: bool = False,
+    non_adjacent_prior_label: str | None = None,
 ) -> tuple[str, ...]:
     items: list[str] = [
         (
@@ -220,6 +229,16 @@ def _build_limitations(
         )
     if attribution_skipped:
         items.append("Attribution not computed — no attributable positions.")
+    if prior_missing:
+        items.append(
+            "No prior report for this household — comparison columns show "
+            "n/a (first report)."
+        )
+    elif non_adjacent_prior_label is not None:
+        items.append(
+            f"Prior comparison period ({non_adjacent_prior_label}) is not "
+            "the immediately preceding month — Δ is not period-over-period."
+        )
     items.extend(attribution_limitations)
     items.extend(risk_limitations)
     return tuple(items)
@@ -239,12 +258,127 @@ def _risk_limitation_notes(risk: RiskResult) -> tuple[str, ...]:
     return tuple(notes)
 
 
+def find_prior_bundle(
+    household_id: str,
+    *,
+    as_of: date,
+    base: Path | None = None,
+) -> ReportBundle | None:
+    """Most recent prior ``bundle.json`` for a household — walk-forward safe.
+
+    Returns the bundle with the greatest ``as_of_date`` strictly earlier than
+    *as_of*; a bundle dated on or after *as_of* is never returned (no
+    lookahead — CLAUDE.md walk-forward convention). ``base`` defaults to the
+    repo root so the read base matches where the writer persists artifacts.
+    """
+    root = base if base is not None else repo_root()
+    hh_dir = root / "runs" / "reports" / household_id
+    if not hh_dir.is_dir():
+        return None
+
+    best: tuple[date, datetime, ReportBundle] | None = None
+    for bundle_path in hh_dir.glob("**/bundle.json"):
+        try:
+            prior = ReportBundle.model_validate_json(
+                bundle_path.read_text(encoding="utf-8")
+            )
+        except (OSError, ValueError):
+            continue
+        if prior.as_of_date >= as_of:
+            continue  # walk-forward: never read a bundle at/after current
+        generated = prior.generated_at
+        if generated.tzinfo is None:
+            generated = generated.replace(tzinfo=UTC)
+        if best is None or (prior.as_of_date, generated) > (best[0], best[1]):
+            best = (prior.as_of_date, generated, prior)
+    return best[2] if best else None
+
+
+def _months_between(earlier: date, later: date) -> int:
+    return (later.year - earlier.year) * 12 + (later.month - earlier.month)
+
+
+def _comparison_delta(
+    label: str,
+    current: Decimal | None,
+    prior: Decimal | None,
+) -> ComparisonDelta:
+    abs_delta: Decimal | None = None
+    pct_delta: Decimal | None = None
+    if current is not None and prior is not None:
+        abs_delta = current - prior
+        if prior != Decimal("0"):
+            pct_delta = abs_delta / abs(prior)
+    return ComparisonDelta(
+        label=label,
+        current=current,
+        prior=prior,
+        abs_delta=abs_delta,
+        pct_delta=pct_delta,
+    )
+
+
+def _performance_deltas(
+    performance: HouseholdPerformanceReport | None,
+    prior: HouseholdPerformanceReport | None,
+) -> tuple[ComparisonDelta, ...]:
+    fields = (
+        "total_market_value",
+        "unrealized_gain",
+        "realized_gain_ytd",
+        "after_tax_return_ytd",
+    )
+    deltas: list[ComparisonDelta] = []
+    for name in fields:
+        cur = getattr(performance, name) if performance is not None else None
+        pri = getattr(prior, name) if prior is not None else None
+        deltas.append(_comparison_delta(name, cur, pri))
+    return tuple(deltas)
+
+
+def _drift_deltas(
+    ips_drift: IpsDriftReport | None,
+    prior: IpsDriftReport | None,
+) -> tuple[ComparisonDelta, ...]:
+    prior_weights: dict[str, Decimal] = {}
+    if prior is not None:
+        prior_weights = {r.asset_class: r.current_weight for r in prior.rows}
+    deltas: list[ComparisonDelta] = []
+    if ips_drift is not None:
+        for row in ips_drift.rows:
+            deltas.append(
+                _comparison_delta(
+                    row.asset_class,
+                    row.current_weight,
+                    prior_weights.get(row.asset_class),
+                )
+            )
+    return tuple(deltas)
+
+
+def _build_comparison(
+    prior: ReportBundle,
+    *,
+    as_of: date,
+    performance: HouseholdPerformanceReport | None,
+    ips_drift: IpsDriftReport | None,
+) -> ReportComparison:
+    return ReportComparison(
+        prior_snapshot_id=prior.snapshot_id,
+        prior_as_of_date=prior.as_of_date,
+        is_adjacent=_months_between(prior.as_of_date, as_of) == 1,
+        performance=_performance_deltas(performance, prior.performance),
+        drift=_drift_deltas(ips_drift, prior.ips_drift),
+    )
+
+
 def collect_report_bundle(
     session: Session,
     household_id: str,
     *,
     period: ReportPeriod,
     as_of: date,
+    base: Path | None = None,
 ) -> ReportBundle:
     """Assemble a frozen terrain map from registered plane outputs."""
     positions = list_lot_positions(session, household_id=household_id)
@@ -290,6 +424,23 @@ def collect_report_bundle(
     )
     risk_lims = _risk_limitation_notes(risk_headline)
 
+    prior = find_prior_bundle(household_id, as_of=as_of, base=base)
+    comparison = (
+        _build_comparison(
+            prior,
+            as_of=as_of,
+            performance=performance,
+            ips_drift=ips_drift,
+        )
+        if prior is not None
+        else None
+    )
+    non_adjacent_label = (
+        comparison.prior_as_of_date.isoformat()
+        if comparison is not None and not comparison.is_adjacent
+        else None
+    )
+
     limitations = _build_limitations(
         snapshot_id=snapshot_id,
         as_of_date=as_of,
@@ -299,6 +450,8 @@ def collect_report_bundle(
         attribution_limitations=attribution_lims,
         risk_limitations=risk_lims,
         attribution_skipped=attribution is None,
+        prior_missing=prior is None,
+        non_adjacent_prior_label=non_adjacent_label,
     )
 
     return ReportBundle(
@@ -317,4 +470,5 @@ def collect_report_bundle(
         data_sources=_DATA_SOURCES,
         attribution=attribution,
         risk_headline=risk_headline,
+        comparison=comparison,
     )
