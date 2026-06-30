@@ -9,7 +9,7 @@ def test_risk_build_report_has_deliverables() -> None:
     assert report.contract_status == "v1.2"
     assert len(report.deliverables) >= 7
     assert len(report.rungs) == 5
-    assert report.shipped_count == 23
+    assert report.shipped_count == 24
     assert report.planned_count == 0
     assert report.synthetic_ips_status == "si4"
     assert len(report.synthetic_ips_deliverables) == 6
@@ -40,6 +40,10 @@ def test_risk_build_report_has_deliverables() -> None:
     assert qa2.status == "shipped"
     qa5 = next(d for d in report.deliverables if d.id == "qa5-optimizer-edges")
     assert qa5.status == "shipped"
+    qa6 = next(
+        d for d in report.deliverables if d.id == "qa6-walk-forward-guard"
+    )
+    assert qa6.status == "shipped"
 
 
 def test_render_risk_build_html_sections() -> None:

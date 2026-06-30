@@ -304,6 +304,19 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         ),
         falsifier_test="tests/test_corporate_actions.py",
     ),
+    BuildDeliverable(
+        id="qa6-walk-forward-guard",
+        track="qa_plan",
+        slice="qa6",
+        name="Walk-forward guard — future-data injection raises",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "validate_backtest_walk_forward on lots + marks; "
+            "scenario observation + series cutoff guards"
+        ),
+        falsifier_test="tests/test_walk_forward_guard.py",
+    ),
 ]
 
 RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (

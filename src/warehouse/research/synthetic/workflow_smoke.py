@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from warehouse.decision.ips.monitor import build_ips_drift_report_from_views
 from warehouse.decision.optimizer.heuristics import run_tax_aware_optimizer
+from warehouse.research.backtest.walk_forward import assert_lots_not_after
 from warehouse.research.synthetic.fixture_views import (
     lot_positions_from_fixture,
     smoke_as_of_date,
@@ -55,6 +56,30 @@ class WorkflowSmokeResult(BaseModel):
     @property
     def ok(self) -> bool:
         return all(check.ok for check in self.checks)
+
+
+def _walk_forward_guard_check(
+    bundle: SyntheticHouseholdBundle,
+    *,
+    as_of: date,
+) -> WorkflowSmokeCheck:
+    """qa6 — reject future lots before downstream legs run."""
+    restricted = frozenset(bundle.ips.restricted_securities)
+    positions = lot_positions_from_fixture(
+        bundle.fixture, restricted_tickers=restricted
+    )
+    try:
+        assert_lots_not_after(positions, as_of=as_of)
+        ok = True
+        detail = f"lots={len(positions)}; as_of={as_of.isoformat()}"
+    except Exception as err:
+        ok = False
+        detail = f"raised {type(err).__name__}: {err}"
+    return WorkflowSmokeCheck(
+        workflow="walk_forward_guard",
+        ok=ok,
+        detail=detail,
+    )
 
 
 def _policy_monitoring_check(
@@ -237,6 +262,7 @@ def run_workflow_smoke(
     """Run the full in-process smoke (drift, v0 TLH, MV-QP, scenario, PM)."""
     eval_date = as_of or smoke_as_of_date(bundle.fixture)
     checks = [
+        _walk_forward_guard_check(bundle, as_of=eval_date),
         _policy_monitoring_check(bundle),
         _rebalance_tax_overlay_check(bundle, as_of=eval_date),
         _mv_rebalance_qp_check(bundle),

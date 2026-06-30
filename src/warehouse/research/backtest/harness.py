@@ -15,7 +15,10 @@ from sqlalchemy.orm import Session
 from warehouse.config import Settings, get_settings
 from warehouse.data.ledger.views import list_lot_positions
 from warehouse.infra.db.models import BacktestRunRow
-from warehouse.research.backtest import BacktestResult, WalkForwardError
+from warehouse.research.backtest import BacktestResult
+from warehouse.research.backtest.walk_forward import (
+    validate_backtest_walk_forward,
+)
 
 
 class BacktestRunView(BaseModel):
@@ -55,11 +58,16 @@ def run_backtest(
 ) -> BacktestRunView:
     cfg = settings or get_settings()
     purge_days = cfg.walk_forward_purge_days
-    if (end_date - start_date).days < purge_days:
-        window_days = (end_date - start_date).days
-        raise WalkForwardError(f"{window_days}d < {purge_days}d purge min")
 
     positions = list_lot_positions(session, household_id=household_id)
+    validate_backtest_walk_forward(
+        session,
+        household_id=household_id,
+        positions=positions,
+        start_date=start_date,
+        end_date=end_date,
+        purge_days=purge_days,
+    )
     if not positions:
         raise ValueError(f"No positions for household {household_id}")
 
