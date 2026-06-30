@@ -38,6 +38,12 @@ class LotLedger(BaseModel):
     as_of_date: date
 
 
+from warehouse.data.ledger.corporate_actions import (  # noqa: E402
+    StockSplitAction,
+    apply_stock_split,
+    apply_stock_splits,
+    oracle_stock_split_basis,
+)
 from warehouse.data.ledger.wash_chains import (  # noqa: E402
     WashSaleSellEvent,
     assign_wash_sale_chain_ids,
@@ -48,7 +54,11 @@ __all__ = [
     "Lot",
     "LotLedger",
     "Position",
+    "StockSplitAction",
     "WashSaleSellEvent",
+    "apply_stock_split",
+    "apply_stock_splits",
     "assign_wash_sale_chain_ids",
+    "oracle_stock_split_basis",
     "substantially_identical_securities",
 ]

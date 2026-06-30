@@ -65,6 +65,7 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
             "tests/test_phase2.py",
             "tests/test_architecture.py",
             "tests/test_lot_properties.py",
+            "tests/test_corporate_actions.py",
         ],
         coverage_glob="src/warehouse/data/**",
         coverage_floor_pct=90.0,
@@ -73,7 +74,8 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         mutation_targets=["src/warehouse/data/ledger/__init__.py"],
         property_paths=["tests/test_lot_properties.py"],
         note=(
-            "Wash-sale chain merge under random lot streams (qa3); "
+            "Wash-sale chain merge (qa3); "
+            "corporate-action basis oracle (qa4); "
             "H2 partial-qty + ST6 boundary extension"
         ),
     ),

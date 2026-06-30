@@ -288,6 +288,19 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         ),
         falsifier_test="tests/test_phase4.py",
     ),
+    BuildDeliverable(
+        id="qa4-corporate-actions",
+        track="qa_plan",
+        slice="qa4",
+        name="Corporate actions on lot ledger",
+        status="shipped",
+        doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
+        note=(
+            "Stock split/reverse split via apply_stock_split; "
+            "independent total-basis oracle"
+        ),
+        falsifier_test="tests/test_corporate_actions.py",
+    ),
 ]
 
 RISK_BUILD_DELIVERABLES: list[BuildDeliverable] = (
