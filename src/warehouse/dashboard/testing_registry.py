@@ -72,6 +72,10 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         report_mutation=True,
         mutation_targets=["src/warehouse/data/ledger/__init__.py"],
         property_paths=["tests/test_lot_properties.py"],
+        note=(
+            "Wash-sale chain merge under random lot streams (qa3); "
+            "H2 partial-qty + ST6 boundary extension"
+        ),
     ),
     PlaneTestSlice(
         plane_id="research",

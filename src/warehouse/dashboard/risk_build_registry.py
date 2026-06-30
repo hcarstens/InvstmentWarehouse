@@ -237,8 +237,8 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         status="shipped",
         doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
         note=(
-            "Independent oracle on evaluate_wash_sale_risk "
-            "+ chain id invariant"
+            "Transitive chain merge via assign_wash_sale_chain_ids; "
+            "property oracle on random lot streams"
         ),
         falsifier_test="tests/test_lot_properties.py",
     ),
