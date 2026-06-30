@@ -46,6 +46,7 @@ from warehouse.reporting.report_writer import (
     ReportBundle,
     ReportPeriod,
     ReportWriterError,
+    approve_and_render_report,
     build_and_write_household_reports,
     collect_report_bundle,
     render_external_pdf,
@@ -80,6 +81,19 @@ def seeded() -> Iterator[None]:
 
 def _msg(op: str, kind: Kind, payload) -> Message:
     return Message(op=op, kind=kind, payload=payload, correlation_id="c")
+
+
+def _build_then_approve(session, *, household_id: str = DEMO):
+    """rw6: build a report, then advisor-approve it to render the PDF."""
+    written = build_and_write_household_reports(
+        session, household_id, as_of_date=AS_OF, actor_id="test"
+    )
+    return approve_and_render_report(
+        session,
+        household_id=household_id,
+        snapshot_id=written.snapshot_id,
+        reviewer_id="advisor:test",
+    )
 
 
 def _seed_household_with_lot(
@@ -333,10 +347,29 @@ def test_report_build_writes_three_files(seeded: None) -> None:
     assert Path(written.internal_markdown_path).is_file()
     assert Path(written.external_markdown_path).is_file()
     assert Path(written.bundle_json_path).is_file()
-    assert Path(written.external_pdf_path or "").is_file()
-    assert written.external_pdf_sha256 is not None
+    # rw6: PDF is the client-of-record deliverable — not produced at build
+    # time; it awaits advisor sign-off.
+    assert written.external_pdf_path is None
+    assert written.external_pdf_sha256 is None
     assert written.period_label == f"month-end-{AS_OF.isoformat()}"
     assert Path(written.output_dir).name == written.snapshot_id
+
+
+def test_external_pdf_blocked_until_advisor_approves(seeded: None) -> None:
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+        assert written.external_pdf_path is None  # awaiting approval
+        approved = approve_and_render_report(
+            session,
+            household_id=DEMO,
+            snapshot_id=written.snapshot_id,
+            reviewer_id="advisor:test",
+        )
+    assert approved.external_pdf_path is not None
+    assert Path(approved.external_pdf_path).is_file()
+    assert approved.external_pdf_sha256 is not None
 
 
 def test_report_build_messaging_round_trip(seeded: None) -> None:
@@ -517,12 +550,7 @@ def test_report_build_writes_external_pdf_when_pandoc_available(
         pytest.skip("pandoc not installed")
 
     with session_scope() as session:
-        written = build_and_write_household_reports(
-            session,
-            DEMO,
-            as_of_date=AS_OF,
-            actor_id="test",
-        )
+        written = _build_then_approve(session)
     pdf_path = Path(written.external_pdf_path or "")
     assert pdf_path.is_file()
     assert pdf_path.stat().st_size > 0
@@ -533,12 +561,7 @@ def test_external_pdf_sha256_matches_file_bytes(
     seeded_tmp_reports: Path,
 ) -> None:
     with session_scope() as session:
-        written = build_and_write_household_reports(
-            session,
-            DEMO,
-            as_of_date=AS_OF,
-            actor_id="test",
-        )
+        written = _build_then_approve(session)
     pdf_path = Path(written.external_pdf_path or "")
     assert pdf_path.is_file()
     assert written.external_pdf_sha256 == sha256_file(pdf_path)
@@ -577,24 +600,23 @@ def test_pdf_render_raises_when_pandoc_missing(
         )
 
 
-def test_report_build_audit_includes_pdf_hash(
+def test_report_approved_audit_includes_pdf_hash(
     seeded_tmp_reports: Path,
 ) -> None:
+    # rw6: the PDF hash lands on the report_approved row (advisor sign-off is
+    # what produces the client-of-record PDF), not on report_build.
     with session_scope() as session:
-        written = build_and_write_household_reports(
-            session,
-            DEMO,
-            as_of_date=AS_OF,
-            actor_id="test",
-        )
+        written = _build_then_approve(session)
         entries = list_audit_entries(session, household_id=DEMO)
     match = next(
         e
         for e in entries
-        if e.action == "report_build" and e.resource_id == written.snapshot_id
+        if e.action == "report_approved"
+        and e.resource_id == written.snapshot_id
     )
     assert match.details["external_pdf_path"] == written.external_pdf_path
     assert match.details["external_pdf_sha256"] == written.external_pdf_sha256
+    assert match.details["reviewer_id"] == "advisor:test"
 
 
 def _seed_open_break(session, *, account_id: str = "acct_demo") -> None:
@@ -649,7 +671,9 @@ def test_external_pdf_blocked_when_open_breaks(
     assert match.details.get("reason") == "open_reconciliation_breaks"
 
 
-def test_month_end_batch_pdf_on_success(seeded_tmp_reports: Path) -> None:
+def test_month_end_batch_awaits_approval(seeded_tmp_reports: Path) -> None:
+    # rw6: month-end fan-out produces drafts; each PDF awaits per-household
+    # advisor sign-off, so the batch itself delivers no PDFs.
     from warehouse.workflows.month_end import run_month_end_reporting_batch
 
     with session_scope() as session:
@@ -659,11 +683,19 @@ def test_month_end_batch_pdf_on_success(seeded_tmp_reports: Path) -> None:
             household_ids=[DEMO],
             actor_id="test",
         )
-    completed = next(o for o in result.outcomes if o.status == "completed")
-    assert completed.written is not None
-    assert completed.written.external_pdf_path is not None
-    assert completed.written.external_pdf_sha256 is not None
-    assert Path(completed.written.external_pdf_path).is_file()
+        completed = next(o for o in result.outcomes if o.status == "completed")
+        assert completed.written is not None
+        assert completed.written.external_pdf_path is None
+        # Advisor approves → PDF becomes the deliverable.
+        approved = approve_and_render_report(
+            session,
+            household_id=DEMO,
+            snapshot_id=completed.written.snapshot_id,
+            reviewer_id="advisor:test",
+        )
+    assert approved.external_pdf_path is not None
+    assert approved.external_pdf_sha256 is not None
+    assert Path(approved.external_pdf_path).is_file()
 
 
 def test_pdf_render_subprocess_failure_propagates(
@@ -718,16 +750,12 @@ def test_dashboard_panel_shows_pdf_hash(
         lambda: tmp_path,
     )
     with session_scope() as session:
-        written = build_and_write_household_reports(
-            session,
-            DEMO,
-            as_of_date=AS_OF,
-            actor_id="test",
-        )
+        written = _build_then_approve(session)
     html = render_reporting_page()
     assert written.external_pdf_sha256 is not None
     assert written.external_pdf_sha256[:12] in html
     assert "Attribution exhibit:" in html
+    assert "delivered" in html
 
 
 # --- rw5 attribution + risk headline exhibits --------------------------------
@@ -911,3 +939,116 @@ def test_dashboard_panel_shows_attribution_status(
     assert "Risk headline exhibit:" in html
     assert "live" in html
     assert "external.pdf" in html
+
+
+# --- rw6 advisor approval gate falsifiers ------------------------------------
+
+
+def test_approval_create_payload_requires_exactly_one_subject() -> None:
+    from warehouse.messaging.payloads import ApprovalCreatePayload
+
+    # neither subject
+    with pytest.raises(ValueError, match="exactly one"):
+        ApprovalCreatePayload(household_id=DEMO)
+    # both subjects
+    with pytest.raises(ValueError, match="exactly one"):
+        ApprovalCreatePayload(
+            household_id=DEMO,
+            optimization_run_id="run_x",
+            report_snapshot_id="rpt_x",
+        )
+
+
+def test_report_approval_round_trip_via_messaging(
+    seeded_tmp_reports: Path,
+) -> None:
+    from warehouse.messaging.payloads import ApprovalCreatePayload
+
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+        ctx = DispatchContext(session=session, actor_id="advisor:test")
+        view = dispatch_message(
+            ctx,
+            _msg(
+                "approval.create",
+                Kind.COMMAND,
+                ApprovalCreatePayload(
+                    household_id=DEMO,
+                    report_snapshot_id=written.snapshot_id,
+                ),
+            ),
+        )
+    assert view.subject_type == "report"
+    assert view.subject_id == written.snapshot_id
+    assert view.optimization_run_id is None
+    assert view.status == "pending"
+
+
+def test_recon_gate_precedes_approval_gate(seeded_tmp_reports: Path) -> None:
+    # Even an approved report stays blocked while firm-wide breaks are open —
+    # recon is the first gate (rw4), approval the second (rw6).
+    with session_scope() as session:
+        written = build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+        _seed_open_break(session)
+        approved = approve_and_render_report(
+            session,
+            household_id=DEMO,
+            snapshot_id=written.snapshot_id,
+            reviewer_id="advisor:test",
+        )
+        entries = list_audit_entries(session, household_id=DEMO)
+    assert approved.external_pdf_path is None
+    match = next(
+        e
+        for e in entries
+        if e.action == "report_approved"
+        and e.resource_id == written.snapshot_id
+    )
+    assert match.details.get("reason") == "open_reconciliation_breaks"
+
+
+def test_optimization_approval_keeps_run_id(seeded: None) -> None:
+    # rw6 back-compat: optimization subjects still populate optimization_run_id
+    # (OMS staging joins on it) with subject_type=optimization.
+    from warehouse.decision.approval.service import create_approval_request
+
+    with session_scope() as session:
+        ctx_run = "run_rw6_backcompat"
+        # No optimization_runs row exists, but SQLite FK enforcement is off by
+        # default in this app; the create path itself is what we assert on.
+        view = create_approval_request(session, ctx_run, DEMO)
+    assert view.subject_type == "optimization"
+    assert view.subject_id == ctx_run
+    assert view.optimization_run_id == ctx_run
+
+
+def test_dashboard_panel_awaiting_delivery_before_approval(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    from warehouse.dashboard.report_writer_data import (
+        load_report_writer_panel,
+    )
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        _resolve_open_breaks(session)
+    monkeypatch.setattr("warehouse.config.repo_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        "warehouse.reporting.report_writer.writer.repo_root",
+        lambda: tmp_path,
+    )
+    with session_scope() as session:
+        build_and_write_household_reports(
+            session, DEMO, as_of_date=AS_OF, actor_id="test"
+        )
+    panel = load_report_writer_panel(
+        household_id=DEMO, reports_base_path=tmp_path
+    )
+    assert panel.panel_status == "live"
+    assert panel.delivery_state == "awaiting_delivery"
+    assert panel.external_pdf_path is None

@@ -17,6 +17,7 @@ from warehouse.reporting.report_writer.pdf import (
 )
 from warehouse.reporting.report_writer.render import render_markdown
 from warehouse.reporting.report_writer.writer import (
+    approve_and_render_report,
     build_and_write_household_reports,
     find_latest_written_report,
     write_report_bundle,
@@ -28,6 +29,7 @@ __all__ = [
     "ReportPeriod",
     "ReportWriterError",
     "WrittenHouseholdReport",
+    "approve_and_render_report",
     "build_and_write_household_reports",
     "collect_report_bundle",
     "external_pdf_delivery_blocked",

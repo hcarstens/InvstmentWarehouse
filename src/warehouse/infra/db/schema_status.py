@@ -23,7 +23,7 @@ from warehouse.infra.db.models import (
     WorkflowDefinitionRow,
 )
 
-HEAD_REVISION = "006_reporting_realized"
+HEAD_REVISION = "007_approval_report_subject"
 
 TRACKED_TABLES: tuple[type[DeclarativeBase], ...] = (
     EntityRow,

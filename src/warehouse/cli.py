@@ -156,7 +156,8 @@ def approve_list(household: str) -> None:
         requests = list_approval_requests(session, household_id=household)
     for req in requests:
         click.echo(
-            f"{req.request_id} {req.status} run={req.optimization_run_id}"
+            f"{req.request_id} {req.status} "
+            f"{req.subject_type}={req.subject_id}"
         )
 
 
@@ -356,6 +357,50 @@ def report_write(
     if written.external_pdf_path:
         click.echo(f"  PDF: {written.external_pdf_path}")
         click.echo(f"  PDF sha256: {written.external_pdf_sha256}")
+
+
+@report.command("approve")
+@click.option("--household", default=DEMO_HOUSEHOLD_ID, show_default=True)
+@click.option(
+    "--snapshot",
+    required=True,
+    help="Report snapshot id to approve for client delivery.",
+)
+@click.option("--reviewer", default="advisor:demo", show_default=True)
+def report_approve(household: str, snapshot: str, reviewer: str) -> None:
+    """Record advisor sign-off on a report, then render its client PDF.
+
+    The external PDF (client-of-record) is only produced after this gate — no
+    document ships without a named human decision (rw6).
+    """
+    from warehouse.infra.db.base import session_scope
+    from warehouse.infra.db.bootstrap import bootstrap_database
+    from warehouse.reporting.report_writer.collect import ReportWriterError
+    from warehouse.reporting.report_writer.writer import (
+        approve_and_render_report,
+    )
+
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        try:
+            written = approve_and_render_report(
+                session,
+                household_id=household,
+                snapshot_id=snapshot,
+                reviewer_id=reviewer,
+            )
+        except ReportWriterError as err:
+            click.echo(str(err), err=True)
+            raise SystemExit(1) from err
+    click.echo(f"Approved {snapshot} by {reviewer}")
+    if written.external_pdf_path:
+        click.echo(f"  PDF: {written.external_pdf_path}")
+        click.echo(f"  PDF sha256: {written.external_pdf_sha256}")
+    else:
+        click.echo(
+            "  PDF not rendered — open reconciliation breaks still block "
+            "delivery. Resolve breaks, then re-run."
+        )
 
 
 @report.command("pdf")

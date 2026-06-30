@@ -9,14 +9,17 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from warehouse.decision.approval import ApprovalStatus
+from warehouse.decision.approval import ApprovalStatus, ApprovalSubject
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import ApprovalRequestRow
 
 
 class ApprovalRequestView(BaseModel):
     request_id: str
-    optimization_run_id: str
+    subject_type: str
+    subject_id: str | None
+    # Populated only for optimization subjects (OMS staging joins on it).
+    optimization_run_id: str | None
     household_id: str
     status: str
     reviewer_id: str | None
@@ -24,16 +27,21 @@ class ApprovalRequestView(BaseModel):
     created_at: datetime
 
 
-def create_approval_request(
+def _create_approval(
     session: Session,
-    optimization_run_id: str,
+    *,
     household_id: str,
+    subject_type: ApprovalSubject,
+    subject_id: str,
+    optimization_run_id: str | None,
 ) -> ApprovalRequestView:
     request_id = f"appr_{uuid4().hex[:12]}"
     created = datetime.now(UTC)
     session.add(
         ApprovalRequestRow(
             request_id=request_id,
+            subject_type=subject_type.value,
+            subject_id=subject_id,
             optimization_run_id=optimization_run_id,
             household_id=household_id,
             status=ApprovalStatus.PENDING.value,
@@ -47,13 +55,18 @@ def create_approval_request(
         resource_type="approval_request",
         resource_id=request_id,
         household_id=household_id,
-        details={"optimization_run_id": optimization_run_id},
+        details={
+            "subject_type": subject_type.value,
+            "subject_id": subject_id,
+        },
     )
     # Flush so the request is queryable within the same transaction (a chained
     # caller may approval.decide it immediately) — matches stage_orders flush.
     session.flush()
     return ApprovalRequestView(
         request_id=request_id,
+        subject_type=subject_type.value,
+        subject_id=subject_id,
         optimization_run_id=optimization_run_id,
         household_id=household_id,
         status=ApprovalStatus.PENDING.value,
@@ -61,6 +74,62 @@ def create_approval_request(
         reviewed_at=None,
         created_at=created,
     )
+
+
+def create_approval_request(
+    session: Session,
+    optimization_run_id: str,
+    household_id: str,
+) -> ApprovalRequestView:
+    """Open an approval gate on an optimization run (OMS staging subject)."""
+    return _create_approval(
+        session,
+        household_id=household_id,
+        subject_type=ApprovalSubject.OPTIMIZATION,
+        subject_id=optimization_run_id,
+        optimization_run_id=optimization_run_id,
+    )
+
+
+def create_report_approval_request(
+    session: Session,
+    *,
+    report_snapshot_id: str,
+    household_id: str,
+) -> ApprovalRequestView:
+    """Open an advisor sign-off gate on a report snapshot (rw6).
+
+    The client-of-record PDF is not rendered until this request is APPROVED —
+    the costly-signal gate from the report-writer persona (T3).
+    """
+    return _create_approval(
+        session,
+        household_id=household_id,
+        subject_type=ApprovalSubject.REPORT,
+        subject_id=report_snapshot_id,
+        optimization_run_id=None,
+    )
+
+
+def report_approval_status(
+    session: Session,
+    report_snapshot_id: str,
+) -> str | None:
+    """Latest status of the advisor gate for a report snapshot, or None.
+
+    Returns the most recent request's status so a re-opened gate (rejected then
+    re-requested) reflects the current decision.
+    """
+    row = session.scalars(
+        select(ApprovalRequestRow)
+        .where(
+            ApprovalRequestRow.subject_type == ApprovalSubject.REPORT.value,
+            ApprovalRequestRow.subject_id == report_snapshot_id,
+        )
+        .order_by(ApprovalRequestRow.created_at.desc())
+        .limit(1)
+    ).first()
+    return row.status if row is not None else None
 
 
 def list_approval_requests(
@@ -104,7 +173,10 @@ def update_approval_status(
         resource_type="approval_request",
         resource_id=request_id,
         household_id=row.household_id,
-        details={"optimization_run_id": row.optimization_run_id},
+        details={
+            "subject_type": row.subject_type,
+            "subject_id": row.subject_id or "",
+        },
     )
     # Decoupled (contract §5/§9.3): recording the decision does NOT stage
     # orders. The caller chains `orders.stage` after an APPROVED decision, by
@@ -115,6 +187,8 @@ def update_approval_status(
 def _row_to_view(row: ApprovalRequestRow) -> ApprovalRequestView:
     return ApprovalRequestView(
         request_id=row.request_id,
+        subject_type=row.subject_type,
+        subject_id=row.subject_id,
         optimization_run_id=row.optimization_run_id,
         household_id=row.household_id,
         status=row.status,

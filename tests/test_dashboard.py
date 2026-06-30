@@ -639,6 +639,7 @@ def test_report_writer_panel_shows_snapshot_when_artifact_exists(
     from warehouse.infra.db.models import ReconciliationBreakRow
     from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
     from warehouse.reporting.report_writer import (
+        approve_and_render_report,
         build_and_write_household_reports,
     )
 
@@ -667,6 +668,13 @@ def test_report_writer_panel_shows_snapshot_when_artifact_exists(
             DEMO_HOUSEHOLD_ID,
             as_of_date=date(2026, 6, 24),
             actor_id="test",
+        )
+        # rw6: advisor sign-off renders the client-of-record PDF.
+        written = approve_and_render_report(
+            session,
+            household_id=DEMO_HOUSEHOLD_ID,
+            snapshot_id=written.snapshot_id,
+            reviewer_id="advisor:test",
         )
     html = render_reporting_page()
     assert written.snapshot_id.startswith("rpt_")

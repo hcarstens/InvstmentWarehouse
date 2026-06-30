@@ -9,6 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from warehouse.config import repo_root
+from warehouse.decision.approval import ApprovalStatus
+from warehouse.decision.approval.service import (
+    create_report_approval_request,
+    report_approval_status,
+    update_approval_status,
+)
 from warehouse.infra.audit.store import write_audit
 from warehouse.infra.db.models import MarketPriceRow
 from warehouse.reporting.report_writer.collect import (
@@ -151,14 +157,26 @@ def _attach_external_pdf(
     household_id: str,
     as_of: date,
 ) -> tuple[WrittenHouseholdReport, dict[str, str]]:
-    """Render external PDF when recon allows; return audit detail extras."""
-    # ADVISOR REVIEW GATE (human) ──► client delivery (external PDF)
-    # Full document-approval workflow deferred — needs approval.create for
-    # documents (today tied to optimization_run_id). See plan §10.
+    """Render external PDF when recon allows AND an advisor has approved.
+
+    Two gates, recon first: open firm-wide breaks block delivery outright; a
+    clean book still requires an APPROVED report-subject approval before the
+    client-of-record PDF is produced (rw6 — persona T3 costly signal). Both
+    gates surface as ``external_pdf_blocked`` with a distinct ``reason``.
+    """
     extra: dict[str, str] = {}
     if external_pdf_delivery_blocked(session):
         extra["external_pdf_blocked"] = "true"
         extra["reason"] = "open_reconciliation_breaks"
+        return written, extra
+    if report_approval_status(session, bundle.snapshot_id) != (
+        ApprovalStatus.APPROVED.value
+    ):
+        # ADVISOR REVIEW GATE (human) ──► client delivery (external PDF).
+        # Render only after `warehouse report approve` (or approval.decide on a
+        # report subject) records sign-off for this snapshot.
+        extra["external_pdf_blocked"] = "true"
+        extra["reason"] = "awaiting_advisor_approval"
         return written, extra
 
     pdf_path = Path(written.output_dir) / "external.pdf"
@@ -247,6 +265,100 @@ def build_and_write_household_reports(
         action="report_build",
         resource_type="household_report",
         resource_id=bundle.snapshot_id,
+        household_id=household_id,
+        details=audit_details,
+    )
+    session.flush()
+    return written
+
+
+def _load_snapshot_artifacts(
+    household_id: str,
+    snapshot_id: str,
+    *,
+    base: Path | None = None,
+) -> tuple[WrittenHouseholdReport, ReportBundle]:
+    """Locate a written report by snapshot and load its frozen bundle."""
+    hh_dir = household_reports_dir(household_id, base=base)
+    matches = list(hh_dir.glob(f"**/{snapshot_id}/bundle.json"))
+    if not matches:
+        raise ReportWriterError(
+            f"No report artifacts for household_id={household_id} "
+            f"snapshot_id={snapshot_id} under {hh_dir}"
+        )
+    bundle_path = matches[0]
+    snapshot_dir = bundle_path.parent
+    bundle = ReportBundle.model_validate_json(
+        bundle_path.read_text(encoding="utf-8")
+    )
+    pdf_path = snapshot_dir / "external.pdf"
+    written = WrittenHouseholdReport(
+        snapshot_id=bundle.snapshot_id,
+        household_id=bundle.household_id,
+        period_label=bundle.period.label,
+        as_of_date=bundle.as_of_date,
+        generated_at=bundle.generated_at,
+        output_dir=str(snapshot_dir),
+        internal_markdown_path=str(snapshot_dir / "internal.md"),
+        external_markdown_path=str(snapshot_dir / "external.md"),
+        bundle_json_path=str(bundle_path),
+        external_pdf_path=str(pdf_path) if pdf_path.is_file() else None,
+        external_pdf_sha256=(
+            sha256_file(pdf_path) if pdf_path.is_file() else None
+        ),
+    )
+    return written, bundle
+
+
+def approve_and_render_report(
+    session: Session,
+    *,
+    household_id: str,
+    snapshot_id: str,
+    reviewer_id: str,
+    base: Path | None = None,
+) -> WrittenHouseholdReport:
+    """Record advisor sign-off on a report snapshot, then render its PDF.
+
+    The approval *is* the trigger for the client-of-record PDF: the deliverable
+    cannot exist without a named human decision (rw6 — persona T3). If recon
+    breaks are still open the PDF stays blocked even after approval; the audit
+    row records the reason.
+    """
+    written, bundle = _load_snapshot_artifacts(
+        household_id, snapshot_id, base=base
+    )
+    request = create_report_approval_request(
+        session,
+        report_snapshot_id=snapshot_id,
+        household_id=household_id,
+    )
+    update_approval_status(
+        session,
+        request.request_id,
+        status=ApprovalStatus.APPROVED,
+        reviewer_id=reviewer_id,
+    )
+    written, pdf_extra = _attach_external_pdf(
+        session,
+        bundle=bundle,
+        written=written,
+        household_id=household_id,
+        as_of=bundle.as_of_date,
+    )
+    audit_details: dict[str, str] = {
+        "snapshot_id": snapshot_id,
+        "household_id": household_id,
+        "approval_request_id": request.request_id,
+        "reviewer_id": reviewer_id,
+    }
+    audit_details.update(pdf_extra)
+    write_audit(
+        session,
+        actor_id=reviewer_id,
+        action="report_approved",
+        resource_type="household_report",
+        resource_id=snapshot_id,
         household_id=household_id,
         details=audit_details,
     )

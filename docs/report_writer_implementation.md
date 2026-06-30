@@ -2,7 +2,10 @@
 
 **Status:** **rw0–rw5 shipped** — `report.build` COMMAND live; external PDF channel via Pandoc
 with sha256 pinning; month-end batch fan-out via `workflows.month_end.run_month_end_reporting_batch`.
-**Date:** 2026-06-29
+**rw6 shipped (2026-06-30):** advisor approval gate — external PDF now requires an
+APPROVED report-subject approval (recon gate still first). Remaining seams in §7/§16:
+rw7 comparability columns, rw8 collector import-cycle fix.
+**Date:** 2026-06-30
 **Owner:** reporting plane / `warehouse.reporting.report_writer` (new sub-package)
 **Inputs:** [`research/report_writing.md`](research/report_writing.md) (reader-first structure,
 source → intermediate → deliverable, traceability gates, DHA terrain-map lineage),
@@ -341,6 +344,94 @@ Acceptance is by **artifact traceability** (every exhibit number reconciles to b
 - Documented trigger: positions reconciled, marks fresh, period close (`TODO.md`).
 - Failures propagate with `household_id` context.
 
+### rw6 — advisor approval gate on client delivery *(initial next step)*
+
+**Goal:** the `ADVISOR REVIEW GATE (human) ──► client delivery` box in §1's dataflow becomes
+real. Today external PDF is gated **only** by recon breaks (`_attach_external_pdf`,
+`external_pdf_delivery_blocked`); a client-of-record document still ships with no named human
+sign-off. This is the persona's **costly-signal axiom** ([`Persona of The Financial Report
+Writer.md`](heuristics/Persona%20of%20The%20Financial%20Report%20Writer.md) §6, T3) — the one
+claim a report cannot make cheaply is "an advisor stands behind this." Closes open question #9
+for documents.
+
+**Design constraint — approval is coupled to optimizations.** `ApprovalRequestRow`
+(`infra/db/models.py:297`) has a **required** `optimization_run_id` column; `ApprovalRequestView`,
+`create_approval_request`, and `update_approval_status` (`decision/approval/service.py`) all take
+it positionally, and OMS `stage_orders_from_approval` **joins on it**
+(`execution/oms/service.py`). So a document approval cannot reuse the row as-is. Resolve by
+**generalizing the subject** rather than overloading `optimization_run_id`:
+
+- Add `subject_type: ApprovalSubject` (`OPTIMIZATION` | `REPORT`) + `subject_id` to the row;
+  make `optimization_run_id` **nullable** and back-fill `subject_type=OPTIMIZATION`,
+  `subject_id=optimization_run_id` in an Alembic migration. OMS keeps reading
+  `optimization_run_id` (now derived from `subject_id` where `subject_type=OPTIMIZATION`) — no
+  OMS behavior change. New frozen/immutable view fields registered if the view is in
+  `FROZEN_TYPES`.
+- **Messaging (S1):** no new op — reuse `approval.create` / `approval.decide`. Extend
+  `ApprovalCreatePayload` with optional `report_snapshot_id` (XOR with `optimization_run_id`;
+  raise if both/neither — the raise is the gate, §8). This honors "no second op until a caller
+  needs it."
+
+| Task | File(s) |
+| --- | --- |
+| `ApprovalSubject` enum; nullable `optimization_run_id` + `subject_type`/`subject_id` columns; Alembic migration + back-fill | `decision/approval/__init__.py`, `infra/db/models.py`, `infra/db/migrations/` |
+| `create_approval_request` accepts a report subject; `ApprovalRequestView` carries `subject_type`/`subject_id` | `decision/approval/service.py` |
+| `ApprovalCreatePayload` optional `report_snapshot_id` (XOR validator) | `messaging/payloads.py` |
+| Gate external PDF on an **approved** report-subject request; pending/absent ⇒ block with `reason=awaiting_advisor_approval` (additive to the existing recon-break block) | `reporting/report_writer/writer.py` (`_attach_external_pdf`) |
+| CLI `warehouse report approve --snapshot <id>` (+ surface in `warehouse report ...` list) | `cli.py` |
+| Dashboard: Report writer panel shows delivery state (`blocked: recon` / `awaiting approval` / `delivered`) | `dashboard/report_writer_data.py`, `dashboard/render_phase4.py` |
+| Tests: XOR payload raise; PDF blocked until approved; recon block still wins; OMS join unaffected by migration | `tests/test_report_writer.py`, `tests/test_messaging_handlers.py`, `tests/test_frozen.py` |
+
+**Acceptance:**
+
+- External PDF is **not** written until an `approval.decide(status=APPROVED)` exists for that
+  `report_snapshot_id`; before then the panel + audit detail read `awaiting_advisor_approval`.
+- Open recon breaks still block first (recon gate precedes approval gate — both must pass).
+- `dispatch_message("approval.create", report_snapshot_id=...)` round-trips; passing both
+  `optimization_run_id` and `report_snapshot_id` **raises**.
+- Existing optimization-approval + OMS staging tests stay green (migration is back-compatible).
+
+### rw7 — comparability columns (prior-period / YoY) *(after rw6)*
+
+**Goal:** satisfy the persona's **comparable, time-adjusted-figures axiom** (§7, Fi2) — "a number
+is decision-grade only when placed against the prior period, a benchmark, or a present-value
+frame." Today every exhibit (`render.py`) is point-in-time: a performance or drift figure ships
+with **no denominator**. Add a prior-period column sourced from the previous `bundle.json` for the
+same household.
+
+| Task | File(s) |
+| --- | --- |
+| `find_prior_bundle(household_id, period)` — load the most recent prior `bundle.json` under `runs/reports/{hh}/` (walk-forward safe: prior `as_of` strictly earlier) | `reporting/report_writer/collect.py` |
+| Optional `prior: ReportBundle \| None` reference (or a `comparison` delta snapshot) on `ReportBundle`; frozen | `reporting/report_writer/models.py`, `integrity/frozen_registry.py` |
+| Exhibit A/B render Δ vs prior (absolute + %); `n/a` when no prior exists (first report) — never a fabricated zero (honesty rule §3) | `reporting/report_writer/render.py` |
+| Limitation line when prior is missing or from a non-adjacent period | `reporting/report_writer/collect.py` |
+| Tests: second month-end shows Δ vs first; first-ever report renders `n/a`, not `0`; no lookahead | `tests/test_report_writer.py` |
+
+**Acceptance:**
+
+- The second month-end report for a household shows prior-period and Δ columns on performance +
+  drift; the first shows `n/a` with a stated limitation.
+- Comparison never reads a bundle with `as_of >=` the current report (walk-forward).
+
+### rw8 — collector import-cycle fix *(hygiene, independent of rw6/rw7)*
+
+**Goal:** remove the recurring cycle risk flagged in `JOURNAL.md` (2026-06-30):
+`reporting/report_writer/collect.py` imports from **all five planes at module scope** — the source
+of the `daily_refresh` cycle worked around in the rw5 commit. Not reader-facing; fixes a structural
+fault before it re-bites.
+
+| Task | File(s) |
+| --- | --- |
+| Move the cross-plane imports into the collector functions (function-scope) or behind a thin provider indirection, so importing the package no longer pulls all planes | `reporting/report_writer/collect.py` |
+| Confirm no import-time cycle: `python -c "import warehouse.workflows.daily_refresh, warehouse.reporting.report_writer"` clean without the rw5 workaround | (verification) |
+| Remove the rw5 cycle workaround once the root cause is gone; note in `JOURNAL.md` | rw5-workaround site, `JOURNAL.md` |
+
+**Acceptance:**
+
+- Importing `warehouse.reporting.report_writer` does not transitively import the execution/data
+  planes at module load; `pytest` import-graph stays acyclic without the workaround.
+- Full gate green (`scripts/ci.sh`).
+
 ---
 
 ## 8. Protocol invariants — acceptance matrix
@@ -458,10 +549,27 @@ Blocked on tax estimate engine for non-zero client tax exhibits — parallel tra
 | rw3 month-end workflow | shipped | `run_month_end_reporting_batch`; Tier-1 recon gate on external PDF shipped (firm-wide breaks, no tier field) |
 | rw4 PDF channel | shipped | Pandoc v1; `external.pdf` + `external_pdf_sha256`; recon gate blocks PDF not Markdown; `warehouse report pdf` |
 | rw5 extended exhibits | shipped | internal Exhibit D (attribution) + E (risk headline); external D/E deferred |
+| rw6 advisor approval gate | **shipped** | `ApprovalSubject` (optimization\|report); nullable `optimization_run_id` + `subject_type`/`subject_id` (migration 007, back-filled); `approval.create` reused via XOR `report_snapshot_id`; `approve_and_render_report` produces the PDF only after sign-off (recon gate still precedes); `warehouse report approve`; panel `delivery_state` (delivered\|awaiting_delivery) |
+| rw7 comparability columns | **planned** | prior-period / YoY Δ from prior `bundle.json`; `n/a` not `0` on first report |
+| rw8 collector import-cycle fix | **planned** | function-scope cross-plane imports; drop rw5 workaround |
 
 ---
 
-## 15. Research falsifiers to monitor
+## 16. Open seams (rw6+) — persona-graded
+
+The three remaining gaps, ranked through [`Persona of The Financial Report
+Writer.md`](heuristics/Persona%20of%20The%20Financial%20Report%20Writer.md). Build order is
+rw6 → rw7 → rw8; rw8 is independent and can land any time.
+
+| Seam | Persona axiom | Why it matters | Slice |
+| --- | --- | --- | --- |
+| **Advisor approval gate** | §6 Credibility through costly signal (T3) | A client-of-record document ships with no named human sign-off; the §1 dataflow's review gate is hollow. Highest value; `approval.create` already exists to extend. | **rw6 (shipped)** |
+| **Comparability** | §7 Comparable, time-adjusted figures (Fi2) | Exhibits are point-in-time — a figure with no prior-period denominator is not decision-grade. | rw7 |
+| **Collector import cycle** | — (engineering hygiene) | `collect.py` imports all five planes at module scope; recurring cycle risk (JOURNAL 2026-06-30). Not reader-facing. | rw8 |
+
+---
+
+## 17. Research falsifiers to monitor
 
 Operationalize before claiming client-value (from DHA runs):
 

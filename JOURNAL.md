@@ -4,6 +4,52 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-06-30 — rw6: advisor approval gate on client delivery
+
+**Problem:** the report writer's external PDF (the client-of-record document)
+was gated only by reconciliation breaks — a clean book shipped a PDF with no
+named human sign-off. The §1 dataflow's `ADVISOR REVIEW GATE` was hollow. This
+is the report-writer persona's costly-signal axiom (T3): the one claim a report
+cannot make cheaply is "an advisor stands behind this."
+
+**Constraint discovered:** `approval.create` existed but was hard-wired to
+optimizations — `ApprovalRequestRow.optimization_run_id` was NOT NULL with an FK,
+and OMS staging joins on it. A document approval could not reuse the row as-is.
+
+**Shipped:**
+
+- **Generalized approval subject** — `ApprovalSubject` enum
+  (`optimization` | `report`); `ApprovalRequestRow` gains `subject_type` /
+  `subject_id` and `optimization_run_id` is now nullable. **Migration 007**
+  (`007_approval_report_subject`, batch mode for SQLite) adds the columns and
+  back-fills existing rows as `subject_type=optimization`,
+  `subject_id=optimization_run_id`. Round-trips clean on a fresh DB; downgrade
+  is intentionally lossy once report approvals exist (NULL run_id can't become
+  NOT NULL — fails loudly).
+- **Messaging (S1 — no new op):** `approval.create` reused. `ApprovalCreatePayload`
+  takes `optimization_run_id` XOR `report_snapshot_id` (a `model_validator`
+  raises on both/neither — the gate is the declaration).
+- **Gate:** `_attach_external_pdf` now checks recon **then** approval; a report
+  with no APPROVED report-subject request blocks with
+  `reason=awaiting_advisor_approval`. `approve_and_render_report` records the
+  sign-off and *then* renders the PDF — the deliverable cannot exist without a
+  named decision. PDF hash lands on the `report_approved` audit row.
+- **OMS defense:** `stage_orders_from_approval` raises if an approval has no
+  `optimization_run_id` (a report subject must never reach the trade boundary).
+- **CLI:** `warehouse report approve --snapshot <id> [--reviewer]`;
+  `warehouse approve list` now prints `subject_type=subject_id`.
+- **Dashboard:** Report writer panel gained `delivery_state`
+  (`delivered` | `awaiting_delivery`) — a freshly built report with no PDF is
+  now the normal awaiting-approval state, not an error banner.
+
+**Behavior change:** `report.build` (and the month-end batch) no longer emit a
+PDF at build time — they produce review drafts that await per-household advisor
+approval. Existing PDF-at-build tests updated to approve first.
+
+**Suite green: 653 passed, 1 skipped (pandoc).** ruff ✓ mypy (193 files) ✓.
+
+---
+
 ## 2026-06-30 — Push stability: fast pre-push, Python 3.12 pin, deterministic property tests
 
 **Problem:** `git push` had become slow and intermittently failing. Root cause

@@ -34,6 +34,8 @@ class ReportWriterPanelData(BaseModel):
     external_pdf_sha256_preview: str | None = None
     attribution_status: str | None = None
     risk_headline_status: str | None = None
+    # delivered (PDF present) | awaiting_delivery (rw6 — recon/approval gate)
+    delivery_state: str | None = None
     panel_status: str = "empty"  # empty | live | error
     error: str | None = None
 
@@ -167,6 +169,10 @@ def load_report_writer_panel(
                 error=f"external.pdf unreadable: {err}",
             )
     else:
+        # rw6: a freshly built report has no PDF until an advisor approves it
+        # (or once recon breaks clear). That is the normal pre-delivery state,
+        # not an error — surface it as live + awaiting_delivery so the panel
+        # reflects the gate rather than a failure.
         return ReportWriterPanelData(
             household_id=household_id,
             snapshot_id=bundle.snapshot_id,
@@ -178,12 +184,10 @@ def load_report_writer_panel(
             internal_markdown_path=internal_md,
             external_markdown_path=str(external_path),
             bundle_json_path=str(bundle_path),
-            panel_status="error",
-            error=(
-                "external.md present but external.pdf missing — PDF render "
-                "failed, was blocked by open reconciliation breaks, or "
-                "Pandoc is unavailable. Re-run warehouse report pdf."
-            ),
+            attribution_status=attr_status,
+            risk_headline_status=risk_status,
+            delivery_state="awaiting_delivery",
+            panel_status="live",
         )
 
     return ReportWriterPanelData(
@@ -202,5 +206,6 @@ def load_report_writer_panel(
         external_pdf_sha256_preview=pdf_preview,
         attribution_status=attr_status,
         risk_headline_status=risk_status,
+        delivery_state="delivered",
         panel_status="live",
     )

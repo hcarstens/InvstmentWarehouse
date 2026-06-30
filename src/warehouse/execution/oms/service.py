@@ -54,6 +54,15 @@ def stage_orders_from_approval(
             f"approval status is '{approval.status}', "
             f"expected '{ApprovalStatus.APPROVED.value}'"
         )
+    # rw6: approvals are now subject-typed. Only optimization subjects carry an
+    # optimization_run_id and can stage orders; a report-document approval must
+    # never reach the OMS boundary.
+    run_id = approval.optimization_run_id
+    if run_id is None:
+        raise ValueError(
+            f"Cannot stage orders for {approval_request_id}: approval subject "
+            f"is '{approval.subject_type}', not an optimization run"
+        )
 
     existing = session.scalar(
         select(StagedOrderRow.order_id)
@@ -65,7 +74,7 @@ def stage_orders_from_approval(
 
     trades = session.scalars(
         select(OptimizationTradeRow).where(
-            OptimizationTradeRow.run_id == approval.optimization_run_id
+            OptimizationTradeRow.run_id == run_id
         )
     ).all()
     now = datetime.now(UTC)
@@ -76,7 +85,7 @@ def stage_orders_from_approval(
             StagedOrderRow(
                 order_id=order_id,
                 approval_request_id=approval_request_id,
-                optimization_run_id=approval.optimization_run_id,
+                optimization_run_id=run_id,
                 household_id=approval.household_id,
                 lot_id=trade.lot_id,
                 security_id=trade.security_id,
@@ -92,7 +101,7 @@ def stage_orders_from_approval(
             StagedOrderView(
                 order_id=order_id,
                 approval_request_id=approval_request_id,
-                optimization_run_id=approval.optimization_run_id,
+                optimization_run_id=run_id,
                 household_id=approval.household_id,
                 lot_id=trade.lot_id,
                 security_id=trade.security_id,

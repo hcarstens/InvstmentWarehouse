@@ -298,10 +298,20 @@ class ApprovalRequestRow(Base):
     __tablename__ = "approval_requests"
 
     request_id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    optimization_run_id: Mapped[str] = mapped_column(
+    # rw6: subject is generalized. Optimization subjects keep
+    # optimization_run_id populated (OMS staging joins on it); report
+    # subjects set subject_id to the report snapshot_id and leave the FK NULL.
+    subject_type: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        server_default="optimization",
+        index=True,
+    )
+    subject_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    optimization_run_id: Mapped[str | None] = mapped_column(
         String(64),
         ForeignKey("optimization_runs.run_id"),
-        nullable=False,
+        nullable=True,
         index=True,
     )
     household_id: Mapped[str] = mapped_column(

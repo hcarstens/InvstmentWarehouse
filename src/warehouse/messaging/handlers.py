@@ -26,6 +26,7 @@ from warehouse.decision.analyst import (
 from warehouse.decision.approval.service import (
     ApprovalRequestView,
     create_approval_request,
+    create_report_approval_request,
     update_approval_status,
 )
 from warehouse.decision.constraints import evaluate_lot_sell_allowed
@@ -257,6 +258,14 @@ def _optimizer_persist(
 def _approval_create(
     ctx: DispatchContext, p: ApprovalCreatePayload
 ) -> ApprovalRequestView:
+    # Payload validator guarantees exactly one subject is set.
+    if p.report_snapshot_id is not None:
+        return create_report_approval_request(
+            ctx.session,
+            report_snapshot_id=p.report_snapshot_id,
+            household_id=p.household_id,
+        )
+    assert p.optimization_run_id is not None  # XOR validator
     return create_approval_request(
         ctx.session, p.optimization_run_id, p.household_id
     )

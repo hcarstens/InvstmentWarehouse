@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.analyst import AttributionReport
@@ -76,8 +76,28 @@ class OptimizerPersistPayload(BaseModel):
 
 
 class ApprovalCreatePayload(BaseModel):
-    optimization_run_id: str
+    """Open an approval gate — exactly one subject (optimization XOR report).
+
+    rw6: report-document approvals reuse ``approval.create`` (messaging S1 — no
+    second op) by passing ``report_snapshot_id`` instead of
+    ``optimization_run_id``. Supplying both or neither raises (the gate is the
+    declaration, §8).
+    """
+
     household_id: str
+    optimization_run_id: str | None = None
+    report_snapshot_id: str | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_subject(self) -> ApprovalCreatePayload:
+        has_opt = self.optimization_run_id is not None
+        has_report = self.report_snapshot_id is not None
+        if has_opt == has_report:
+            raise ValueError(
+                "approval.create requires exactly one of "
+                "optimization_run_id or report_snapshot_id"
+            )
+        return self
 
 
 class ApprovalDecidePayload(BaseModel):

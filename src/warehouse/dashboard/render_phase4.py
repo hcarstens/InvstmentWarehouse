@@ -251,6 +251,19 @@ def render_report_writer_section(
     sha_title = f' title="{sha_full}"' if sha_full else ""
     attr_status = html.escape(data.attribution_status or "—")
     risk_status = html.escape(data.risk_headline_status or "—")
+    if data.delivery_state == "delivered":
+        delivery = (
+            '<span class="badge badge-live">delivered</span> '
+            "advisor-approved PDF on disk"
+        )
+    elif data.delivery_state == "awaiting_delivery":
+        delivery = (
+            '<span class="badge badge-stub">awaiting advisor '
+            "approval</span> external PDF blocked until sign-off "
+            "(<code>warehouse report approve</code>) and recon clear"
+        )
+    else:
+        delivery = "—"
     return f"""
   <section>
     <h2>Report writer — {html.escape(data.household_id)}</h2>
@@ -259,6 +272,7 @@ def render_report_writer_section(
        period <code>{html.escape(data.period_label or "—")}</code> ·
        as of {html.escape(str(data.as_of_date))} ·
        generated {html.escape(ts)}</p>
+    <p>Client delivery: {delivery}</p>
     <p>Attribution exhibit: <strong>{attr_status}</strong> ·
        Risk headline exhibit: <strong>{risk_status}</strong></p>
     <h3>Executive summary (BLUF) — external.md excerpt</h3>
