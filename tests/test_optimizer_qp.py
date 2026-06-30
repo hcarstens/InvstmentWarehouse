@@ -11,6 +11,7 @@ from warehouse.config import get_settings
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.data.security_master import AssetClass as SecClass
 from warehouse.decision.ips import AllocationTarget, InvestmentPolicyStatement
+from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer.models import OptimizerInfeasibleError
 from warehouse.decision.optimizer.qp import solve_qp
 from warehouse.decision.optimizer.rebalance import run_mv_rebalance
@@ -153,6 +154,45 @@ def test_target_weights_sum_to_one() -> None:
     ]
     ips = _wide_ips(["equity", "fixed_income"])
     proposal = run_mv_rebalance(positions, ips)
+    total = sum(proposal.target_weights.values(), Decimal("0"))
+    assert abs(total - Decimal("1")) <= Decimal("0.0001")
+
+
+def test_all_constraints_binding_pinned_ips_falsifier() -> None:
+    """qa5/H7 — pinned min=max on every sleeve; binding_bounds lists all."""
+    positions = [
+        _lot("VTI", SecClass.EQUITY, Decimal("30")),
+        _lot("BND", SecClass.FIXED_INCOME, Decimal("70")),
+    ]
+    ips = InvestmentPolicyStatement(
+        ips_id="ips_test",
+        household_id="hh_test",
+        version=1,
+        effective_date="2026-01-01",
+        allocation_targets=[
+            AllocationTarget(
+                asset_class="equity",  # type: ignore[arg-type]
+                min_weight=Decimal("0.3"),
+                max_weight=Decimal("0.3"),
+                target_weight=Decimal("0.3"),
+            ),
+            AllocationTarget(
+                asset_class="fixed_income",  # type: ignore[arg-type]
+                min_weight=Decimal("0.7"),
+                max_weight=Decimal("0.7"),
+                target_weight=Decimal("0.7"),
+            ),
+        ],
+    )
+    proposal = run_mv_rebalance(
+        positions, ips, assumptions=_symmetric_assumptions()
+    )
+    assert proposal.target_weights[IpsSleeve.EQUITY] == Decimal("0.3")
+    assert proposal.target_weights[IpsSleeve.FIXED_INCOME] == Decimal("0.7")
+    assert set(proposal.binding_bounds) == {
+        "ips_max:equity",
+        "ips_max:fixed_income",
+    }
     total = sum(proposal.target_weights.values(), Decimal("0"))
     assert abs(total - Decimal("1")) <= Decimal("0.0001")
 

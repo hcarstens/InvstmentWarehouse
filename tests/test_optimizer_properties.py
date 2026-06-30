@@ -16,6 +16,7 @@ from hypothesis import strategies as st
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.data.security_master import AssetClass as SecClass
 from warehouse.decision.ips import AllocationTarget, InvestmentPolicyStatement
+from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer.models import OptimizerInfeasibleError
 from warehouse.decision.optimizer.qp import project_capped_simplex, solve_qp
 from warehouse.decision.optimizer.rebalance import run_mv_rebalance
@@ -472,3 +473,202 @@ def test_lambda_near_zero_budget_and_box() -> None:
     )
     assert _oracle_budget_sum(w)
     assert _oracle_box_feasible(w, [0.0, 0.0], [0.3, 1.0])
+
+
+# --- qa5 boundary falsifiers (ST6 ⊕ QA5) -------------------------------------
+
+
+@st.composite
+def near_singular_sigma(draw: st.DrawFn, n: int) -> list[list[float]]:
+    """Diagonal Σ with vol in [1e-12, 1e-6] — spectral-edge hunt."""
+    vols = draw(
+        st.lists(
+            st.floats(
+                min_value=1e-12,
+                max_value=1e-6,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    return [[vols[i] * vols[j] for j in range(n)] for i in range(n)]
+
+
+@st.composite
+def pinned_simplex_weights(draw: st.DrawFn) -> list[float]:
+    """w_min = w_max pinned to a budget-feasible simplex point."""
+    n = draw(st.integers(min_value=2, max_value=4))
+    raw = draw(
+        st.lists(
+            st.floats(
+                min_value=0.05,
+                max_value=0.95,
+                allow_nan=False,
+                allow_infinity=False,
+            ),
+            min_size=n,
+            max_size=n,
+        )
+    )
+    total = sum(raw)
+    return [r / total for r in raw]
+
+
+@_QP_HYPOTHESIS
+@given(
+    bounds=feasible_box(),
+    sigma=near_singular_sigma(2),
+    lam=st.floats(
+        min_value=1e-12,
+        max_value=50.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+def test_near_singular_sigma_property(
+    bounds: tuple[list[float], list[float]],
+    sigma: list[list[float]],
+    lam: float,
+) -> None:
+    """qa5/ST6 — near-singular Σ still satisfies budget + box oracles."""
+    w_min, w_max = bounds
+    n = len(w_min)
+    assume(len(sigma) == n)
+    mu = [0.08] * n
+    w = solve_qp(mu, sigma, w_min, w_max, lam=lam, **_QP_KW)
+    assert _oracle_budget_sum(w, tol=float(_SUM_TOL))
+    assert _oracle_box_feasible(w, w_min, w_max)
+
+
+@_QP_HYPOTHESIS
+@given(
+    target=pinned_simplex_weights(),
+    lam=st.floats(
+        min_value=1e-6,
+        max_value=100.0,
+        allow_nan=False,
+        allow_infinity=False,
+    ),
+)
+def test_pinned_box_all_constraints_binding_property(
+    target: list[float],
+    lam: float,
+) -> None:
+    """qa5 — w_min = w_max pins every sleeve; oracle is the pinned vector."""
+    n = len(target)
+    mu = [0.15 - 0.02 * i for i in range(n)]
+    sigma = [[0.02 if i == j else 0.0 for j in range(n)] for i in range(n)]
+    w = solve_qp(mu, sigma, target, target, lam=lam, **_QP_KW)
+    assert w == pytest.approx(target, abs=1e-5)
+    assert _oracle_budget_sum(w)
+
+
+def test_zero_turnover_budget_freezes_weights() -> None:
+    """qa5/E3 — max turnover = 0 → ‖Δw‖₁ = 0, turnover_binding True."""
+    positions = _bond_heavy_positions()
+    ips = _ips_with_budget(Decimal("0"))
+    proposal = run_mv_rebalance(
+        positions,
+        ips,
+        assumptions=_equity_favoring_assumptions(),
+        compute_stress=False,
+    )
+    assert proposal.turnover_binding is True
+    assert proposal.turnover_l1 == Decimal("0")
+    assert all(d == Decimal("0") for d in proposal.delta_w.values())
+    assert _oracle_budget_sum(
+        [float(w) for w in proposal.target_weights.values()],
+        tol=float(_SUM_TOL),
+    )
+
+
+def test_zero_nav_raises_before_solve() -> None:
+    """qa5/E3 — zero NAV must fail loudly, not return a default book."""
+    ips = InvestmentPolicyStatement(
+        ips_id="ips_test",
+        household_id="hh_test",
+        version=1,
+        effective_date="2026-01-01",
+        allocation_targets=[
+            AllocationTarget(
+                asset_class="equity",  # type: ignore[arg-type]
+                min_weight=Decimal("0"),
+                max_weight=Decimal("1"),
+                target_weight=Decimal("1"),
+            ),
+        ],
+    )
+    zero_mv = _lot("VTI", SecClass.EQUITY, Decimal("0"))
+    with pytest.raises(ValueError, match="no market value"):
+        run_mv_rebalance([zero_mv], ips, compute_stress=False)
+    with pytest.raises(ValueError, match="no market value"):
+        run_mv_rebalance([], ips, compute_stress=False)
+
+
+def test_single_asset_book_weight_one() -> None:
+    """qa5/E3 — single sleeve book stays at w = 1 with zero delta."""
+    ips = InvestmentPolicyStatement(
+        ips_id="ips_test",
+        household_id="hh_test",
+        version=1,
+        effective_date="2026-01-01",
+        allocation_targets=[
+            AllocationTarget(
+                asset_class="equity",  # type: ignore[arg-type]
+                min_weight=Decimal("0"),
+                max_weight=Decimal("1"),
+                target_weight=Decimal("1"),
+            ),
+        ],
+    )
+    proposal = run_mv_rebalance(
+        [_lot("VTI", SecClass.EQUITY, Decimal("100"))],
+        ips,
+        compute_stress=False,
+    )
+    assert len(proposal.target_weights) == 1
+    assert proposal.target_weights[IpsSleeve.EQUITY] == Decimal("1")
+    assert all(d == Decimal("0") for d in proposal.delta_w.values())
+
+
+def test_pinned_ips_all_sleeves_binding_via_rebalance() -> None:
+    """qa5/H7 — every IPS bound binding; oracle is the pinned allocation."""
+    positions = _bond_heavy_positions()
+    pinned = InvestmentPolicyStatement(
+        ips_id="ips_test",
+        household_id="hh_test",
+        version=1,
+        effective_date="2026-01-01",
+        allocation_targets=[
+            AllocationTarget(
+                asset_class="equity",  # type: ignore[arg-type]
+                min_weight=Decimal("0.2"),
+                max_weight=Decimal("0.2"),
+                target_weight=Decimal("0.2"),
+            ),
+            AllocationTarget(
+                asset_class="fixed_income",  # type: ignore[arg-type]
+                min_weight=Decimal("0.8"),
+                max_weight=Decimal("0.8"),
+                target_weight=Decimal("0.8"),
+            ),
+        ],
+    )
+    proposal = run_mv_rebalance(
+        positions,
+        pinned,
+        assumptions=_equity_favoring_assumptions(),
+        compute_stress=False,
+    )
+    assert set(proposal.binding_bounds) == {
+        "ips_max:equity",
+        "ips_max:fixed_income",
+    }
+    assert proposal.target_weights[IpsSleeve.EQUITY] == Decimal("0.2")
+    assert proposal.target_weights[IpsSleeve.FIXED_INCOME] == Decimal("0.8")
+    assert _oracle_budget_sum(
+        [float(w) for w in proposal.target_weights.values()],
+        tol=float(_SUM_TOL),
+    )

@@ -249,7 +249,10 @@ QA_PLAN_DELIVERABLES: list[BuildDeliverable] = [
         name="Near-singular Σ + all-constraints-binding QP edges",
         status="shipped",
         doc_href="docs/qa_plan_implementation.md#7-gap-backlog--qa-implementation-slices",
-        note="Raises on infeasible box; fixed point when w_min = w_max",
+        note=(
+            "Near-singular Σ property hunt; infeasible box raises; "
+            "pinned IPS + zero-turnover E3 boundaries"
+        ),
         falsifier_test="tests/test_optimizer_properties.py",
     ),
     BuildDeliverable(

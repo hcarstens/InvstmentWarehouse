@@ -139,6 +139,10 @@ PLANE_TEST_SLICES: list[PlaneTestSlice] = [
         report_mutation=True,
         mutation_targets=["src/warehouse/decision/optimizer/qp.py"],
         property_paths=["tests/test_optimizer_properties.py"],
+        note=(
+            "Near-singular Σ + all-constraints-binding QP edges (qa5); "
+            "pinned IPS, zero turnover, zero NAV boundaries"
+        ),
     ),
     PlaneTestSlice(
         plane_id="execution",

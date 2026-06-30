@@ -213,7 +213,7 @@ Critical plane — mutation kill % reported on `optimizer/qp.py`.
 | --- | --- | --- | --- |
 | IPS monitor | Drift vs IPS | `test_phase3.py`, synthetic workflow | Liquidity sleeve transitions |
 | Optimizer v1 (po0–po2) | QP KKT, turnover, robust stress | `test_optimizer_*.py` | MIP when shipped |
-| **Optimizer (property)** | **Invariants: Σ weights = 1, long-only ⇒ wᵢ ≥ 0, turnover ≤ bound, feasible ⇒ no constraint violated, more risk-aversion ⇒ lower variance** | **`test_optimizer_properties.py` (hypothesis, ST6)** | **Near-singular Σ, all-constraints-binding** |
+| **Optimizer (property)** | **Invariants: Σ weights = 1, long-only ⇒ wᵢ ≥ 0, turnover ≤ bound, feasible ⇒ no constraint violated, more risk-aversion ⇒ lower variance** | **`test_optimizer_properties.py` (hypothesis, ST6)** | **— (qa5 shipped)** |
 | Tax overlay | Tax delta vs baseline | `test_optimizer_tax_seam.py` | STCG/LTCG date boundaries — **st6d partial** (`test_reporting_tax.py`) |
 | PM / analyst | Narrative, NPA, attribution | `test_pm_*.py`, `test_analyst_*.py` | Kill-criteria edges |
 | Orchestrator | Office Manager gate | `test_orchestrator.py` | — |
@@ -474,7 +474,7 @@ boundary concentration (ST6), coverage never gates `ok` (ST3).
 | --- | --- | --- |
 | **Execution** | Multi-custodian break taxonomy; OMS cancel/replace | Next QA3 priority |
 | **Data** | Wash-sale chain boundaries; corporate actions; beneficiary edges | `test_lot_properties.py` extension |
-| **Decision** | Near-singular Σ; all-constraints-binding | `test_optimizer_properties.py` |
+| **Decision** | — | qa5 shipped (`test_optimizer_properties.py`, `test_optimizer_qp.py`) |
 | **Research** | Explicit `WalkForwardError` coverage expansion | Partial in `test_phase3.py` |
 | **Reporting** | After-tax return YTD | `after_tax_return_ytd` still `None` |
 | **Infra** | Postgres/Redis; migration rollback | Phase 5 |

@@ -38,6 +38,8 @@ def test_risk_build_report_has_deliverables() -> None:
     assert phase_b.status == "shipped"
     qa2 = next(d for d in report.deliverables if d.id == "qa2-oms-transitions")
     assert qa2.status == "shipped"
+    qa5 = next(d for d in report.deliverables if d.id == "qa5-optimizer-edges")
+    assert qa5.status == "shipped"
 
 
 def test_render_risk_build_html_sections() -> None:
