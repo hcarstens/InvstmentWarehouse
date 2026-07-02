@@ -67,6 +67,10 @@ def _metrics_section(report: StatusReport) -> str:
     planes = len(report.planes)
     errors = report.infra_error_count
     return (
+        "<p><strong>Portfolio-management platform</strong> — the living "
+        "status report for the daily PM loop: <strong>observe → update → "
+        "allocate → check → report</strong> over a book (positions, mandate, "
+        "beliefs). Advisory only; the human approval gate dominates.</p>"
         f"<p><strong>North star:</strong> {north} · "
         f"<strong>Build order:</strong> {order}</p>"
         '<div class="metrics">'

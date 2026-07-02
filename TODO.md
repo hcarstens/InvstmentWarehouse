@@ -128,6 +128,23 @@ Backend:
 - [x] **Advisory bundle panel (full)** — `AdviceBundle` presentation keyed by `correlation_id`: headline, ℍ_Allocation axiom strip, specialist liveness badges.
 - [ ] **Tax leg stub → live** — flips `evaluate_tax_scenario` to real numbers; **does not change the `pm.advise` contract**. Gated on the tax estimate engine above, *not* on PM. Kept at `$0` on purpose so synthetic portfolios + IPS can exercise the whole flow.
 
+### PM Pivot (pv0–pv5) — wealth → portfolio management — `docs/pm_pivot_plan_implementation.md`
+
+Reframe the platform from wealth management (after-tax wealth maximization over a
+household/entity graph) to **portfolio management** (the daily observe → update →
+allocate → check → report loop). ~80% of plumbing carries over; adds two engines
+(Bayesian belief update + daily stats) and quarantines — not deletes — the
+tax/wealth machinery. North-star lens: `docs/heuristics/Mental Model of The
+Portfolio Manager.md` (ℍ_Allocation); Persona is the judgment companion for
+pv1/pv3/pv5. Strategy: `docs/research/pm_pivot_plan.md`.
+
+- [x] **pv0 — reframe (docs + vocab, additive)** — north star swapped wealth → PM (CLAUDE.md + `dashboard/status.py` + catalog landing); PM daily-loop diagram + heuristics-table row in CLAUDE.md; `Book`/`Portfolio` thin alias of `PmAdvisePayload` + `resolve_book`/`resolve_book_from_bundle` in `warehouse.decision.pm` (no `household_id` rename); IPS monitor (`policy.check`) documented as the **mandate/limit monitor** (vocab only); `pm_pivot` track registered. No new op / engine / frozen type. Falsifiers: `tests/test_pm_pivot.py`.
+- [ ] **pv1 — Bayesian belief engine (Black–Litterman v0)** — `decision/beliefs`: `View`/`PriorBelief`/`PosteriorBelief`/`BeliefUpdate` (frozen + registered), `black_litterman` blend (pure-Python linalg), `beliefs.update` op; posterior μ → the shipped po0 QP (caller change only, no engine change); prior = shipped sleeve μ (**no new market data**). Panel: `/decision` → **Belief Journal**. Zero-view identity + directional + confidence-monotone falsifiers.
+- [ ] **pv2 — FIIJ ingest adapter + daily stats** — `data/ingest/fiij.py` (finance-view → `signal` views, confidence from OOS Brier, `regime_class`), price/mark **history** `(security_id, as_of_date)`, `research/stats` daily loop (returns/vol/z-score/attribution); **wire the two dead walk-forward guards** (review M3) on the first real time series. Panel: `/research` → **Daily Movements**.
+- [ ] **pv3 — close the loop (LIVE PoC)** — `run_pm_daily`: FIIJ views + regime → `beliefs.update` → QP → `policy.check` drift → alert queue; regime-conditional Σ from FIIJ `regime_class`; sleeve rollup (decision 4) so the QP is reused unchanged. Panel: **PM Daily Cockpit**.
+- [ ] **pv4 — quarantine wealth machinery + fix C1** — move tax/wash/TLH/asset-location/trust logic into optional `warehouse.wealth`; wealth panels behind a nav toggle; fix C1 (malformed `# type: ignore` in `pm_workout.py`) + C2 → `mypy src` clean.
+- [ ] **pv5 (later) — hierarchical name selection** — recover FIIJ's cross-sectional edge via a within-sleeve layer over `breakouts.csv` (single-name caps, no global N×N Σ). Panel: **Name-Selection**.
+
 ### Portfolio Analyst (pa0–pa2) — **shipped** — `docs/portfolio_analyst_implementation.md`
 
 Analyst leg is **live** today for drift + concentration (`policy.check`) plus the pa0–pa2 depth

@@ -1,7 +1,32 @@
 # Investment Warehouse
 
-Tech-enabled multi-family office platform shell. North star: **after-tax wealth
-maximization** over a wealth data model (assets, entities, contracts, relationships).
+Portfolio-management platform shell. North star: **portfolio management** — run
+the daily PM loop **observe → update → allocate → check → report** over a book
+(positions, mandate, beliefs), maximizing risk-adjusted active return while the
+whole survives being wrong.
+
+> **Pivot in progress (pm_pivot).** The platform is reframing from wealth
+> management (after-tax wealth maximization over a household/entity graph) to
+> portfolio management (the daily belief-driven allocation loop). ~80% of the
+> plumbing carries over; the tax/wealth machinery is being *quarantined, not
+> deleted* (returns later as an objective sleeve). See
+> `docs/research/pm_pivot_plan.md` (strategy) and
+> `docs/pm_pivot_plan_implementation.md` (stepped pv0–pv5 build).
+
+## The PM daily loop (north-star workflow)
+
+The unit of account is the **book / portfolio** (ℍ_Allocation axiom 1), and the
+platform's job is one closed, **advisory** loop over the five planes — nothing
+auto-trades (human approval gate dominates):
+
+```text
+observe ─► update ─────────► allocate ──────► check ──────────► report
+(daily    (Bayesian belief   (optimizer QP    (mandate / limit   (belief journal
+ stats)    update: prior      → target w*/Δw   monitor = IPS      + calibration:
+           ⊕ views)           on posterior μ)  drift → alerts)    were we right?)
+DATA/      RESEARCH →          DECISION         DECISION           REPORTING
+RESEARCH   DECISION            (optimizer)      (policy.check)
+```
 
 Derived from the Sharpe founding investment engineer brief — see
 `docs/research/sharpe_founding_engineer_brief.md`.
@@ -172,6 +197,7 @@ domain. Do not paste the full axioms into responses — use them as lenses.
 
 | When you are… | Read and apply |
 | --- | --- |
+| Reasoning about **portfolio management** (the north-star loop: observe → update → allocate → check → report; the book as unit of account; belief updating, sizing, survival, rebalancing; `warehouse.decision.pm`, `decision.beliefs`, `research.stats`, the pm_pivot slices) | [`docs/heuristics/Mental Model of The Portfolio Manager.md`](docs/heuristics/Mental%20Model%20of%20The%20Portfolio%20Manager.md) — ℍ_Allocation axioms 1–7 (**primary north-star lens**: book as unit of account, effective bets, sizing dominates selection, survive to compound, margin of safety, control exposure, rebalance on calibrated evidence). For **judgment-heavy** slices (view-weighting, survival sizing, concentrate-vs-diversify) add [`docs/heuristics/Persona of The Portfolio Manager.md`](docs/heuristics/Persona%20of%20The%20Portfolio%20Manager.md) as the companion — don't stack it on structural/reframe work |
 | Designing, reviewing, or implementing **risk** (measurement, scenarios, stress, limits, portfolio construction, `warehouse.research.risk`, risk API/dashboard) | [`docs/heuristics/Risk Management.md`](docs/heuristics/Risk%20Management.md) — RM1–RM7 (quantify, diversify, prevent, EV, tails, factor independence, controllable exposure) |
 | Designing, reviewing, or implementing **portfolio optimization** (allocation, target weights, rebalance, mean-variance / QP, efficient frontier, position sizing, turnover, `warehouse.decision.optimizer`) | [`docs/heuristics/Portfolio Optimization.md`](docs/heuristics/Portfolio%20Optimization.md) — PO1–PO8 (diversification, efficient frontier, CML, Kelly sizing, concentration–diversification, estimation error, non-stationarity, turnover cost) |
 | Thinking about **repo or project organization** (where code/docs live, naming, discovery, package boundaries, docs layout) | [`docs/heuristics/Libraries.md`](docs/heuristics/Libraries.md) — HLib1–HLib6 (collocation, fixed location, hierarchy, controlled vocabulary, citation chaining, single entry point) |
@@ -213,6 +239,9 @@ pytest tests/test_frozen.py   # frozen registry immutability
 - `CI.md` — CI commands, GitHub Actions replay, pre-push checklist
 - `docs/dev_contract_registry.md` — scopes, boundaries, track status (index + amendment protocol)
 - `docs/research/sharpe_founding_engineer_brief.md` — platform synthesis
+- `docs/heuristics/Mental Model of The Portfolio Manager.md` — north-star PM lens (ℍ_Allocation axioms 1–7)
+- `docs/research/pm_pivot_plan.md` — wealth → portfolio-management reframe (strategy)
+- `docs/pm_pivot_plan_implementation.md` — stepped pivot build (pv0–pv5)
 - `docs/heuristics/Risk Management.md` — risk reasoning axioms (RM1–RM7)
 - `docs/heuristics/Libraries.md` — repo organization axioms (HLib1–HLib6)
 - `docs/heuristics/Cartography.md` — module/map structure axioms (C1–C8)

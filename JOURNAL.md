@@ -4,6 +4,54 @@ Build log for Investment Warehouse. Newest entries at top.
 
 ---
 
+## 2026-07-02 — pm_pivot pv0: reframe wealth → portfolio management
+
+**What.** First slice of the PM pivot (`docs/pm_pivot_plan_implementation.md`):
+a **reframe only** — additive, no engine/op/frozen-type change. The platform now
+*reads* as a portfolio-management system whose north star is the daily
+**observe → update → allocate → check → report** loop over a book, not after-tax
+wealth maximization over a household/entity graph.
+
+**Shipped.**
+- **North star swapped** in `CLAUDE.md` (header + a new PM daily-loop diagram),
+  `dashboard/status.py` (`north_star`), and the catalog landing copy — so
+  `warehouse serve` reads as a PM platform. A pivot-in-progress note points at
+  the strategy + stepped-build docs.
+- **Heuristics lens** — added a **Portfolio Manager** row to the CLAUDE.md
+  heuristic-frameworks table: `Mental Model of The Portfolio Manager`
+  (ℍ_Allocation) as the **primary north-star lens**, the Persona as the
+  judgment companion reserved for pv1/pv3/pv5 (not stacked on reframe work).
+- **Book / Portfolio vocabulary** — introduced `Book` and `Portfolio` as a
+  **thin alias** of the shipped working set (`PmAdvisePayload`), with
+  `resolve_book` / `resolve_book_from_bundle` in `warehouse.decision.pm`. This
+  is the pivot's unit of account (ℍ_Allocation axiom 1) in PM vocabulary — *not*
+  a global `household_id` rename (pm_pivot decision 3).
+- **Mandate/limit monitor** — documented the shipped IPS monitor (`policy.check`)
+  as the mandate/limit monitor in PM vocabulary (registry boundary row; behavior
+  unchanged).
+- **Registry / TODO** — new `pm_pivot` track + build-tree in
+  `dev_contract_registry.md`; pv0–pv5 rows in `TODO.md`. Corrected both pivot
+  docs' own north-star citation from Persona → **Mental Model (primary)**, Persona
+  as judgment companion, so future sessions auto-load the right lens.
+
+**Falsifiers.** `tests/test_pm_pivot.py` — `Book`/`Portfolio` are the working-set
+type; `resolve_book` resolves on the demo household and `resolve_book_from_bundle`
+on HNW rung 3; status north star reads as portfolio management.
+
+**Guardrails held.** Additive only (no new atomic op, no new frozen type, no
+engine change); errors still bubble; 79-char limit; suite green.
+
+**Out of pv0 scope (noted, not chased):** the pre-existing C1 red-mypy case in
+`decision/pm_workout.py` — pv4 owns it.
+
+**Next (pv1).** Black–Litterman belief engine in `decision/beliefs`: frozen
+`View`/`PriorBelief`/`PosteriorBelief`/`BeliefUpdate`, a pure `black_litterman`
+blend, and a `beliefs.update` op whose **posterior μ feeds the shipped po0 QP
+unchanged** (caller change only) — with the prior = the shipped sleeve μ, so it
+ships **with no new market data**. Panel: `/decision` → Belief Journal.
+
+---
+
 ## 2026-06-30 — rw8: collector import-cycle fix (engineering hygiene)
 
 **Problem:** importing `warehouse.reporting.report_writer` transitively pulled

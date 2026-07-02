@@ -17,8 +17,10 @@ from warehouse.decision.ips.store import load_ips
 from warehouse.messaging.payloads import (
     AdviceBundle,
     AxiomScore,
+    Book,
     PmAdvisePayload,
     PmNarrative,
+    Portfolio,
 )
 from warehouse.research.risk.models import (
     RiskHorizon,
@@ -224,3 +226,26 @@ def build_working_set_from_bundle(
         cohort_id=prov.cohort_id,
         as_of_date=as_of_date,
     )
+
+
+# --- pm_pivot pv0: Book / Portfolio vocabulary ------------------------------
+# The PM daily loop's unit of account is the Book (a.k.a. Portfolio): the same
+# working set assembled above, read through portfolio-management vocabulary
+# (ℍ_Allocation axiom 1). ``Book``/``Portfolio`` are thin aliases of
+# ``PmAdvisePayload`` (see ``messaging.payloads``); ``resolve_book`` /
+# ``resolve_book_from_bundle`` are the PM-vocabulary names for the shipped
+# builders — additive, no new engine, no ``household_id`` rename.
+__all__ = [
+    "AXIOM_IDS",
+    "SPECIALIST_STATUS",
+    "Book",
+    "Portfolio",
+    "build_working_set",
+    "build_working_set_from_bundle",
+    "resolve_book",
+    "resolve_book_from_bundle",
+    "score_pm_axioms",
+]
+
+resolve_book = build_working_set
+resolve_book_from_bundle = build_working_set_from_bundle

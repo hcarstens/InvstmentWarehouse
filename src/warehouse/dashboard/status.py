@@ -74,7 +74,10 @@ def build_status_report() -> StatusReport:
     return StatusReport(
         app_env=settings.app_env,
         build_order="ledger + security master → entity graph → optimizer → OMS",
-        north_star="after-tax wealth maximization",
+        north_star=(
+            "portfolio management — observe → update → allocate → "
+            "check → report"
+        ),
         phases=PHASES,
         planes=PLANES,
         workflows=WORKFLOW_CATALOG,

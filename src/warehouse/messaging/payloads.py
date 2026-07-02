@@ -136,6 +136,17 @@ class PmAdvisePayload(BaseModel):
     as_of_date: date | None = None
 
 
+# --- pm_pivot pv0: Book / Portfolio vocabulary (thin additive alias) --------
+# The Portfolio-Management pivot's unit of account is the Book (a.k.a.
+# Portfolio) — the working set the daily PM loop observes and re-weights
+# (ℍ_Allocation axiom 1). It is the SAME artifact as the shipped PM working
+# set (``PmAdvisePayload``): positions + IPS/mandate + manifest. This is a
+# vocabulary alias only — no new type, no ``household_id`` rename (pm_pivot
+# decision 3). Resolve one via ``warehouse.decision.pm.resolve_book``.
+Book = PmAdvisePayload
+Portfolio = PmAdvisePayload
+
+
 class ReportBuildPayload(BaseModel):
     household_id: str
     period_label: str | None = None
