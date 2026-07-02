@@ -1,0 +1,26 @@
+[
+  {
+    "as_of_date": "2026-06-30",
+    "fetched_at": "2026-06-30T13:15:00+00:00",
+    "regime_label": "Risk-on / expansion",
+    "regime_class": "neutral",
+    "pending_signals": 0,
+    "sheets": [
+      {
+        "name": "Exotic Structured",
+        "strategy": "silk_structured_exotic",
+        "vote": "long",
+        "dominant_direction": "long",
+        "signals": [
+          {
+            "id": "silk_structured_exotic",
+            "name": "Exotic structured note trend",
+            "value": 0.20,
+            "available": true,
+            "detail": "z=0.6 unmapped strategy tag"
+          }
+        ]
+      }
+    ]
+  }
+]

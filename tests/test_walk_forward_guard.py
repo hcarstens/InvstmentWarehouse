@@ -139,16 +139,24 @@ def test_backtest_future_lot_injection_raises() -> None:
 
 
 def test_backtest_future_mark_injection_raises() -> None:
-    """qa6 — mark as_of_date after end_date blocks the backtest."""
+    """qa6 — a mark dated after end_date blocks the backtest.
+
+    ``market_prices`` is now a dated series (composite PK ``(security_id,
+    as_of_date)``), so future data is injected by ADDING a future-dated mark
+    (not mutating a PK column). ``mark_dates_for_positions`` sees it and the
+    guard raises.
+    """
     bootstrap_database(seed=True)
     with session_scope() as session:
         stale = session.get(LotRow, "lot_qa6_future")
         if stale is not None:
             session.delete(stale)
-        mark = session.get(MarketPriceRow, "sec_vti")
-        assert mark is not None
-        original_as_of = mark.as_of_date
-        mark.as_of_date = date(2026, 6, 30)
+        future = MarketPriceRow(
+            security_id="sec_vti",
+            as_of_date=date(2026, 6, 30),
+            price=Decimal("250.00"),
+        )
+        session.add(future)
         session.flush()
         try:
             with pytest.raises(WalkForwardError, match="mark as_of_date"):
@@ -159,27 +167,44 @@ def test_backtest_future_mark_injection_raises() -> None:
                     end_date=date(2026, 6, 24),
                 )
         finally:
-            mark.as_of_date = original_as_of
+            session.delete(future)
             session.flush()
 
 
-def test_market_price_single_mark_per_security_invariant() -> None:
-    """Regression: ``list_lot_positions`` outer-joins ``MarketPriceRow`` with
-    NO ``as_of_date`` predicate (views.py:59). That is leakage-safe ONLY while
-    each security has exactly one mark — i.e. the PK is ``security_id`` alone.
-
-    A future time-series schema (e.g. PK ``(security_id, as_of_date)``) would
-    silently let the join pick an arbitrary / future-dated mark. Pin the
-    single-mark assumption here so that change fails loudly and forces a
-    dated-mark predicate to be added to the join.
+def test_market_price_history_pk_and_dated_join() -> None:
+    """M3 caveat CLOSED (pv2): ``market_prices`` is a dated series (composite
+    PK ``(security_id, as_of_date)``) and ``list_lot_positions`` picks the mark
+    AT OR BEFORE ``as_of`` — no future mark leaks through the join.
     """
     pk_cols = {c.name for c in MarketPriceRow.__table__.primary_key.columns}
-    assert pk_cols == {"security_id"}, (
-        "MarketPriceRow PK changed from {security_id} to "
-        f"{pk_cols}: list_lot_positions joins marks with no as_of_date "
-        "predicate and would now leak a future mark — add a dated-mark "
-        "filter to the join before allowing multiple marks per security."
+    assert pk_cols == {"security_id", "as_of_date"}, (
+        "MarketPriceRow PK must be the composite time-series key "
+        f"(security_id, as_of_date); got {pk_cols}."
     )
+    bootstrap_database(seed=True)
+    with session_scope() as session:
+        future = MarketPriceRow(
+            security_id="sec_vti",
+            as_of_date=date(2026, 6, 30),
+            price=Decimal("999.00"),
+        )
+        session.add(future)
+        session.flush()
+        try:
+            positions = list_lot_positions(
+                session,
+                household_id=DEMO_HOUSEHOLD_ID,
+                as_of=date(2026, 6, 24),
+            )
+            vti = [p for p in positions if p.security_id == "sec_vti"]
+            assert vti, "expected a VTI lot in the demo book"
+            # The at-or-before predicate must exclude the 2026-06-30 mark.
+            assert all(p.market_price != Decimal("999.00") for p in vti), (
+                "future-dated mark leaked past the as_of predicate"
+            )
+        finally:
+            session.delete(future)
+            session.flush()
 
 
 def test_backtest_clean_seed_passes_walk_forward() -> None:

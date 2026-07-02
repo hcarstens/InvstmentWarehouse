@@ -1,0 +1,10 @@
+{
+  "thresholds": {
+    "silk_equity": {"oos_brier": 0.18, "passes": true},
+    "silk_commodity_etf": {"oos_brier": 0.27, "passes": false},
+    "silk_crypto": {"oos_brier": 0.31, "passes": false}
+  },
+  "updated_at": "2026-06-29T00:00:00+00:00",
+  "sample_size": 240,
+  "pass_brier_max": 0.25
+}

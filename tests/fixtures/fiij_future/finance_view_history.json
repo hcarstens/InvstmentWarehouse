@@ -1,0 +1,26 @@
+[
+  {
+    "as_of_date": "2026-07-05",
+    "fetched_at": "2026-07-05T13:15:00+00:00",
+    "regime_label": "Risk-on / expansion",
+    "regime_class": "neutral",
+    "pending_signals": 0,
+    "sheets": [
+      {
+        "name": "Equity Trend",
+        "strategy": "silk_equity",
+        "vote": "long",
+        "dominant_direction": "long",
+        "signals": [
+          {
+            "id": "silk_equity",
+            "name": "Equity trend composite",
+            "value": 0.42,
+            "available": true,
+            "detail": "z=1.3 momentum"
+          }
+        ]
+      }
+    ]
+  }
+]

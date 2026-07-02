@@ -10,14 +10,16 @@ Wiring status (a defined guard must imply a called guard):
   ``assert_mark_dates_not_after`` are WIRED into the live backtest path via
   ``validate_backtest_walk_forward`` (called from ``harness.run_backtest``).
 - ``assert_scenario_observations_not_after`` and ``assert_series_cutoff`` are
-  FORWARD-PROVISIONED: the backtest harness has no scenario-observation or
-  path-slice input yet (``research/scenarios`` is a stub). They are NOT wired
-  into any live leg — do not read them as active leakage checks. Their
-  contract is pinned by direct falsifier tests in
-  ``tests/test_walk_forward_guard.py`` (``test_scenario_observation_in_purge_
-  window_raises``, ``test_series_cutoff_beyond_walk_forward_raises``). Wire
-  them into ``validate_backtest_walk_forward`` the moment a dated scenario
-  series or path slice becomes reachable in the backtest path.
+  now WIRED on the pm_pivot pv2 daily-loop time series (review M3 closed —
+  first real series):
+  * ``assert_scenario_observations_not_after`` guards the FIIJ finance-view
+    snapshot dates in ``warehouse.data.ingest.fiij.load_fiij_snapshot`` — a
+    snapshot dated after ``as_of`` raises ``WalkForwardError``.
+  * ``assert_series_cutoff`` guards the price/mark series in
+    ``warehouse.research.stats.stats_daily`` — an observation dated after
+    ``as_of`` raises ``WalkForwardError``.
+  Both remain pinned by direct falsifier tests in
+  ``tests/test_walk_forward_guard.py`` in addition to the live call sites.
 """
 
 from __future__ import annotations

@@ -17,6 +17,10 @@ from typing import TypeVar
 from pydantic import BaseModel
 
 from warehouse.config import get_settings
+from warehouse.data.ingest.fiij import (
+    FiijFinanceViewSnapshot,
+    load_fiij_snapshot,
+)
 from warehouse.data.ingest.runner import IngestRunSummary, run_custodian_ingest
 from warehouse.data.ledger.views import list_lot_positions
 from warehouse.decision.analyst import (
@@ -57,6 +61,7 @@ from warehouse.messaging.payloads import (
     ApprovalDecidePayload,
     AttributionEvaluatePayload,
     BeliefsUpdatePayload,
+    FiijIngestPayload,
     IngestRunPayload,
     LedgerPositionsPayload,
     OptimizePayload,
@@ -70,6 +75,7 @@ from warehouse.messaging.payloads import (
     ReportBuildPayload,
     RiskEvaluatePayload,
     StagedOrders,
+    StatsDailyPayload,
     TaxScenarioPayload,
     TradeValidatePayload,
     TradeValidation,
@@ -81,6 +87,7 @@ from warehouse.reporting.report_writer.writer import (
 from warehouse.research.risk import evaluate_risk
 from warehouse.research.risk.models import RiskResult
 from warehouse.research.risk.scenarios import assumptions_for
+from warehouse.research.stats import DailyStatsReport, stats_daily
 
 _R = TypeVar("_R", bound=BaseModel)
 
@@ -159,6 +166,23 @@ def _beliefs_update(
     # posterior μ feeds the po0 QP as a CALLER change (rebalance_on_posterior),
     # not here: this op records the immutable belief-journal entry.
     return update_beliefs(p.book, p.views, correlation_id=ctx.correlation_id)
+
+
+def _fiij_ingest(
+    ctx: DispatchContext, p: FiijIngestPayload
+) -> FiijFinanceViewSnapshot:
+    # Read-only FIIJ ingest (pv2) — never touches ctx.session. Loads the
+    # snapshot AT OR BEFORE as_of (walk-forward guarded) → fiij-sourced views +
+    # regime_class. An unmapped signal or a future-only snapshot raises.
+    return load_fiij_snapshot(p.as_of_date, path=p.export_path)
+
+
+def _stats_daily(
+    ctx: DispatchContext, p: StatsDailyPayload
+) -> DailyStatsReport:
+    # Pure portfolio-side daily statistics (pv2) — never touches ctx.session.
+    # A price row dated after as_of raises WalkForwardError (M3 guard live).
+    return stats_daily(p.book, p.as_of_date, p.price_history)
 
 
 # --- EVALUATE composite — the Portfolio Manager tier (§4.1) ------------------
@@ -353,6 +377,8 @@ register(
     _beliefs_update,
     Kind.EVALUATE,
 )
+register("ingest.fiij", FiijIngestPayload, _fiij_ingest, Kind.EVALUATE)
+register("stats.daily", StatsDailyPayload, _stats_daily, Kind.EVALUATE)
 register("ingest.run", IngestRunPayload, _ingest_run, Kind.COMMAND)
 register(
     "ledger.reconcile",

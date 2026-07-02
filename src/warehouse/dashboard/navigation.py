@@ -27,6 +27,7 @@ _DATA_PANELS: tuple[str, ...] = (
 _RESEARCH_PANELS: tuple[str, ...] = (
     "Risk manifest",
     "Backtest results",
+    "Daily Movements (FIIJ + stats)",
     "End-to-end smoke matrix (synthetic)",
 )
 

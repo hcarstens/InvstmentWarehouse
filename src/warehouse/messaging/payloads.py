@@ -30,6 +30,7 @@ from warehouse.research.risk.models import (
     RiskRequest,
     RiskResult,
 )
+from warehouse.research.stats.models import PriceObservation
 
 # --- request payloads -------------------------------------------------------
 
@@ -158,6 +159,31 @@ class BeliefsUpdatePayload(BaseModel):
 
     book: PmAdvisePayload
     views: tuple[View, ...] = ()
+
+
+class FiijIngestPayload(BaseModel):
+    """FIIJ finance-view ingest input (pv2) — a path + a walk-forward as_of.
+
+    Read-only ingest boundary (§11 A.3): ``export_path`` is transport-agnostic
+    (empty → the packaged sample slice). The adapter selects the snapshot AT OR
+    BEFORE ``as_of_date`` and RAISES if only a future-dated snapshot exists.
+    """
+
+    as_of_date: date
+    export_path: str | None = None
+
+
+class StatsDailyPayload(BaseModel):
+    """Daily-statistics input (pv2) — a book + its dated price history.
+
+    Pure/advisory: the engine reads the book + ``price_history`` and returns a
+    ``DailyStatsReport`` (no persist). A mark dated after ``as_of_date`` raises
+    ``WalkForwardError`` (M3 guard now live).
+    """
+
+    book: PmAdvisePayload
+    price_history: tuple[PriceObservation, ...] = ()
+    as_of_date: date
 
 
 class ReportBuildPayload(BaseModel):

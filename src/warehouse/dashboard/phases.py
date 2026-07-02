@@ -87,6 +87,11 @@ PHASES: list[Phase] = [
             DashboardPanel(name="Approval queue", phase=3, status="live"),
             DashboardPanel(name="Backtest results", phase=3, status="live"),
             DashboardPanel(
+                name="Daily Movements (FIIJ + stats)",
+                phase=3,
+                status="live",
+            ),
+            DashboardPanel(
                 name="Constraint binding report", phase=3, status="live"
             ),
             DashboardPanel(

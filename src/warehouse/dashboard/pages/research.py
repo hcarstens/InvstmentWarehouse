@@ -19,6 +19,7 @@ from warehouse.dashboard.render_e2e import render_e2e_smoke_section
 from warehouse.dashboard.render_phase3 import render_backtest_section
 from warehouse.dashboard.render_risk import render_risk_section
 from warehouse.dashboard.render_risk_build import render_risk_build_link_card
+from warehouse.dashboard.render_stats import render_daily_movements_section
 from warehouse.dashboard.render_testing import render_qa_footnote
 from warehouse.dashboard.risk_build_data import (
     RiskBuildReport,
@@ -27,6 +28,10 @@ from warehouse.dashboard.risk_build_data import (
 from warehouse.dashboard.risk_data import (
     RiskDashboardData,
     load_risk_dashboard,
+)
+from warehouse.dashboard.stats_data import (
+    DailyMovementsData,
+    load_daily_movements_dashboard,
 )
 from warehouse.dashboard.status import build_status_report
 from warehouse.infra.db.seed import DEMO_HOUSEHOLD_ID
@@ -38,6 +43,7 @@ class ResearchPageData(BaseModel):
     backtests: ResearchBacktestData
     build: RiskBuildReport
     e2e: E2ePanelData
+    daily_movements: DailyMovementsData
     error: str | None = None
 
 
@@ -46,12 +52,14 @@ def load_research_page() -> ResearchPageData:
     backtests = load_research_backtest_data()
     build = load_risk_build_report()
     e2e = load_e2e_smoke_dashboard()
+    daily_movements = load_daily_movements_dashboard()
     error = risk.error or backtests.error
     return ResearchPageData(
         risk=risk,
         backtests=backtests,
         build=build,
         e2e=e2e,
+        daily_movements=daily_movements,
         error=error,
     )
 
@@ -67,6 +75,7 @@ def render_research_page(data: ResearchPageData | None = None) -> str:
                 bundle.backtests.backtest_runs,
                 error=bundle.backtests.error,
             ),
+            render_daily_movements_section(bundle.daily_movements),
             render_e2e_smoke_section(bundle.e2e),
         ]
     )

@@ -227,11 +227,17 @@ class DailyRefreshStepRow(Base):
 class MarketPriceRow(Base):
     __tablename__ = "market_prices"
 
+    # Price/mark HISTORY (pm_pivot pv2): composite PK ``(security_id,
+    # as_of_date)`` retires the single-mark assumption (review M3 caveat) so a
+    # security carries a dated series. ``list_lot_positions`` selects the mark
+    # AT OR BEFORE ``as_of`` (no future-mark leakage).
     security_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("securities.security_id"), primary_key=True
     )
+    as_of_date: Mapped[date] = mapped_column(
+        Date, primary_key=True, nullable=False
+    )
     price: Mapped[Decimal] = mapped_column(Numeric(18, 6), nullable=False)
-    as_of_date: Mapped[date] = mapped_column(Date, nullable=False)
 
 
 class IpsPolicyRow(Base):

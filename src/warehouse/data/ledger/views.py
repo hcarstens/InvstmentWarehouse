@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from warehouse.data.security_master import AssetClass as SecurityAssetClass
@@ -47,26 +47,58 @@ class HouseholdPnlSummary(BaseModel):
     lot_count: int
 
 
+def _latest_mark_subquery(as_of: date | None):  # type: ignore[no-untyped-def]
+    """Per-security latest mark AT OR BEFORE ``as_of`` (M3 caveat fix).
+
+    ``market_prices`` is now a dated series (composite PK), so a naive join
+    would fan out one row per mark. This picks each security's most recent mark
+    ``≤ as_of`` (or its latest mark overall when ``as_of`` is None) — never a
+    future-dated or arbitrary mark.
+    """
+    grouped = select(
+        MarketPriceRow.security_id.label("security_id"),
+        func.max(MarketPriceRow.as_of_date).label("mx"),
+    )
+    if as_of is not None:
+        grouped = grouped.where(MarketPriceRow.as_of_date <= as_of)
+    latest_dates = grouped.group_by(MarketPriceRow.security_id).subquery()
+    return (
+        select(
+            MarketPriceRow.security_id.label("security_id"),
+            MarketPriceRow.price.label("price"),
+            MarketPriceRow.as_of_date.label("as_of_date"),
+        )
+        .join(
+            latest_dates,
+            and_(
+                MarketPriceRow.security_id == latest_dates.c.security_id,
+                MarketPriceRow.as_of_date == latest_dates.c.mx,
+            ),
+        )
+        .subquery()
+    )
+
+
 def list_lot_positions(
     session: Session,
     *,
     household_id: str | None = None,
+    as_of: date | None = None,
 ) -> list[LotPositionView]:
+    latest = _latest_mark_subquery(as_of)
     stmt = (
-        select(LotRow, SecurityRow, EntityRow, MarketPriceRow)
+        select(LotRow, SecurityRow, EntityRow, latest.c.price)
         .join(SecurityRow, LotRow.security_id == SecurityRow.security_id)
         .join(EntityRow, LotRow.account_id == EntityRow.entity_id)
-        .outerjoin(
-            MarketPriceRow, LotRow.security_id == MarketPriceRow.security_id
-        )
+        .outerjoin(latest, LotRow.security_id == latest.c.security_id)
     )
     if household_id:
         stmt = stmt.where(EntityRow.household_id == household_id)
 
     views: list[LotPositionView] = []
-    for lot, security, account, price_row in session.execute(stmt):
+    for lot, security, account, mark_price in session.execute(stmt):
         total_cost = lot.quantity * lot.cost_basis_per_share
-        market_price = price_row.price if price_row else None
+        market_price = mark_price
         market_value = (
             lot.quantity * market_price if market_price is not None else None
         )

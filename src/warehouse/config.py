@@ -135,6 +135,34 @@ class Settings(BaseSettings):
     belief_config_version: str = "2026.07"
     black_litterman_tau: float = 0.05
 
+    # FIIJ finance-view ingest (pm_pivot pv2) — the first LIVE signal source
+    # (github.com/hcarstens/The-FIIJ). Version-pinned for audit replay: a View
+    # ingested from a FIIJ snapshot must reproduce byte-for-byte, so the
+    # value→excess scale, the confidence floor, and the Brier pass threshold
+    # are all pinned. ``fiij_export_path`` is transport-agnostic (§11 A.3): a
+    # path to a checked-in / exported FIIJ slice (empty → the packaged sample
+    # under ``data/ingest/fiij_sample``). ``fiij_value_excess_scale`` turns a
+    # signed z-score-derived ``signal.value`` into an ``expected_excess`` TILT
+    # vs the prior (not an absolute μ). ``fiij_confidence_floor`` is the Ω-
+    # confidence boundary: a passing-OOS-Brier strategy earns ≥ floor; a
+    # FAILING-Brier strategy is ingested strictly BELOW the floor and is NEVER
+    # upgraded (§2 #9 — we ingest FIIJ's alpha, never fabricate our own).
+    # ``fiij_brier_pass_max`` is the pinned OOS-Brier pass threshold.
+    fiij_config_version: str = "2026.07"
+    fiij_export_path: str = ""
+    fiij_value_excess_scale: float = 0.04
+    fiij_confidence_floor: float = 0.20
+    fiij_brier_pass_max: float = 0.25
+
+    # Daily statistics engine (pm_pivot pv2) — the portfolio-side stats FIIJ
+    # does not compute per book. Version-pinned for audit replay: the z-score
+    # significance threshold and the EWMA window pin move-significance. A move
+    # is ``significant`` when |z| exceeds the threshold (signal vs noise); the
+    # EWMA window sets the conditional-vol decay the z-score divides by.
+    stats_config_version: str = "2026.07"
+    stats_zscore_significant_threshold: float = 2.0
+    stats_ewma_window: int = 20
+
     # Portfolio Analyst — ℍ_PortfolioAnalyst checkpoint thresholds.
     # Version-pinned for audit replay. WARN/BREACH are magnitudes of the
     # (annualized where present) active return vs the ex-ante class assumption;

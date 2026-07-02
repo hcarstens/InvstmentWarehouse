@@ -136,7 +136,9 @@ def _seed_perf_household(
             )
         )
     for security_id, price in prices:
-        existing = session.get(MarketPriceRow, security_id)
+        existing = session.get(
+            MarketPriceRow, {"security_id": security_id, "as_of_date": AS_OF}
+        )
         if existing is None:
             session.add(
                 MarketPriceRow(

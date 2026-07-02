@@ -1,0 +1,80 @@
+[
+  {
+    "as_of_date": "2026-06-29",
+    "fetched_at": "2026-06-29T13:15:00+00:00",
+    "regime_label": "Risk-on / expansion",
+    "regime_class": "neutral",
+    "pending_signals": 0,
+    "sheets": [
+      {
+        "name": "Equity Trend",
+        "strategy": "silk_equity",
+        "vote": "long",
+        "dominant_direction": "long",
+        "signals": [
+          {
+            "id": "silk_equity",
+            "name": "Equity trend composite",
+            "value": 0.31,
+            "available": true,
+            "detail": "z=0.9 momentum; z=0.6 breadth"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "as_of_date": "2026-06-30",
+    "fetched_at": "2026-06-30T13:15:00+00:00",
+    "regime_label": "Risk-on / expansion",
+    "regime_class": "neutral",
+    "pending_signals": 1,
+    "sheets": [
+      {
+        "name": "Equity Trend",
+        "strategy": "silk_equity",
+        "vote": "long",
+        "dominant_direction": "long",
+        "signals": [
+          {
+            "id": "silk_equity",
+            "name": "Equity trend composite",
+            "value": 0.42,
+            "available": true,
+            "detail": "z=1.3 momentum; z=0.8 breadth"
+          }
+        ]
+      },
+      {
+        "name": "Commodity ETF",
+        "strategy": "silk_commodity_etf",
+        "vote": "short",
+        "dominant_direction": "short",
+        "signals": [
+          {
+            "id": "silk_commodity_etf",
+            "name": "Commodity ETF trend",
+            "value": -0.30,
+            "available": true,
+            "detail": "z=-0.9 carry-adjusted"
+          }
+        ]
+      },
+      {
+        "name": "Crypto",
+        "strategy": "silk_crypto",
+        "vote": "long",
+        "dominant_direction": "long",
+        "signals": [
+          {
+            "id": "silk_crypto",
+            "name": "Crypto trend",
+            "value": 0.55,
+            "available": true,
+            "detail": "z=1.1 spot-perp basis"
+          }
+        ]
+      }
+    ]
+  }
+]

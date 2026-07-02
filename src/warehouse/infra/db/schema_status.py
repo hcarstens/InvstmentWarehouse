@@ -23,7 +23,7 @@ from warehouse.infra.db.models import (
     WorkflowDefinitionRow,
 )
 
-HEAD_REVISION = "008_recon_break_type"
+HEAD_REVISION = "009_market_price_history"
 
 TRACKED_TABLES: tuple[type[DeclarativeBase], ...] = (
     EntityRow,

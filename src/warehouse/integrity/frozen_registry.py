@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationError
 
 from warehouse.config import Settings
+from warehouse.data.ingest.fiij import FiijFinanceViewSnapshot
 from warehouse.data.ingest.schwab_csv import CustodianPositionRecord
 from warehouse.data.ledger.corporate_actions import StockSplitAction
 from warehouse.data.ledger.wash_chains import WashSaleSellEvent
@@ -81,6 +82,7 @@ from warehouse.research.risk.models import (
     ScenarioSet,
 )
 from warehouse.research.risk.scenarios import assumptions_for
+from warehouse.research.stats.models import DailyMove, DailyStatsReport
 from warehouse.research.synthetic.daily_paths import PathTargets
 from warehouse.research.synthetic.models import ProvenanceManifest
 from warehouse.workflows.month_end import (
@@ -98,8 +100,11 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     BeliefUpdate,
     ComparisonDelta,
     CustodianPositionRecord,
+    DailyMove,
+    DailyStatsReport,
     DispatchContext,
     Event,
+    FiijFinanceViewSnapshot,
     HouseholdPerformanceReport,
     HouseholdRiskManifest,
     KillBreach,
@@ -523,7 +528,48 @@ def _sample_instance(cls: type[Any]) -> Any:
             ),
             belief_config_version="2026.07",
         )
+    if cls is DailyMove:
+        return _sample_daily_move()
+    if cls is DailyStatsReport:
+        return DailyStatsReport(
+            as_of_date=date(2026, 6, 30),
+            stats_config_version="2026.07",
+            moves=(_sample_daily_move(),),
+            rolling_corr_note="not_computed — single-security probe",
+            attribution=(_sample_position_attribution(),),
+            limitations=("factor leg not_computed",),
+        )
+    if cls is FiijFinanceViewSnapshot:
+        return FiijFinanceViewSnapshot(
+            as_of_date=date(2026, 6, 30),
+            fetched_at=datetime(2026, 6, 30, 13, 15, tzinfo=UTC),
+            regime_label="Risk-on / expansion",
+            regime_class="neutral",
+            views=(
+                View(
+                    sleeve=IpsSleeve.EQUITY,
+                    expected_excess=Decimal("0.0168"),
+                    confidence=Decimal("0.82"),
+                    source=ViewSource.FIIJ,
+                    source_ref="silk_equity@2026-06-30",
+                    calibration="oos_brier=0.18 (pass)",
+                    rationale="FIIJ silk_equity value=0.42",
+                ),
+            ),
+            fiij_config_version="2026.07",
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
+
+
+def _sample_daily_move() -> DailyMove:
+    return DailyMove(
+        security_id="sec_vti",
+        as_of_date=date(2026, 6, 30),
+        ret=Decimal("0.032"),
+        ewma_vol=Decimal("0.011"),
+        zscore=Decimal("2.9091"),
+        significant=True,
+    )
 
 
 def _sample_view() -> View:
@@ -679,6 +725,12 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "stress_regime"
     if isinstance(instance, HouseholdRiskManifest):
         return "notional_usd"
+    if isinstance(instance, DailyMove):
+        return "security_id"
+    if isinstance(instance, DailyStatsReport):
+        return "rolling_corr_note"
+    if isinstance(instance, FiijFinanceViewSnapshot):
+        return "regime_class"
     raise TypeError(f"No mutation probe for {type(instance)!r}")
 
 
