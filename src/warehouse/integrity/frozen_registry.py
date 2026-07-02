@@ -29,6 +29,13 @@ from warehouse.decision.analyst import (
     PositionAttribution,
     PositionThesis,
 )
+from warehouse.decision.beliefs.models import (
+    BeliefUpdate,
+    PosteriorBelief,
+    PriorBelief,
+    View,
+    ViewSource,
+)
 from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.ips.sleeves import IpsSleeve
 from warehouse.decision.optimizer import OptimizationResult
@@ -88,6 +95,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     AnalystReview,
     AttributionReport,
     BacktestResult,
+    BeliefUpdate,
     ComparisonDelta,
     CustodianPositionRecord,
     DispatchContext,
@@ -108,6 +116,8 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     PmNarrative,
     PositionAttribution,
     PositionThesis,
+    PosteriorBelief,
+    PriorBelief,
     ProvenanceManifest,
     RealizedGainEvent,
     RebalanceProposal,
@@ -121,6 +131,7 @@ FROZEN_TYPES: tuple[type[Any], ...] = (
     StockSplitAction,
     StressOverlay,
     TaxScenarioResult,
+    View,
     WashSaleSellEvent,
     WrittenHouseholdReport,
 )
@@ -484,7 +495,45 @@ def _sample_instance(cls: type[Any]) -> Any:
             portfolio=portfolio,
             notional_usd=Decimal("1000000"),
         )
+    if cls is View:
+        return _sample_view()
+    if cls is PriorBelief:
+        return PriorBelief(
+            mu={IpsSleeve.EQUITY: Decimal("0.07")},
+            prior_source="class_assumption",
+            assumptions_version="2026.02",
+        )
+    if cls is PosteriorBelief:
+        return PosteriorBelief(
+            mu={IpsSleeve.EQUITY: Decimal("0.08")},
+            tau=Decimal("0.05"),
+        )
+    if cls is BeliefUpdate:
+        return BeliefUpdate(
+            correlation_id="corr_test",
+            as_of_date=date(2026, 7, 2),
+            prior=PriorBelief(
+                mu={IpsSleeve.EQUITY: Decimal("0.07")},
+                assumptions_version="2026.02",
+            ),
+            views=(_sample_view(),),
+            posterior=PosteriorBelief(
+                mu={IpsSleeve.EQUITY: Decimal("0.08")},
+                tau=Decimal("0.05"),
+            ),
+            belief_config_version="2026.07",
+        )
     raise TypeError(f"No sample factory for frozen type {cls!r}")
+
+
+def _sample_view() -> View:
+    return View(
+        sleeve=IpsSleeve.EQUITY,
+        expected_excess=Decimal("0.02"),
+        confidence=Decimal("0.5"),
+        source=ViewSource.MANUAL,
+        rationale="test view",
+    )
 
 
 def _sample_rebalance_proposal() -> RebalanceProposal:
@@ -616,6 +665,14 @@ def _mutation_probe_attr(instance: Any) -> str:
         return "security_id"
     if isinstance(instance, CustodianPositionRecord):
         return "ticker"
+    if isinstance(instance, BeliefUpdate):
+        return "correlation_id"
+    if isinstance(instance, View):
+        return "rationale"
+    if isinstance(instance, PriorBelief):
+        return "prior_source"
+    if isinstance(instance, PosteriorBelief):
+        return "method"
     if isinstance(instance, RiskAssumptions):
         return "regime"
     if isinstance(instance, StressOverlay):

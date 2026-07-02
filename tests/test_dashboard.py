@@ -474,6 +474,41 @@ def test_optimizer_panel_shows_base_vs_stress() -> None:
     assert "alpha" not in lowered
 
 
+def test_belief_journal_panel_wired_and_honest() -> None:
+    """pv1: Belief Journal shows real BL engine output, labelled honestly."""
+    from warehouse.dashboard.beliefs_data import load_beliefs_dashboard
+    from warehouse.dashboard.render_beliefs import (
+        render_beliefs_journal_section,
+    )
+
+    data = load_beliefs_dashboard()
+    assert data.panel_status == "live", data.error
+    assert data.method == "black_litterman"
+    assert data.rows  # prior → posterior μ rows for the book's sleeves
+    assert data.views  # a demo manual view drives the update
+    panel = render_beliefs_journal_section(data)
+    # Prior → posterior → w* structure present.
+    assert "Belief Journal" in panel
+    assert "Prior μ" in panel
+    assert "Posterior μ" in panel
+    assert "Pre-view w*" in panel
+    # Honesty: view source is `manual`, calibration not_computed, prior is an
+    # ex-ante class assumption (never equilibrium / forecast / alpha).
+    assert "manual" in panel
+    assert "not_computed" in panel
+    assert "ex-ante class assumption" in panel
+    lowered = panel.lower()
+    assert "forecast" not in lowered
+    assert "alpha" not in lowered
+
+
+def test_belief_journal_panel_on_decision_page() -> None:
+    from warehouse.dashboard.pages.decision import render_decision_page
+
+    html = render_decision_page()
+    assert "Belief Journal" in html
+
+
 def test_testing_page_empty_state() -> None:
     from warehouse.dashboard.pages.testing import (
         TestingPageData,

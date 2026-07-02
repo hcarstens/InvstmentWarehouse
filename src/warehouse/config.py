@@ -125,6 +125,16 @@ class Settings(BaseSettings):
     pm_drift_warn: float = 0.03
     pm_binding_constraint_warn: int = 3
 
+    # Belief engine (pm_pivot pv1) — Black–Litterman posterior μ. Version-
+    # pinned for audit replay: a posterior is a replay fingerprint (prior ⊕
+    # views → versioned μ), so τ and the Ω convention must reproduce
+    # byte-for-byte. black_litterman_tau scales the prior covariance (τΣ) in
+    # the blend — the standard BL scalar (small: the prior is tight vs a single
+    # view). The engine restricts to the 6-sleeve class block, raises on a
+    # singular Σ.
+    belief_config_version: str = "2026.07"
+    black_litterman_tau: float = 0.05
+
     # Portfolio Analyst — ℍ_PortfolioAnalyst checkpoint thresholds.
     # Version-pinned for audit replay. WARN/BREACH are magnitudes of the
     # (annualized where present) active return vs the ex-ante class assumption;

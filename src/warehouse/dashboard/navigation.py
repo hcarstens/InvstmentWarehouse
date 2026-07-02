@@ -36,6 +36,7 @@ _DECISION_PANELS: tuple[str, ...] = (
     "IPS drift monitor",
     "Optimizer proposals",
     "MV rebalance (target weights w*)",
+    "Belief Journal (Black–Litterman)",
     "Approval queue",
     "Constraint binding report",
     "Synthetic IPS binding matrix",

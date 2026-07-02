@@ -29,6 +29,7 @@ from warehouse.decision.approval.service import (
     create_report_approval_request,
     update_approval_status,
 )
+from warehouse.decision.beliefs import BeliefUpdate, update_beliefs
 from warehouse.decision.constraints import evaluate_lot_sell_allowed
 from warehouse.decision.ips.monitor import (
     IpsDriftReport,
@@ -55,6 +56,7 @@ from warehouse.messaging.payloads import (
     ApprovalCreatePayload,
     ApprovalDecidePayload,
     AttributionEvaluatePayload,
+    BeliefsUpdatePayload,
     IngestRunPayload,
     LedgerPositionsPayload,
     OptimizePayload,
@@ -148,6 +150,15 @@ def _attribution_evaluate(
         config_version=settings.analyst_config_version,
         min_holding_years=Decimal(str(settings.analyst_min_holding_years)),
     )
+
+
+def _beliefs_update(
+    ctx: DispatchContext, p: BeliefsUpdatePayload
+) -> BeliefUpdate:
+    # Pure Black–Litterman blend (pv1) — never touches ctx.session. The
+    # posterior μ feeds the po0 QP as a CALLER change (rebalance_on_posterior),
+    # not here: this op records the immutable belief-journal entry.
+    return update_beliefs(p.book, p.views, correlation_id=ctx.correlation_id)
 
 
 # --- EVALUATE composite — the Portfolio Manager tier (§4.1) ------------------
@@ -336,6 +347,12 @@ register(
     Kind.EVALUATE,
 )
 register("pm.advise", PmAdvisePayload, _pm_advise, Kind.EVALUATE)
+register(
+    "beliefs.update",
+    BeliefsUpdatePayload,
+    _beliefs_update,
+    Kind.EVALUATE,
+)
 register("ingest.run", IngestRunPayload, _ingest_run, Kind.COMMAND)
 register(
     "ledger.reconcile",

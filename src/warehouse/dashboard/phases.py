@@ -79,6 +79,11 @@ PHASES: list[Phase] = [
                 phase=3,
                 status="live",
             ),
+            DashboardPanel(
+                name="Belief Journal (Black–Litterman)",
+                phase=3,
+                status="live",
+            ),
             DashboardPanel(name="Approval queue", phase=3, status="live"),
             DashboardPanel(name="Backtest results", phase=3, status="live"),
             DashboardPanel(

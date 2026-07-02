@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 from warehouse.data.ledger.views import LotPositionView
 from warehouse.decision.analyst import AttributionReport
 from warehouse.decision.approval import ApprovalStatus
+from warehouse.decision.beliefs.models import View
 from warehouse.decision.ips import InvestmentPolicyStatement
 from warehouse.decision.ips.monitor import IpsDriftReport
 from warehouse.decision.optimizer import OptimizationResult
@@ -145,6 +146,18 @@ class PmAdvisePayload(BaseModel):
 # decision 3). Resolve one via ``warehouse.decision.pm.resolve_book``.
 Book = PmAdvisePayload
 Portfolio = PmAdvisePayload
+
+
+class BeliefsUpdatePayload(BaseModel):
+    """Belief engine input (pv1) — a book + confidence-weighted views.
+
+    The Black–Litterman blend is pure/advisory: prior μ (from the book's IPS
+    sleeve universe) ⊕ ``views`` → a posterior μ recorded as a
+    ``BeliefUpdate``. Views are ``manual``/demo in pv1 (FIIJ ingest is pv2).
+    """
+
+    book: PmAdvisePayload
+    views: tuple[View, ...] = ()
 
 
 class ReportBuildPayload(BaseModel):
